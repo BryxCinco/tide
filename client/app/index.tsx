@@ -1,14 +1,9 @@
-import { Text, View } from 'react-native';
+import { Redirect } from 'expo-router';
 
+import { useAuth } from '@/hooks/useAuth';
+
+// Auth gate: "/" always resolves here first, then hands off based on session state.
 export default function Index() {
-  return (
-    <View className="flex-1 items-center justify-center bg-bg-light">
-      <Text className="text-lg font-semibold text-text-primary">
-        TIDE setup complete
-      </Text>
-      <Text className="mt-2 text-sm text-text-secondary">
-        Time · Interest · Diary · Entries
-      </Text>
-    </View>
-  );
+  const { isAuthenticated } = useAuth();
+  return <Redirect href={isAuthenticated ? '/(tabs)' : '/(auth)/login'} />;
 }
