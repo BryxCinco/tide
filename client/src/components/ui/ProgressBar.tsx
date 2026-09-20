@@ -7,7 +7,7 @@ import { cn } from '../../utils/cn';
 import { gradients } from '../../utils/gradients';
 import { Text } from './Text';
 
-export type ProgressBarVariant = 'teal' | 'blue' | 'purple' | 'gradient';
+export type ProgressBarVariant = 'teal' | 'blue' | 'purple' | 'muted' | 'gradient';
 export type ProgressBarSize = 'sm' | 'md' | 'lg';
 
 export interface ProgressBarProps {
@@ -33,6 +33,7 @@ const solidFillClasses: Record<Exclude<ProgressBarVariant, 'gradient'>, string> 
   teal: 'bg-tide-teal',
   blue: 'bg-ocean-blue',
   purple: 'bg-deep-purple',
+  muted: 'bg-gray-400',
 };
 
 /** Animated horizontal progress track. */

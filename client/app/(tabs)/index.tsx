@@ -1,36 +1,77 @@
 import { router } from 'expo-router';
-import { View } from 'react-native';
+import { useState } from 'react';
+import { ScrollView } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, GuestBanner, Text } from '@/components/ui';
+import {
+  ChatbotFAB,
+  FocusFlow,
+  Header,
+  HeroCard,
+  QuickActions,
+  RecentActivity,
+  RecentJournal,
+  StatsRow,
+} from '@/components/dashboard';
+import { GuestBanner } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
+import {
+  mockFocusActivities,
+  mockFocusScore,
+  mockHeroFocus,
+  mockQuickActions,
+  mockRecentActivity,
+  mockRecentJournal,
+  mockStats,
+} from '@/mocks/mockDashboard';
 
-// Placeholder dashboard — proves the auth redirect flow end-to-end. Phase 4 replaces this screen.
-export default function DashboardPlaceholder() {
-  const { user, isGuest, logout } = useAuth();
+const STAGGER_MS = 70;
 
-  const handleLogout = async () => {
-    await logout();
-    router.replace('/(auth)/login');
-  };
+export default function DashboardScreen() {
+  const { user, isGuest } = useAuth();
+  const [chatVisible, setChatVisible] = useState(false);
 
   return (
-    <SafeAreaView className="flex-1 bg-base">
-      {isGuest && (
-        <View className="px-4 pt-4">
-          <GuestBanner onLinkPress={() => router.push('/(auth)/link-account')} />
-        </View>
-      )}
+    <SafeAreaView className="flex-1 bg-base" edges={['top']}>
+      <ScrollView className="flex-1" contentContainerClassName="gap-6 p-4 pb-24 sm:p-6">
+        {isGuest && <GuestBanner onLinkPress={() => router.push('/(auth)/link-account')} />}
 
-      <View className="flex-1 items-center justify-center gap-2 px-6">
-        <Text variant="h2" color="primary">
-          Welcome, {user?.name ?? 'friend'}
-        </Text>
-        <Text variant="body" color="muted" className="mb-6 text-center">
-          {isGuest ? 'Guest session' : user?.email} — the real dashboard lands in Phase 4.
-        </Text>
-        <Button title="Log out" variant="secondary" onPress={handleLogout} />
-      </View>
+        <Animated.View entering={FadeInDown.duration(400)}>
+          <Header name={user?.name ?? 'there'} avatarSource={user?.avatar} hasUnreadNotifications />
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(STAGGER_MS).duration(400)}>
+          <HeroCard label={mockHeroFocus.label} subtitle={mockHeroFocus.subtitle} />
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(STAGGER_MS * 2).duration(400)}>
+          <StatsRow stats={mockStats} />
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(STAGGER_MS * 3).duration(400)}>
+          <FocusFlow score={mockFocusScore} activities={mockFocusActivities} />
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(STAGGER_MS * 4).duration(400)}>
+          <QuickActions actions={mockQuickActions} onChatPress={() => setChatVisible(true)} />
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(STAGGER_MS * 5).duration(400)}>
+          <RecentActivity entries={mockRecentActivity} />
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(STAGGER_MS * 6).duration(400)}>
+          <RecentJournal entries={mockRecentJournal} />
+        </Animated.View>
+      </ScrollView>
+
+      <ChatbotFAB
+        userName={user?.name}
+        visible={chatVisible}
+        onOpen={() => setChatVisible(true)}
+        onClose={() => setChatVisible(false)}
+      />
     </SafeAreaView>
   );
 }
