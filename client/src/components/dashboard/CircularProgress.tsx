@@ -54,8 +54,7 @@ export function CircularProgress({ value, size = 160, strokeWidth = 12, children
           fill="none"
           strokeDasharray={circumference}
           animatedProps={animatedProps}
-          rotation={-90}
-          origin={`${size / 2}, ${size / 2}`}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
       </Svg>
 

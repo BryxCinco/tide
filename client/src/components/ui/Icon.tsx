@@ -19,6 +19,8 @@ export interface IconProps {
   color?: string;
   /** Stroke width. Defaults to 2 for a consistent line weight across the app. */
   strokeWidth?: number;
+  /** Fill color for the icon's interior, e.g. a solid star when favorited. Defaults to "none". */
+  fill?: string;
   /** Wraps the icon in a `View` and applies this NativeWind className to it. */
   className?: string;
   style?: StyleProp<ViewStyle>;
@@ -30,6 +32,7 @@ export function Icon({
   size = 20,
   color = colors.text.muted,
   strokeWidth = 2,
+  fill = 'none',
   className,
   style,
 }: IconProps) {
@@ -38,7 +41,7 @@ export function Icon({
     return null;
   }
 
-  const icon = <LucideIcon size={size} color={color} strokeWidth={strokeWidth} />;
+  const icon = <LucideIcon size={size} color={color} strokeWidth={strokeWidth} fill={fill} />;
 
   if (!className && !style) {
     return icon;

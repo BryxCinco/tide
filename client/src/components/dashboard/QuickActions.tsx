@@ -19,7 +19,7 @@ export interface QuickActionsProps {
   onChatPress?: () => void;
 }
 
-/** 2x2 on mobile, 4-across on web. */
+/** 2x2 on phone, 4-across from tablet (md, 768px+) up. */
 export function QuickActions({ actions, onChatPress }: QuickActionsProps) {
   return (
     <View className="flex-row flex-wrap gap-3">
@@ -33,7 +33,7 @@ export function QuickActions({ actions, onChatPress }: QuickActionsProps) {
             onPress={() => (isChat ? onChatPress?.() : router.push(action.href as Href))}
             className={cn(
               'items-center gap-3 rounded-xl border border-subtle bg-base p-4',
-              'basis-[47%] sm:basis-0 sm:min-w-[140px] sm:flex-1',
+              'basis-[47%] md:basis-0 md:min-w-[140px] md:flex-1',
               'hover:scale-[1.02] hover:bg-tide-teal/5',
             )}
             style={({ pressed }) => [pressed && { transform: [{ scale: 0.97 }] }]}

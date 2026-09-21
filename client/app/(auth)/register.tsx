@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, Divider, Icon, Input, Text } from '@/components/ui';
+import { BackButton, Button, Divider, Icon, Input, Text } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/utils/cn';
 import { colors } from '@/utils/theme';
@@ -67,14 +67,8 @@ export default function RegisterScreen() {
   return (
     <SafeAreaView className="flex-1 bg-base">
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerClassName="flex-grow px-6 py-6" keyboardShouldPersistTaps="handled">
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={8}
-            className="mb-6 h-9 w-9 items-center justify-center rounded-full bg-surface"
-          >
-            <Icon name="ChevronLeft" size={20} color={colors.text.primary} />
-          </Pressable>
+        <ScrollView contentContainerClassName="flex-grow px-4 py-6 md:px-6 lg:px-8" keyboardShouldPersistTaps="handled">
+          <BackButton className="mb-6" />
 
           <View className="w-full self-center" style={{ maxWidth: 400 }}>
             <Text variant="h1" color="primary" className="mb-1">

@@ -49,7 +49,7 @@ function StatCard({ stat }: { stat: StatItem }) {
     <View
       className={cn(
         'gap-3 rounded-xl border border-subtle bg-elevated p-4',
-        'basis-[47%] sm:basis-0 sm:min-w-[140px] sm:flex-1',
+        'basis-[47%] md:basis-0 md:min-w-[140px] md:flex-1',
         'hover:shadow-md',
       )}
     >
@@ -79,7 +79,7 @@ export interface StatsRowProps {
   stats: StatItem[];
 }
 
-/** 2x2 on mobile, 4-across on web. */
+/** 2x2 on phone, 4-across from tablet (md, 768px+) up. */
 export function StatsRow({ stats }: StatsRowProps) {
   return (
     <View className="flex-row flex-wrap gap-3">

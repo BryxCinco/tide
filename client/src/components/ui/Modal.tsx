@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import { useEffect } from 'react';
-import { Modal as RNModal, Platform, Pressable, View } from 'react-native';
+import { Modal as RNModal, Pressable, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import { useResponsive } from '../../hooks/useResponsive';
 import { cn } from '../../utils/cn';
 import { colors, shadows } from '../../utils/theme';
 import { Icon } from './Icon';
@@ -15,21 +16,17 @@ export interface ModalProps {
   onClose: () => void;
   title?: string;
   children: ReactNode;
-  /** Max width on web / content height on mobile. Defaults to `md`. */
+  /** Max width when centered (tablet/desktop) / content height on phone. Defaults to `md`. */
   size?: ModalSize;
 }
 
-const webSizeClasses: Record<ModalSize, string> = {
-  sm: 'max-w-sm',
-  md: 'max-w-md',
-  lg: 'max-w-lg',
-  full: 'h-full w-full',
-};
-
 /**
- * Centered-with-scale on web, slide-up-from-bottom on mobile. Backdrop tap closes it.
+ * Bottom-sheet on phone, centered on tablet/desktop — driven by viewport width (useResponsive),
+ * not Platform.OS, so a wide browser window and a native tablet both get the centered
+ * treatment, and a narrow/mobile browser gets the same bottom sheet a phone app would.
  */
 export function Modal({ visible, onClose, title, children, size = 'md' }: ModalProps) {
+  const { isPhone, isTablet } = useResponsive();
   const progress = useSharedValue(0);
 
   useEffect(() => {
@@ -39,15 +36,15 @@ export function Modal({ visible, onClose, title, children, size = 'md' }: ModalP
   const backdropStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
 
   const contentStyle = useAnimatedStyle(() => {
-    if (Platform.OS === 'web') {
+    if (isPhone) {
       return {
         opacity: progress.value,
-        transform: [{ scale: 0.95 + progress.value * 0.05 }],
+        transform: [{ translateY: (1 - progress.value) * 48 }],
       };
     }
     return {
       opacity: progress.value,
-      transform: [{ translateY: (1 - progress.value) * 48 }],
+      transform: [{ scale: 0.95 + progress.value * 0.05 }],
     };
   });
 
@@ -57,20 +54,30 @@ export function Modal({ visible, onClose, title, children, size = 'md' }: ModalP
 
   const isFull = size === 'full';
 
+  // 'md' is the width real forms use (ActivityFormModal, TaskFormModal) — tied directly to
+  // the tablet/desktop numbers from the spec. 'sm' (confirm dialogs) and 'lg' keep fixed
+  // widths; there's no current use of 'lg' to tune against, so it isn't tiered.
+  const centeredWidthClasses: Record<ModalSize, string> = {
+    sm: 'max-w-sm',
+    md: isTablet ? 'max-w-[500px]' : 'max-w-[600px]',
+    lg: 'max-w-lg',
+    full: 'h-full w-full',
+  };
+
   return (
     <RNModal visible={visible} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
-      <View className={cn('flex-1', Platform.OS === 'web' ? 'items-center justify-center p-4' : 'justify-end')}>
+      <View className={cn('flex-1', isPhone ? 'justify-end' : 'items-center justify-center p-4')}>
         <Animated.View
           style={[{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.7)' }, backdropStyle]}
         >
           <Pressable style={{ flex: 1 }} onPress={onClose} />
         </Animated.View>
 
-        <Animated.View style={contentStyle} className={Platform.OS === 'web' ? cn('w-full', webSizeClasses[size]) : undefined}>
+        <Animated.View style={contentStyle} className={isPhone ? undefined : cn('w-full', centeredWidthClasses[size])}>
           <View
             className={cn(
               'overflow-hidden border border-glass bg-surface',
-              Platform.OS === 'web' ? 'rounded-2xl' : isFull ? '' : 'rounded-t-2xl',
+              isPhone ? (isFull ? '' : 'rounded-t-2xl') : 'rounded-2xl',
               isFull && 'h-full w-full',
             )}
             style={shadows.lg}

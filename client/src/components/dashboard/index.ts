@@ -7,3 +7,4 @@ export * from './QuickActions';
 export * from './RecentActivity';
 export * from './RecentJournal';
 export * from './StatsRow';
+export * from './TodaysTasks';

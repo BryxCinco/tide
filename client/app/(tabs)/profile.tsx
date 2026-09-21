@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Avatar, Button, Text } from '@/components/ui';
+import { Avatar, BackButton, Button, ResponsiveContainer, Text } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 
 // Placeholder — a later phase builds the real Profile/Settings screen.
@@ -17,6 +17,13 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-base">
+      <ResponsiveContainer className="flex-row items-center gap-3 py-4 md:py-6 lg:py-8">
+        <BackButton onPress={() => router.push('/')} />
+        <Text variant="h3" color="primary">
+          Profile
+        </Text>
+      </ResponsiveContainer>
+
       <View className="flex-1 items-center justify-center gap-3 px-6">
         <Avatar name={user?.name} source={user?.avatar} size="xl" />
         <Text variant="h2" color="primary" className="mt-2">

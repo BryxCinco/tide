@@ -1,4 +1,5 @@
 export * from './Avatar';
+export * from './BackButton';
 export * from './Badge';
 export * from './Button';
 export * from './Card';
@@ -10,4 +11,5 @@ export * from './Input';
 export * from './Loader';
 export * from './Modal';
 export * from './ProgressBar';
+export * from './ResponsiveContainer';
 export * from './Text';

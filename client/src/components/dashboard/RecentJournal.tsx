@@ -26,7 +26,7 @@ export function RecentJournal({ entries }: RecentJournalProps) {
         {entries.map((entry) => (
           <View
             key={entry.id}
-            className="basis-full gap-2 rounded-xl border border-subtle bg-surface p-4 sm:basis-[31%]"
+            className="basis-full gap-2 rounded-xl border border-subtle bg-surface p-4 md:basis-[31%]"
           >
             <Text variant="caption" color="muted" className="normal-case tracking-normal">
               {entry.date}
