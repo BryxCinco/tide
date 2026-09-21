@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { Pressable } from 'react-native';
 
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { cn } from '../../utils/cn';
-import { colors } from '../../utils/theme';
 import { Icon } from './Icon';
 import { Text } from './Text';
 
@@ -22,12 +23,18 @@ export interface BackButtonProps {
 /** Reusable back-navigation control — chevron-left, Tide Light styling, teal-tinted hover on web. */
 export function BackButton({ onPress, label, variant = 'icon', className }: BackButtonProps) {
   const handlePress = onPress ?? (() => router.back());
+  // onHoverIn/Out only ever fire on web (pointer devices) — a no-op on touch, so this is
+  // safe to wire up unconditionally rather than branching on Platform.OS.
+  const [isHovered, setIsHovered] = useState(false);
+  const hoverProps = { onHoverIn: () => setIsHovered(true), onHoverOut: () => setIsHovered(false) };
+  const themeColors = useThemeColors();
+  const iconColor = isHovered ? themeColors.brand.tideTeal : themeColors.text.primary;
 
   if (variant === 'text') {
     return (
-      <Pressable onPress={handlePress} hitSlop={8} className={cn('flex-row items-center gap-1', className)}>
-        <Icon name="ChevronLeft" size={18} color={colors.text.primary} />
-        <Text variant="body" color="primary" className="font-medium">
+      <Pressable onPress={handlePress} hitSlop={8} className={cn('flex-row items-center gap-1', className)} {...hoverProps}>
+        <Icon name="ChevronLeft" size={18} color={iconColor} />
+        <Text variant="body" color={isHovered ? 'accent' : 'primary'} className="font-medium">
           {label ?? 'Back'}
         </Text>
       </Pressable>
@@ -43,10 +50,12 @@ export function BackButton({ onPress, label, variant = 'icon', className }: Back
           'h-10 flex-row items-center gap-2 self-start rounded-full border border-subtle bg-base px-4 hover:bg-elevated',
           className,
         )}
+        style={({ pressed }) => [pressed && { transform: [{ scale: 0.95 }] }]}
+        {...hoverProps}
       >
-        <Icon name="ChevronLeft" size={18} color={colors.text.primary} />
+        <Icon name="ChevronLeft" size={18} color={iconColor} />
         {label && (
-          <Text variant="body" color="primary" className="font-medium">
+          <Text variant="body" color={isHovered ? 'accent' : 'primary'} className="font-medium">
             {label}
           </Text>
         )}
@@ -62,8 +71,10 @@ export function BackButton({ onPress, label, variant = 'icon', className }: Back
         'h-10 w-10 items-center justify-center rounded-full border border-subtle bg-base hover:bg-elevated',
         className,
       )}
+      style={({ pressed }) => [pressed && { transform: [{ scale: 0.95 }] }]}
+      {...hoverProps}
     >
-      <Icon name="ChevronLeft" size={20} color={colors.text.primary} />
+      <Icon name="ChevronLeft" size={20} color={iconColor} />
     </Pressable>
   );
 }

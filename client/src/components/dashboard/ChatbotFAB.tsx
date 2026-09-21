@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Platform, Pressable } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { gradients } from '../../utils/gradients';
 import { colors, shadows } from '../../utils/theme';
 import { Button, Icon, Modal, Text } from '../ui';
@@ -21,6 +22,7 @@ export interface ChatbotFABProps {
 
 /** Floating action button that opens a placeholder "coming soon" chat modal. */
 export function ChatbotFAB({ userName, visible, onOpen, onClose }: ChatbotFABProps) {
+  const themeColors = useThemeColors();
   const size = Platform.OS === 'web' ? 64 : 56;
   const firstName = userName?.trim().split(/\s+/)[0];
 
@@ -76,7 +78,7 @@ export function ChatbotFAB({ userName, visible, onOpen, onClose }: ChatbotFABPro
               borderRadius: 7,
               backgroundColor: colors.brand.tideTeal,
               borderWidth: 2,
-              borderColor: colors.background.base,
+              borderColor: themeColors.background.base,
             },
             dotStyle,
           ]}

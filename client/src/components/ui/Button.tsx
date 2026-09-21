@@ -6,8 +6,10 @@ import {
   type GestureResponderEvent,
 } from 'react-native';
 
+import { useThemeColors } from '../../hooks/useThemeColors';
+import { useThemeStore } from '../../store/themeStore';
 import { cn } from '../../utils/cn';
-import { colors, shadows } from '../../utils/theme';
+import { shadows } from '../../utils/theme';
 import { Icon, type IconName } from './Icon';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -50,25 +52,20 @@ const iconSizes: Record<ButtonSize, number> = {
   lg: 20,
 };
 
+// Web-only pseudo-classes (hover:) are simply inert on native — there's no hover concept
+// on a touchscreen — so it's safe to add them unconditionally for the web polish they ask for.
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: 'bg-tide-teal',
-  secondary: 'bg-transparent border border-tide-teal hover:bg-tide-teal/10',
-  ghost: 'bg-transparent hover:bg-subtle',
-  danger: 'bg-error',
+  primary: 'bg-tide-teal hover:bg-tide-teal-dark',
+  secondary: 'bg-base border border-default hover:border-tide-teal hover:bg-elevated',
+  ghost: 'bg-transparent hover:bg-elevated',
+  danger: 'bg-error hover:bg-[#DC2626]',
 };
 
 const textColorClasses: Record<ButtonVariant, string> = {
   primary: 'text-inverse',
   secondary: 'text-tide-teal',
-  ghost: 'text-muted',
+  ghost: 'text-muted group-hover:text-primary',
   danger: 'text-inverse',
-};
-
-const spinnerColors: Record<ButtonVariant, string> = {
-  primary: colors.text.inverse,
-  secondary: colors.brand.tideTeal,
-  ghost: colors.text.muted,
-  danger: colors.text.inverse,
 };
 
 /** Primary call-to-action control with solid/outline/ghost/danger variants. */
@@ -85,13 +82,32 @@ export function Button({
   className,
 }: ButtonProps) {
   const isDisabled = disabled || loading;
+  const themeColors = useThemeColors();
+  const isDark = useThemeStore((s) => s.theme === 'dark');
+
+  // primary/danger labels sit on a solid brand-colored fill (unchanged by theme), so they
+  // stay white in both themes; only ghost's muted tone actually shifts with theme.
+  const spinnerColors: Record<ButtonVariant, string> = {
+    primary: themeColors.text.inverse,
+    secondary: themeColors.brand.tideTeal,
+    ghost: themeColors.text.muted,
+    danger: themeColors.text.inverse,
+  };
+
+  // Only primary/danger get a permanent colored glow — secondary/ghost stay flat so the
+  // glow reads as "this is the important action" rather than decorating every button.
+  // Dark mode gets the more dramatic glow variant per the design spec.
+  const variantShadow: Partial<Record<ButtonVariant, object>> = {
+    primary: isDark ? shadows.glowTealDark : shadows.glowTeal,
+    danger: isDark ? shadows.glowErrorDark : shadows.glowError,
+  };
 
   return (
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
       className={cn(
-        'flex-row items-center justify-center rounded-md',
+        'group flex-row items-center justify-center rounded-xl',
         sizeClasses[size],
         variantClasses[variant],
         fullWidth ? 'w-full' : 'self-start',
@@ -99,8 +115,8 @@ export function Button({
         className,
       )}
       style={({ pressed }) => [
-        variant === 'primary' && shadows.sm,
-        pressed && !isDisabled && { transform: [{ scale: 0.97 }] },
+        !isDisabled && variantShadow[variant],
+        pressed && !isDisabled && { transform: [{ scale: 0.98 }] },
       ]}
     >
       {loading ? (

@@ -11,6 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { formatClock } from '../../utils/formatTime';
 import { colors } from '../../utils/theme';
 import { Text } from '../ui';
@@ -38,6 +39,7 @@ const statusLabels: Record<TimerRingStatus, string> = {
  * sweeps one full lap every 60s — tangible progress feedback tied to the visible seconds
  * digit, rather than an arbitrary percentage of nothing. */
 export function CircularTimer({ seconds, status, activityLabel, size = 280 }: CircularTimerProps) {
+  const themeColors = useThemeColors();
   const strokeWidth = Math.max(10, Math.round(size * 0.045));
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -92,7 +94,7 @@ export function CircularTimer({ seconds, status, activityLabel, size = 280 }: Ci
           </LinearGradient>
         </Defs>
 
-        <Circle cx={size / 2} cy={size / 2} r={radius} stroke={colors.background.hover} strokeWidth={strokeWidth} fill="none" />
+        <Circle cx={size / 2} cy={size / 2} r={radius} stroke={themeColors.background.hover} strokeWidth={strokeWidth} fill="none" />
 
         {status !== 'idle' && (
           <AnimatedCircle

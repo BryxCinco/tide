@@ -1,10 +1,11 @@
-import { Image, Text as RNText, View } from 'react-native';
+import { Image, Text as RNText, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { cn } from '../../utils/cn';
-import { colors } from '../../utils/theme';
 
 export type AvatarSize = 'sm' | 'md' | 'lg' | 'xl';
 export type AvatarStatus = 'online' | 'offline' | 'busy';
+export type AvatarRingColor = 'purple' | 'teal';
 
 export interface AvatarProps {
   /** Image URI. Falls back to initials when omitted or the image fails to load. */
@@ -15,9 +16,15 @@ export interface AvatarProps {
   size?: AvatarSize;
   /** Small status dot, bottom-right. Omit to hide it entirely. */
   status?: AvatarStatus;
-  /** Adds a 2px deep-purple ring for highlighting important members. */
+  /** Adds a 2px ring for highlighting — `purple` (default, "important member") or `teal`
+   * (the sidebar/drawer profile section's own-account highlight). */
   ring?: boolean;
+  ringColor?: AvatarRingColor;
   className?: string;
+  /** Overrides `size`'s fixed classes with an exact pixel size — needed anywhere the
+   * dimension is computed at runtime (e.g. a responsive avatar), since NativeWind can't
+   * statically generate styles for a dynamic arbitrary-value className. */
+  style?: StyleProp<ViewStyle>;
 }
 
 const sizeClasses: Record<AvatarSize, string> = {
@@ -41,10 +48,9 @@ const statusDotClasses: Record<AvatarSize, string> = {
   xl: 'h-3.5 w-3.5',
 };
 
-const statusColors: Record<AvatarStatus, string> = {
-  online: colors.status.success,
-  offline: colors.text.disabled,
-  busy: colors.status.warning,
+const ringColorClasses: Record<AvatarRingColor, string> = {
+  purple: 'border-deep-purple',
+  teal: 'border-tide-teal',
 };
 
 function getInitials(name?: string): string {
@@ -59,13 +65,21 @@ function getInitials(name?: string): string {
 }
 
 /** Circular user avatar with image/initials fallback, status dot, and optional highlight ring. */
-export function Avatar({ source, name, size = 'md', status, ring = false, className }: AvatarProps) {
+export function Avatar({ source, name, size = 'md', status, ring = false, ringColor = 'purple', className, style }: AvatarProps) {
+  const themeColors = useThemeColors();
+  const statusColors: Record<AvatarStatus, string> = {
+    online: themeColors.status.success,
+    offline: themeColors.text.disabled,
+    busy: themeColors.status.warning,
+  };
+
   return (
-    <View className={cn('relative', sizeClasses[size], className)}>
+    <View className={cn('relative', sizeClasses[size], className)} style={style}>
       <View
         className={cn(
           'h-full w-full items-center justify-center overflow-hidden rounded-full bg-tide-teal',
-          ring && 'border-2 border-deep-purple',
+          ring && 'border-2',
+          ring && ringColorClasses[ringColor],
         )}
       >
         {source ? (

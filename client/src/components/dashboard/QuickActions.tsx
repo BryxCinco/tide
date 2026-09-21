@@ -6,11 +6,14 @@ import { cn } from '../../utils/cn';
 import { colors } from '../../utils/theme';
 import { Icon, Text } from '../ui';
 
-const tintClasses: Record<AccentTone, { bg: string; icon: string }> = {
+// 'muted' has no explicit icon color — Icon's own default already resolves to the
+// theme-reactive muted tone, so omitting it here (rather than a static light-mode hex)
+// keeps it correct in dark mode too.
+const tintClasses: Record<AccentTone, { bg: string; icon?: string }> = {
   teal: { bg: 'bg-tide-teal/10', icon: colors.brand.tideTeal },
   blue: { bg: 'bg-ocean-blue/10', icon: colors.brand.oceanBlue },
   purple: { bg: 'bg-deep-purple/10', icon: colors.brand.deepPurple },
-  muted: { bg: 'bg-hover', icon: colors.text.muted },
+  muted: { bg: 'bg-hover' },
 };
 
 export interface QuickActionsProps {

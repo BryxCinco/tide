@@ -1,4 +1,13 @@
-export const colors = {
+interface ColorPalette {
+  background: { base: string; elevated: string; surface: string; hover: string };
+  brand: { tideTeal: string; tideTealDark: string; tideTealLight: string; oceanBlue: string; deepPurple: string };
+  text: { primary: string; secondary: string; muted: string; disabled: string; inverse: string };
+  border: { subtle: string; default: string; hover: string; accent: string };
+  status: { success: string; warning: string; error: string; info: string };
+  glass: { background: string; border: string };
+}
+
+export const colors: ColorPalette = {
   background: {
     base: '#FFFFFF',
     elevated: '#F9FAFB',
@@ -42,7 +51,49 @@ export const colors = {
     background: 'rgba(255, 255, 255, 0.7)',
     border: 'rgba(17, 24, 39, 0.08)',
   },
-} as const;
+};
+
+/**
+ * Dark counterpart to `colors` — same shape, so `useThemeColors()` can swap between
+ * them for anything that needs a JS color value (Icon `color` props, RN shadow colors)
+ * rather than a Tailwind className. Brand/status hues are intentionally identical to
+ * `colors` (teal etc. don't change with theme); only the neutrals shift.
+ */
+export const darkColors: ColorPalette = {
+  background: {
+    base: '#0A0E14',
+    elevated: '#111721',
+    surface: '#161D2A',
+    hover: '#1E2633',
+  },
+
+  brand: colors.brand,
+
+  text: {
+    primary: '#FFFFFF',
+    secondary: '#E5E7EB',
+    muted: '#9CA3AF',
+    disabled: '#6B7280',
+    // NOT flipped: every current usage is text on a solid brand-colored surface (a teal/red
+    // button, a gradient card) — that surface stays brand-colored in both themes, so its
+    // label should stay white in both, not flip to near-black.
+    inverse: '#FFFFFF',
+  },
+
+  border: {
+    subtle: 'rgba(255, 255, 255, 0.06)',
+    default: 'rgba(255, 255, 255, 0.10)',
+    hover: 'rgba(255, 255, 255, 0.16)',
+    accent: '#14B8A6',
+  },
+
+  status: colors.status,
+
+  glass: {
+    background: 'rgba(17, 23, 33, 0.7)',
+    border: 'rgba(255, 255, 255, 0.08)',
+  },
+};
 
 export const spacing = {
   xs: 4,
@@ -120,6 +171,60 @@ export const shadows = {
     shadowOpacity: 0.1,
     shadowRadius: 20,
     elevation: 8,
+  },
+  /**
+   * Colored "glow" shadows for premium CTAs (primary button, danger button, FAB).
+   * RN shadow* props (not CSS box-shadow) so the tint renders on native too —
+   * react-native-web already translates these into an equivalent box-shadow on web.
+   */
+  glowTeal: {
+    shadowColor: '#14B8A6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  glowError: {
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  /** Soft, centered halo for focused inputs — approximates a CSS focus ring since RN's
+   * shadow* props have no "spread" control, only blur (shadowRadius). */
+  focusRing: {
+    shadowColor: '#14B8A6',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  /**
+   * Dark-mode glows read as dramatically more luminous against the near-black
+   * background — same shadowColor, higher opacity/radius. Picked at the call site via
+   * `useThemeStore`, not a `dark:` className, since these are RN shadow* props.
+   */
+  glowTealDark: {
+    shadowColor: '#14B8A6',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+  glowErrorDark: {
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  focusRingDark: {
+    shadowColor: '#14B8A6',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 5,
   },
 } as const;
 

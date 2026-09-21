@@ -52,3 +52,40 @@ export interface QuickActionItem {
   tint: AccentTone;
   href: string;
 }
+
+export interface Quote {
+  id: string;
+  text: string;
+  author: string;
+}
+
+export interface Habit {
+  id: string;
+  label: string;
+  icon: IconName;
+  /** One entry per day of the current week, Monday-first. */
+  completedDays: boolean[];
+}
+
+export type WidgetId =
+  | 'hero'
+  | 'stats'
+  | 'tasks'
+  | 'focusFlow'
+  | 'quote'
+  | 'quickActions'
+  | 'recentActivity'
+  | 'recentJournal'
+  | 'insights'
+  | 'habits';
+
+export interface WidgetConfig {
+  id: WidgetId;
+  enabled: boolean;
+  /** Lower renders first. Not necessarily contiguous — reorder rewrites all of them. */
+  order: number;
+}
+
+export interface DashboardPreferences {
+  widgets: WidgetConfig[];
+}

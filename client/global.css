@@ -1,3 +1,57 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Thin, unobtrusive scrollbar for long-form text areas (web only — native ignores this file). */
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #D1D5DB transparent;
+}
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #D1D5DB;
+  border-radius: 9999px;
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Sidebar/drawer nav scroll — invisible until hovered, then a thin teal thumb. */
+.sidebar-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.sidebar-scrollbar:hover {
+  scrollbar-color: #14B8A6 transparent;
+}
+.sidebar-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+}
+.sidebar-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: #14B8A6;
+}
+.sidebar-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Backs the circular theme-reveal in themeTransition.ts. Suppress the browser's default
+ * cross-fade for the view transition's pseudo-elements so only our own clip-path circle
+ * animation (run via `.animate()` in themeTransition.ts) is visible. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) {
+  z-index: 1;
+}
+::view-transition-new(root) {
+  z-index: 9999;
+}

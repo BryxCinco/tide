@@ -23,6 +23,9 @@ interface AuthState {
   logout: () => Promise<void>;
   restoreSession: () => Promise<void>;
   clearError: () => void;
+  /** Patches the current user in place (avatar/bio/cover edits from the Dashboard/Profile) —
+   * a no-op when signed out. Persists immediately so a reload doesn't lose the change. */
+  updateUser: (updates: Partial<Pick<User, 'name' | 'avatar' | 'bio' | 'coverType' | 'coverValue'>>) => void;
 }
 
 function wait(ms: number): Promise<void> {
@@ -167,4 +170,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   clearError: () => set({ error: null }),
+
+  updateUser: (updates) => {
+    const current = get().user;
+    if (!current) return;
+    const user: User = { ...current, ...updates };
+    storage.setItem(USER_KEY, JSON.stringify(user));
+    set({ user });
+  },
 }));

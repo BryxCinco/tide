@@ -103,7 +103,7 @@ export function ActivityFormModal({ visible, onClose, activity, onSaved }: Activ
                       isSelected ? 'border-tide-teal bg-tide-teal/10' : 'border-subtle bg-surface',
                     )}
                   >
-                    <Icon name={option as IconName} size={18} color={isSelected ? color : colors.text.muted} />
+                    <Icon name={option as IconName} size={18} color={isSelected ? color : undefined} />
                   </Pressable>
                 );
               })}
@@ -125,7 +125,7 @@ export function ActivityFormModal({ visible, onClose, activity, onSaved }: Activ
                     style={{
                       backgroundColor: option,
                       borderWidth: isSelected ? 2 : 0,
-                      borderColor: colors.text.primary,
+                      borderColor: colors.brand.tideTeal,
                     }}
                   >
                     {isSelected && <Icon name="Check" size={16} color={colors.text.inverse} />}

@@ -5,7 +5,7 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from '
 
 import { useResponsive } from '../../hooks/useResponsive';
 import { cn } from '../../utils/cn';
-import { colors, shadows } from '../../utils/theme';
+import { shadows } from '../../utils/theme';
 import { Icon } from './Icon';
 import { Text } from './Text';
 
@@ -88,7 +88,7 @@ export function Modal({ visible, onClose, title, children, size = 'md' }: ModalP
                   {title}
                 </Text>
                 <Pressable onPress={onClose} hitSlop={8}>
-                  <Icon name="X" size={20} color={colors.text.muted} />
+                  <Icon name="X" size={20} />
                 </Pressable>
               </View>
             )}

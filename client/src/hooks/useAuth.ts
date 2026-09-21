@@ -13,6 +13,7 @@ export function useAuth() {
   const linkGuestToAccount = useAuthStore((s) => s.linkGuestToAccount);
   const logout = useAuthStore((s) => s.logout);
   const clearError = useAuthStore((s) => s.clearError);
+  const updateUser = useAuthStore((s) => s.updateUser);
 
   return {
     user,
@@ -26,5 +27,6 @@ export function useAuth() {
     linkGuestToAccount,
     logout,
     clearError,
+    updateUser,
   };
 }

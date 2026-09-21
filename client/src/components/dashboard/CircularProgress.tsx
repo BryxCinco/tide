@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import Animated, { Easing, useAnimatedProps, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 
-import { colors } from '../../utils/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -18,6 +18,7 @@ export interface CircularProgressProps {
 
 /** Gradient-stroke ring (teal -> ocean blue) that animates from 0 to `value` on mount/change. */
 export function CircularProgress({ value, size = 160, strokeWidth = 12, children }: CircularProgressProps) {
+  const themeColors = useThemeColors();
   const clamped = Math.max(0, Math.min(100, value));
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -37,12 +38,12 @@ export function CircularProgress({ value, size = 160, strokeWidth = 12, children
       <Svg width={size} height={size}>
         <Defs>
           <LinearGradient id="circularProgressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <Stop offset="0%" stopColor={colors.brand.tideTeal} />
-            <Stop offset="100%" stopColor={colors.brand.oceanBlue} />
+            <Stop offset="0%" stopColor={themeColors.brand.tideTeal} />
+            <Stop offset="100%" stopColor={themeColors.brand.oceanBlue} />
           </LinearGradient>
         </Defs>
 
-        <Circle cx={size / 2} cy={size / 2} r={radius} stroke={colors.background.hover} strokeWidth={strokeWidth} fill="none" />
+        <Circle cx={size / 2} cy={size / 2} r={radius} stroke={themeColors.background.hover} strokeWidth={strokeWidth} fill="none" />
 
         <AnimatedCircle
           cx={size / 2}

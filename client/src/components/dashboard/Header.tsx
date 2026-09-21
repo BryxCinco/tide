@@ -2,7 +2,6 @@ import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
 
 import { getFormattedDate, getGreeting } from '../../utils/greeting';
-import { colors } from '../../utils/theme';
 import { Avatar, Icon, Text } from '../ui';
 
 export interface HeaderProps {
@@ -31,9 +30,10 @@ export function Header({ name, avatarSource, hasUnreadNotifications = false, onN
         <Pressable
           onPress={onNotificationsPress}
           hitSlop={8}
-          className="relative h-10 w-10 items-center justify-center rounded-full bg-surface"
+          className="relative h-10 w-10 items-center justify-center rounded-full border border-subtle bg-base hover:bg-elevated"
+          style={({ pressed }) => [pressed && { transform: [{ scale: 0.95 }] }]}
         >
-          <Icon name="Bell" size={20} color={colors.text.secondary} />
+          <Icon name="Bell" size={20} />
           {hasUnreadNotifications && <View className="absolute right-2 top-2 h-2 w-2 rounded-full bg-tide-teal" />}
         </Pressable>
 

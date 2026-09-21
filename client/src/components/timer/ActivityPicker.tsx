@@ -3,7 +3,6 @@ import { Pressable, View } from 'react-native';
 import type { Activity } from '../../types/activity';
 import { cn } from '../../utils/cn';
 import { hexToRgba } from '../../utils/color';
-import { colors } from '../../utils/theme';
 import { Icon, Text, type IconName } from '../ui';
 
 export interface ActivityPickerProps {
@@ -58,12 +57,12 @@ export function ActivityPicker({ activities, selectedId, onSelect, disabled = fa
           disabled={disabled}
           onPress={onAddCustom}
           className={cn(
-            'basis-[47%] items-center gap-2 rounded-xl border border-dashed border-default bg-base p-3 md:basis-[30%] lg:basis-[14%]',
+            'basis-[47%] items-center gap-2 rounded-xl border border-dashed border-subtle bg-base p-3 md:basis-[30%] lg:basis-[14%]',
             disabled && 'opacity-50',
           )}
         >
           <View className="h-11 w-11 items-center justify-center rounded-full bg-surface">
-            <Icon name="Plus" size={20} color={colors.text.muted} />
+            <Icon name="Plus" size={20} />
           </View>
           <Text variant="caption" color="muted" className="text-center normal-case tracking-normal">
             Custom

@@ -1,8 +1,10 @@
 import { forwardRef, useState } from 'react';
 import { Pressable, Text as RNText, TextInput, View, type TextInputProps } from 'react-native';
 
+import { useThemeColors } from '../../hooks/useThemeColors';
+import { useThemeStore } from '../../store/themeStore';
 import { cn } from '../../utils/cn';
-import { colors } from '../../utils/theme';
+import { shadows } from '../../utils/theme';
 import { Icon, type IconName } from './Icon';
 import { Text } from './Text';
 
@@ -54,6 +56,8 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
 ) {
   const [isFocused, setIsFocused] = useState(false);
   const [isSecureVisible, setIsSecureVisible] = useState(false);
+  const themeColors = useThemeColors();
+  const isDark = useThemeStore((s) => s.theme === 'dark');
 
   const hasError = Boolean(error);
 
@@ -67,20 +71,21 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
 
       <View
         className={cn(
-          'flex-row items-center rounded-md border bg-base px-3',
+          'flex-row items-center rounded-xl border bg-base px-3.5',
           multiline ? 'min-h-24 items-start py-3' : 'h-11',
-          hasError ? 'border-error' : isFocused ? 'border-accent' : 'border-default',
+          hasError ? 'border-error' : isFocused ? 'border-tide-teal' : 'border-subtle',
           !editable && 'opacity-50',
         )}
+        style={isFocused && !hasError ? (isDark ? shadows.focusRingDark : shadows.focusRing) : undefined}
       >
-        {icon && <Icon name={icon} size={18} color={colors.text.muted} className="mr-2" />}
+        {icon && <Icon name={icon} size={18} color={isFocused ? themeColors.brand.tideTeal : undefined} className="mr-2" />}
 
         <TextInput
           ref={ref}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor={colors.text.disabled}
+          placeholderTextColor={themeColors.text.disabled}
           editable={editable}
           multiline={multiline}
           secureTextEntry={secureTextEntry && !isSecureVisible}
@@ -96,10 +101,10 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
 
         {secureTextEntry ? (
           <Pressable onPress={() => setIsSecureVisible((v) => !v)} hitSlop={8}>
-            <Icon name={isSecureVisible ? 'EyeOff' : 'Eye'} size={18} color={colors.text.muted} />
+            <Icon name={isSecureVisible ? 'EyeOff' : 'Eye'} size={18} />
           </Pressable>
         ) : (
-          rightIcon && <Icon name={rightIcon} size={18} color={colors.text.muted} />
+          rightIcon && <Icon name={rightIcon} size={18} />
         )}
       </View>
 

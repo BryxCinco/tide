@@ -43,21 +43,21 @@ export function ActivityRow({
 
       <View className="flex-row items-center gap-1">
         <Pressable onPress={onMoveUp} disabled={!canMoveUp} hitSlop={6} className={!canMoveUp ? 'opacity-30' : undefined}>
-          <Icon name="ChevronUp" size={18} color={colors.text.muted} />
+          <Icon name="ChevronUp" size={18} />
         </Pressable>
         <Pressable onPress={onMoveDown} disabled={!canMoveDown} hitSlop={6} className={!canMoveDown ? 'opacity-30' : undefined}>
-          <Icon name="ChevronDown" size={18} color={colors.text.muted} />
+          <Icon name="ChevronDown" size={18} />
         </Pressable>
         <Pressable onPress={onToggleFavorite} hitSlop={6} className="ml-1">
           <Icon
             name="Star"
             size={18}
-            color={activity.isFavorite ? colors.status.warning : colors.text.muted}
+            color={activity.isFavorite ? colors.status.warning : undefined}
             fill={activity.isFavorite ? colors.status.warning : 'none'}
           />
         </Pressable>
         <Pressable onPress={onEdit} hitSlop={6} className="ml-1">
-          <Icon name="Pencil" size={18} color={colors.text.muted} />
+          <Icon name="Pencil" size={18} />
         </Pressable>
       </View>
     </View>

@@ -2,7 +2,7 @@ import * as LucideIcons from 'lucide-react-native';
 import type { LucideProps } from 'lucide-react-native';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { colors } from '../../utils/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 /** Names of every icon exported by lucide-react-native, e.g. "Timer", "BookOpen". */
 export type IconName = Exclude<
@@ -26,22 +26,26 @@ export interface IconProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/** Thin, consistently-stroked wrapper around lucide-react-native icons. */
+/** Thin, consistently-stroked wrapper around lucide-react-native icons. Falls back to the
+ * theme's muted text color (light or dark) when no explicit `color` is given. */
 export function Icon({
   name,
   size = 20,
-  color = colors.text.muted,
+  color,
   strokeWidth = 2,
   fill = 'none',
   className,
   style,
 }: IconProps) {
+  const themeColors = useThemeColors();
+  const resolvedColor = color ?? themeColors.text.muted;
+
   const LucideIcon = LucideIcons[name] as React.ComponentType<LucideProps> | undefined;
   if (!LucideIcon) {
     return null;
   }
 
-  const icon = <LucideIcon size={size} color={color} strokeWidth={strokeWidth} fill={fill} />;
+  const icon = <LucideIcon size={size} color={resolvedColor} strokeWidth={strokeWidth} fill={fill} />;
 
   if (!className && !style) {
     return icon;

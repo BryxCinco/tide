@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
 
+import { useThemeColors } from '../../hooks/useThemeColors';
+import { useThemeStore } from '../../store/themeStore';
 import { useActivityStore } from '../../store/activityStore';
 import { useTaskStore } from '../../store/taskStore';
 import type { Task, TaskPriority, TaskStatus } from '../../types/task';
 import { cn } from '../../utils/cn';
 import { confirmAsync } from '../../utils/confirm';
-import { colors } from '../../utils/theme';
+import { shadows } from '../../utils/theme';
 import { Button, Icon, Input, Modal, Text } from '../ui';
 
 export interface TaskFormModalProps {
@@ -43,7 +45,7 @@ function PillOption<T extends string>({
   return (
     <Pressable
       onPress={() => onPress(value)}
-      className={cn('rounded-full border px-3 py-1.5', selected ? 'border-tide-teal bg-tide-teal/10' : 'border-default bg-base')}
+      className={cn('rounded-full border px-3 py-1.5', selected ? 'border-tide-teal bg-tide-teal/10' : 'border-subtle bg-base')}
     >
       <Text variant="caption" color={selected ? 'accent' : 'secondary'} className="normal-case tracking-normal">
         {label}
@@ -61,6 +63,8 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
   const allActivities = useActivityStore((s) => s.activities);
   const activities = useMemo(() => allActivities.filter((a) => !a.isArchived), [allActivities]);
   const { height } = useWindowDimensions();
+  const themeColors = useThemeColors();
+  const isDark = useThemeStore((s) => s.theme === 'dark');
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -70,6 +74,7 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
   const [linkedActivityId, setLinkedActivityId] = useState<string | undefined>(undefined);
   const [tags, setTags] = useState<string[]>([]);
   const [tagDraft, setTagDraft] = useState('');
+  const [isTagFocused, setIsTagFocused] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isEditing = Boolean(task);
@@ -183,7 +188,7 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
               <View className="flex-row flex-wrap gap-2">
                 <Pressable
                   onPress={() => setLinkedActivityId(undefined)}
-                  className={cn('rounded-full border px-3 py-1.5', !linkedActivityId ? 'border-tide-teal bg-tide-teal/10' : 'border-default bg-base')}
+                  className={cn('rounded-full border px-3 py-1.5', !linkedActivityId ? 'border-tide-teal bg-tide-teal/10' : 'border-subtle bg-base')}
                 >
                   <Text variant="caption" color={!linkedActivityId ? 'accent' : 'secondary'} className="normal-case tracking-normal">
                     None
@@ -195,7 +200,7 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
                     onPress={() => setLinkedActivityId(activity.id)}
                     className={cn(
                       'rounded-full border px-3 py-1.5',
-                      linkedActivityId === activity.id ? 'border-tide-teal bg-tide-teal/10' : 'border-default bg-base',
+                      linkedActivityId === activity.id ? 'border-tide-teal bg-tide-teal/10' : 'border-subtle bg-base',
                     )}
                   >
                     <Text
@@ -215,33 +220,42 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
             <Text variant="label" color="muted">
               Tags
             </Text>
-            <View className="flex-row items-center gap-2">
-              <Input
-                placeholder="Add a tag"
-                value={tagDraft}
-                onChangeText={setTagDraft}
-                onSubmitEditing={addTagFromDraft}
-                returnKeyType="done"
-                className="flex-1"
-              />
-              <Button title="Add" variant="secondary" size="sm" onPress={addTagFromDraft} />
-            </View>
             {tags.length > 0 && (
               <View className="flex-row flex-wrap gap-2">
                 {tags.map((tag) => (
                   <Pressable
                     key={tag}
                     onPress={() => setTags((prev) => prev.filter((t) => t !== tag))}
-                    className="flex-row items-center gap-1 rounded-full border border-default bg-surface px-2.5 py-1"
+                    className="flex-row items-center gap-1 rounded-full border border-subtle bg-surface px-2.5 py-1"
                   >
                     <Text variant="caption" color="secondary" className="normal-case tracking-normal">
                       {tag}
                     </Text>
-                    <Icon name="X" size={12} color={colors.text.muted} />
+                    <Icon name="X" size={12} />
                   </Pressable>
                 ))}
               </View>
             )}
+            <View
+              className={cn(
+                'h-11 flex-row items-center gap-2 rounded-full border bg-elevated pl-4 pr-1.5',
+                isTagFocused ? 'border-tide-teal' : 'border-subtle',
+              )}
+              style={isTagFocused ? (isDark ? shadows.focusRingDark : shadows.focusRing) : undefined}
+            >
+              <TextInput
+                value={tagDraft}
+                onChangeText={setTagDraft}
+                onSubmitEditing={addTagFromDraft}
+                onFocus={() => setIsTagFocused(true)}
+                onBlur={() => setIsTagFocused(false)}
+                returnKeyType="done"
+                placeholder="Add a tag..."
+                placeholderTextColor={themeColors.text.disabled}
+                className="flex-1 font-sans text-body text-primary"
+              />
+              <Button title="Add" variant="ghost" size="sm" onPress={addTagFromDraft} />
+            </View>
           </View>
 
           <Button title="Save" variant="primary" size="lg" fullWidth onPress={handleSave} />

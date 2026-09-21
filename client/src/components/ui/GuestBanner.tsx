@@ -38,7 +38,7 @@ export function GuestBanner({ onLinkPress, className }: GuestBannerProps) {
       </View>
 
       <Pressable onPress={() => setDismissed(true)} hitSlop={8}>
-        <Icon name="X" size={16} color={colors.text.muted} />
+        <Icon name="X" size={16} />
       </Pressable>
     </View>
   );

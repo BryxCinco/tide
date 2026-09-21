@@ -31,7 +31,7 @@ export function TaskCard({ task, activityName, onToggle, onEdit }: TaskCardProps
         hitSlop={6}
         className={cn(
           'mt-0.5 h-5 w-5 items-center justify-center rounded-full border',
-          isDone ? 'border-tide-teal bg-tide-teal' : 'border-default bg-base',
+          isDone ? 'border-tide-teal bg-tide-teal' : 'border-subtle bg-base',
         )}
       >
         {isDone && <Icon name="Check" size={12} color={colors.text.inverse} />}
@@ -46,7 +46,7 @@ export function TaskCard({ task, activityName, onToggle, onEdit }: TaskCardProps
           <Badge label={priority.label} variant={priority.variant} size="sm" />
           {task.dueDate && (
             <View className="flex-row items-center gap-1">
-              <Icon name="Calendar" size={12} color={colors.text.muted} />
+              <Icon name="Calendar" size={12} />
               <Text variant="caption" color="muted" className="normal-case tracking-normal">
                 {task.dueDate}
               </Text>
@@ -60,7 +60,7 @@ export function TaskCard({ task, activityName, onToggle, onEdit }: TaskCardProps
       </Pressable>
 
       <Pressable onPress={onEdit} hitSlop={6}>
-        <Icon name="Pencil" size={16} color={colors.text.muted} />
+        <Icon name="Pencil" size={16} />
       </Pressable>
     </View>
   );

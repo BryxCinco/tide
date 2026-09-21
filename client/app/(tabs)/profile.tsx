@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Avatar, BackButton, Button, ResponsiveContainer, Text } from '@/components/ui';
+import { Avatar, BackButton, Button, ResponsiveContainer, Text, ThemeToggle } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 
 // Placeholder — a later phase builds the real Profile/Settings screen.
@@ -29,9 +29,17 @@ export default function ProfileScreen() {
         <Text variant="h2" color="primary" className="mt-2">
           {user?.name ?? 'Guest'}
         </Text>
-        <Text variant="body" color="muted" className="mb-6 text-center">
+        <Text variant="body" color="muted" className="mb-2 text-center">
           {isGuest ? 'Guest session — full profile settings coming soon.' : user?.email}
         </Text>
+
+        <View className="mb-4 flex-row items-center gap-3 rounded-xl border border-subtle bg-elevated px-4 py-3">
+          <Text variant="body" color="secondary" className="font-medium">
+            Dark Mode
+          </Text>
+          <ThemeToggle />
+        </View>
+
         <Button title="Log out" variant="secondary" onPress={handleLogout} />
       </View>
     </SafeAreaView>

@@ -33,7 +33,7 @@ export function TaskFilters({ filter, sort, onFilterChange, onSortChange }: Task
             onPress={() => onFilterChange(option.value)}
             className={cn(
               'rounded-full border px-3 py-1.5',
-              filter === option.value ? 'border-tide-teal bg-tide-teal/10' : 'border-default bg-base',
+              filter === option.value ? 'border-tide-teal bg-tide-teal/10' : 'border-subtle bg-base',
             )}
           >
             <Text

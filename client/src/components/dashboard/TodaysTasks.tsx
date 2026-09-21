@@ -56,7 +56,7 @@ export function TodaysTasks({ onAddTask }: TodaysTasksProps) {
                 <Pressable
                   onPress={() => toggleTaskStatus(task.id)}
                   hitSlop={6}
-                  className="h-5 w-5 rounded-full border border-default bg-base"
+                  className="h-5 w-5 rounded-full border border-subtle bg-base"
                 />
                 <Text variant="body" color="primary" className="flex-1 font-medium">
                   {task.title}

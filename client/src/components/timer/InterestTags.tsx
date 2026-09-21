@@ -25,7 +25,7 @@ export function InterestTags({ tags, selectedTags, onToggle }: InterestTagsProps
               onPress={() => onToggle(tag)}
               className={cn(
                 'rounded-full border px-3 py-1.5',
-                isSelected ? 'border-tide-teal bg-tide-teal/10' : 'border-default bg-base',
+                isSelected ? 'border-tide-teal bg-tide-teal/10' : 'border-subtle bg-base',
               )}
             >
               <RNText className={cn('text-sm', isSelected ? 'font-medium text-tide-teal' : 'text-muted')}>

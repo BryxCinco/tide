@@ -1,3 +1,4 @@
+export * from './AnimatedThemeToggle';
 export * from './Avatar';
 export * from './BackButton';
 export * from './Badge';
@@ -5,6 +6,7 @@ export * from './Button';
 export * from './Card';
 export * from './Divider';
 export * from './EmptyState';
+export * from './FAB';
 export * from './GuestBanner';
 export * from './Icon';
 export * from './Input';
@@ -13,3 +15,5 @@ export * from './Modal';
 export * from './ProgressBar';
 export * from './ResponsiveContainer';
 export * from './Text';
+export * from './ThemeToggle';
+export * from './Tooltip';

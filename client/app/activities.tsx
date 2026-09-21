@@ -3,6 +3,7 @@ import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActivityFormModal, ActivityRow } from '@/components/activity';
+import { AppLayout } from '@/components/layout';
 import { BackButton, Button, Input, ResponsiveContainer, Text } from '@/components/ui';
 import { useActivityStore } from '@/store/activityStore';
 import type { Activity } from '@/types/activity';
@@ -71,63 +72,65 @@ export default function ActivitiesScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-base">
-      <ScrollView className="flex-1" contentContainerClassName="pb-24 pt-4 md:pt-6 lg:pt-8">
-        <ResponsiveContainer className="gap-6">
-          <View className="flex-row items-center gap-3">
-            <BackButton />
-            <Text variant="h2" color="primary" className="flex-1">
-              Activities
-            </Text>
-            <Button title="New" variant="primary" size="sm" icon="Plus" onPress={openCreate} />
-          </View>
-
-          <Input placeholder="Search activities" icon="Search" value={search} onChangeText={setSearch} />
-
-          {activities.length === 0 ? (
-            <Text variant="body" color="muted">
-              No activities yet.
-            </Text>
-          ) : (
-            <View className="gap-6">
-              <ActivityGroup
-                title="Favorites"
-                items={favorites}
-                onEdit={openEdit}
-                onToggleFavorite={toggleFavorite}
-                onReorder={reorderActivity}
-              />
-              <ActivityGroup
-                title="Custom"
-                items={custom}
-                onEdit={openEdit}
-                onToggleFavorite={toggleFavorite}
-                onReorder={reorderActivity}
-              />
-              <ActivityGroup
-                title="Pre-defined"
-                items={predefined}
-                onEdit={openEdit}
-                onToggleFavorite={toggleFavorite}
-                onReorder={reorderActivity}
-              />
-              <ActivityGroup
-                title="Archived"
-                items={archived}
-                onEdit={openEdit}
-                onToggleFavorite={toggleFavorite}
-                onReorder={reorderActivity}
-              />
+    <AppLayout showMobileMenuButton={false}>
+      <SafeAreaView className="flex-1 bg-base">
+        <ScrollView className="flex-1" contentContainerClassName="pb-24 pt-4 md:pt-6 lg:pt-8">
+          <ResponsiveContainer className="gap-6">
+            <View className="flex-row items-center gap-3">
+              <BackButton />
+              <Text variant="h2" color="primary" className="flex-1">
+                Activities
+              </Text>
+              <Button title="New" variant="primary" size="sm" icon="Plus" onPress={openCreate} />
             </View>
-          )}
-        </ResponsiveContainer>
-      </ScrollView>
 
-      <ActivityFormModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        activity={editingActivity}
-      />
-    </SafeAreaView>
+            <Input placeholder="Search activities" icon="Search" value={search} onChangeText={setSearch} />
+
+            {activities.length === 0 ? (
+              <Text variant="body" color="muted">
+                No activities yet.
+              </Text>
+            ) : (
+              <View className="gap-6">
+                <ActivityGroup
+                  title="Favorites"
+                  items={favorites}
+                  onEdit={openEdit}
+                  onToggleFavorite={toggleFavorite}
+                  onReorder={reorderActivity}
+                />
+                <ActivityGroup
+                  title="Custom"
+                  items={custom}
+                  onEdit={openEdit}
+                  onToggleFavorite={toggleFavorite}
+                  onReorder={reorderActivity}
+                />
+                <ActivityGroup
+                  title="Pre-defined"
+                  items={predefined}
+                  onEdit={openEdit}
+                  onToggleFavorite={toggleFavorite}
+                  onReorder={reorderActivity}
+                />
+                <ActivityGroup
+                  title="Archived"
+                  items={archived}
+                  onEdit={openEdit}
+                  onToggleFavorite={toggleFavorite}
+                  onReorder={reorderActivity}
+                />
+              </View>
+            )}
+          </ResponsiveContainer>
+        </ScrollView>
+
+        <ActivityFormModal
+          visible={modalVisible}
+          onClose={() => setModalVisible(false)}
+          activity={editingActivity}
+        />
+      </SafeAreaView>
+    </AppLayout>
   );
 }

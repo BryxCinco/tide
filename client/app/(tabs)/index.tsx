@@ -1,22 +1,26 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { ScrollView } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   ChatbotFAB,
+  CustomizeDashboardModal,
   FocusFlow,
-  Header,
+  HabitTracker,
   HeroCard,
+  ProfileHeader,
   QuickActions,
+  QuoteCard,
   RecentActivity,
   RecentJournal,
   StatsRow,
   TodaysTasks,
+  WidgetGrid,
 } from '@/components/dashboard';
+import { SearchBar } from '@/components/search';
 import { TaskFormModal } from '@/components/tasks';
-import { GuestBanner, ResponsiveContainer } from '@/components/ui';
+import { Button, EmptyState, GuestBanner, ResponsiveContainer } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import {
   mockFocusActivities,
@@ -27,51 +31,69 @@ import {
   mockRecentJournal,
   mockStats,
 } from '@/mocks/mockDashboard';
-
-const STAGGER_MS = 70;
+import { getVisibleWidgets, useDashboardStore } from '@/store/dashboardStore';
+import type { WidgetId } from '@/types/dashboard';
 
 export default function DashboardScreen() {
   const { user, isGuest } = useAuth();
   const [chatVisible, setChatVisible] = useState(false);
   const [taskModalVisible, setTaskModalVisible] = useState(false);
+  const [customizeVisible, setCustomizeVisible] = useState(false);
+
+  const allWidgets = useDashboardStore((s) => s.preferences.widgets);
+  const visibleWidgets = useMemo(() => getVisibleWidgets(allWidgets), [allWidgets]);
+
+  const renderWidget = (id: WidgetId): ReactNode => {
+    switch (id) {
+      case 'hero':
+        return <HeroCard label={mockHeroFocus.label} subtitle={mockHeroFocus.subtitle} />;
+      case 'stats':
+        return <StatsRow stats={mockStats} />;
+      case 'tasks':
+        return <TodaysTasks onAddTask={() => setTaskModalVisible(true)} />;
+      case 'focusFlow':
+        return <FocusFlow score={mockFocusScore} activities={mockFocusActivities} />;
+      case 'quote':
+        return <QuoteCard />;
+      case 'quickActions':
+        return <QuickActions actions={mockQuickActions} onChatPress={() => setChatVisible(true)} />;
+      case 'recentActivity':
+        return <RecentActivity entries={mockRecentActivity} />;
+      case 'recentJournal':
+        return <RecentJournal entries={mockRecentJournal} />;
+      case 'insights':
+        // The real Insights screen is Phase 7 — this is a placeholder widget, not a bug.
+        return <EmptyState icon="BarChart3" title="Weekly Insights" description="Coming soon — trends across your time and mood." />;
+      case 'habits':
+        return <HabitTracker />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-base" edges={['top']}>
-      <ScrollView className="flex-1" contentContainerClassName="pb-24 pt-4 md:pt-6 lg:pt-8">
-        <ResponsiveContainer className="gap-6">
-          {isGuest && <GuestBanner onLinkPress={() => router.push('/(auth)/link-account')} />}
+      <ScrollView className="flex-1" contentContainerClassName="pb-24">
+        {isGuest && (
+          <ResponsiveContainer className="pt-4 md:pt-6 lg:pt-8">
+            <GuestBanner onLinkPress={() => router.push('/(auth)/link-account')} />
+          </ResponsiveContainer>
+        )}
 
-          <Animated.View entering={FadeInDown.duration(400)}>
-            <Header name={user?.name ?? 'there'} avatarSource={user?.avatar} hasUnreadNotifications />
-          </Animated.View>
+        <ProfileHeader />
 
-          <Animated.View entering={FadeInDown.delay(STAGGER_MS).duration(400)}>
-            <HeroCard label={mockHeroFocus.label} subtitle={mockHeroFocus.subtitle} />
-          </Animated.View>
+        <ResponsiveContainer className="mt-6 gap-6">
+          <SearchBar />
 
-          <Animated.View entering={FadeInDown.delay(STAGGER_MS * 2).duration(400)}>
-            <StatsRow stats={mockStats} />
-          </Animated.View>
+          <WidgetGrid widgets={visibleWidgets} renderWidget={renderWidget} />
 
-          <Animated.View entering={FadeInDown.delay(STAGGER_MS * 3).duration(400)}>
-            <FocusFlow score={mockFocusScore} activities={mockFocusActivities} />
-          </Animated.View>
-
-          <Animated.View entering={FadeInDown.delay(STAGGER_MS * 4).duration(400)}>
-            <TodaysTasks onAddTask={() => setTaskModalVisible(true)} />
-          </Animated.View>
-
-          <Animated.View entering={FadeInDown.delay(STAGGER_MS * 5).duration(400)}>
-            <QuickActions actions={mockQuickActions} onChatPress={() => setChatVisible(true)} />
-          </Animated.View>
-
-          <Animated.View entering={FadeInDown.delay(STAGGER_MS * 6).duration(400)}>
-            <RecentActivity entries={mockRecentActivity} />
-          </Animated.View>
-
-          <Animated.View entering={FadeInDown.delay(STAGGER_MS * 7).duration(400)}>
-            <RecentJournal entries={mockRecentJournal} />
-          </Animated.View>
+          <Button
+            title="Customize Dashboard"
+            variant="secondary"
+            icon="Settings"
+            onPress={() => setCustomizeVisible(true)}
+            className="mb-2 self-center"
+          />
         </ResponsiveContainer>
       </ScrollView>
 
@@ -83,6 +105,7 @@ export default function DashboardScreen() {
       />
 
       <TaskFormModal visible={taskModalVisible} onClose={() => setTaskModalVisible(false)} />
+      <CustomizeDashboardModal visible={customizeVisible} onClose={() => setCustomizeVisible(false)} />
     </SafeAreaView>
   );
 }
