@@ -7,7 +7,6 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { useThemeStore } from '../../store/themeStore';
 import { COVER_GRADIENTS, DEFAULT_COVER_GRADIENT_ID } from '../../store/userStore';
 import type { CoverType } from '../../types/user';
-import { shadows } from '../../utils/theme';
 import { Icon } from '../ui';
 
 export interface CoverPhotoProps {
@@ -31,7 +30,9 @@ export function CoverPhoto({ coverType, coverValue, height, onPress }: CoverPhot
   const cameraSize = isPhone ? 36 : 40;
 
   return (
-    <View style={{ height }} className="w-full overflow-hidden rounded-b-3xl">
+    // position: 'relative' is RN's default for every View anyway, but set explicitly so
+    // the camera button's `position: 'absolute'` below is unambiguously anchored here.
+    <View style={{ height, position: 'relative' }} className="w-full overflow-hidden rounded-b-3xl">
       <Pressable onPress={onPress} style={{ flex: 1 }}>
         {coverType === 'image' && coverValue ? (
           <Image source={{ uri: coverValue }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
@@ -47,25 +48,36 @@ export function CoverPhoto({ coverType, coverValue, height, onPress }: CoverPhot
         )}
       </Pressable>
 
+      {/* No `left`, no flexDirection — plain absolute top-right, sized 40/36 desktop/mobile. */}
       <Pressable
         onPress={onPress}
         onHoverIn={() => setCameraHovered(true)}
         onHoverOut={() => setCameraHovered(false)}
-        className="absolute right-4 top-4 items-center justify-center rounded-full"
-        style={[
-          {
-            width: cameraSize,
-            height: cameraSize,
-            zIndex: 10,
-            backgroundColor: cameraHovered
-              ? themeColors.brand.tideTeal
-              : isDark
-                ? themeColors.background.elevated
-                : '#FFFFFF',
-            transform: [{ scale: cameraHovered ? 1.05 : 1 }],
-          },
-          shadows.sm,
-        ]}
+        style={{
+          position: 'absolute',
+          top: 16,
+          right: 16,
+          width: cameraSize,
+          height: cameraSize,
+          borderRadius: cameraSize / 2,
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 10,
+          // 'white' unconditionally (as a literal, theme-blind value) would look flat
+          // against a dark-mode elevated surface — kept theme-reactive instead, same
+          // background pairing used everywhere else in the app (bg-elevated in dark).
+          backgroundColor: cameraHovered
+            ? themeColors.brand.tideTeal
+            : isDark
+              ? themeColors.background.elevated
+              : '#FFFFFF',
+          transform: [{ scale: cameraHovered ? 1.05 : 1 }],
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.15,
+          shadowRadius: 4,
+          elevation: 4,
+        }}
       >
         <Icon name="Camera" size={18} color={cameraHovered ? '#FFFFFF' : themeColors.text.primary} />
       </Pressable>

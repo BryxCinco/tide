@@ -10,6 +10,7 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { useThemeStore } from '../../store/themeStore';
 import { useUiStore } from '../../store/uiStore';
 import { hexToRgba } from '../../utils/color';
+import { getSidebarNavPalette } from '../../utils/sidebarNavTheme';
 import { Avatar, Icon, Text, ThemeToggle } from '../ui';
 import { NAV_ITEMS, NavItem } from './NavItem';
 
@@ -65,28 +66,22 @@ export function MobileDrawer() {
     router.replace('/(auth)/login');
   };
 
-  const edgeGlowStyle = isDark
-    ? {
-        shadowColor: themeColors.brand.tideTeal,
-        shadowOffset: { width: 1, height: 0 },
-        shadowOpacity: 0.3,
-        shadowRadius: 32,
-        elevation: 12,
-      }
-    : {
-        shadowColor: themeColors.brand.tideTeal,
-        shadowOffset: { width: 1, height: 0 },
-        shadowOpacity: 0.08,
-        shadowRadius: 24,
-        elevation: 4,
-      };
+  // Same shared palette as Sidebar.tsx/NavItem.tsx — see sidebarNavTheme.ts.
+  const palette = getSidebarNavPalette(isDark);
 
   return (
     <View className="absolute inset-0 z-50" pointerEvents="box-none">
       <Pressable className="absolute inset-0" style={{ backgroundColor: 'rgba(17, 24, 39, 0.4)' }} onPress={closeDrawer} />
 
       <GestureDetector gesture={panGesture}>
-        <Animated.View style={[{ width: drawerWidth, height: '100%' }, drawerStyle, edgeGlowStyle]} className="bg-base">
+        <Animated.View
+          style={[
+            { width: drawerWidth, height: '100%' },
+            drawerStyle,
+            { backgroundColor: palette.background, borderRightWidth: 1, borderRightColor: palette.borderColor },
+            palette.edgeGlow,
+          ]}
+        >
           <SafeAreaView className="flex-1" edges={['top', 'left', 'bottom']}>
             <View className="flex-1 flex-col">
               {/* FIXED TOP */}

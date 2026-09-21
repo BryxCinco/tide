@@ -9,10 +9,9 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { useThemeColors } from '../../hooks/useThemeColors';
 import { useThemeStore } from '../../store/themeStore';
 import { cn } from '../../utils/cn';
-import { hexToRgba } from '../../utils/color';
+import { getSidebarNavPalette } from '../../utils/sidebarNavTheme';
 import { Icon, Text, Tooltip, type IconName } from '../ui';
 
 export interface NavItemConfig {
@@ -46,8 +45,8 @@ export function NavItem({ item, collapsed = false, onNavigate }: NavItemProps) {
   const pathname = usePathname();
   const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
   const [isHovered, setIsHovered] = useState(false);
-  const themeColors = useThemeColors();
   const isDark = useThemeStore((s) => s.theme === 'dark');
+  const palette = getSidebarNavPalette(isDark);
 
   // onHoverIn/Out only ever fire on web (pointer devices) — a no-op on touch, so this is
   // safe to wire up unconditionally rather than branching on Platform.OS.
@@ -55,6 +54,8 @@ export function NavItem({ item, collapsed = false, onNavigate }: NavItemProps) {
   const pulse = useSharedValue(1);
 
   useEffect(() => {
+    // 200ms ease-out for every hover/active transition per spec — this same shared value
+    // drives the row's hover-tint overlay opacity below, not just the translateX/scale.
     hoverProgress.value = withTiming(isHovered ? 1 : 0, { duration: HOVER_DURATION, easing: Easing.out(Easing.ease) });
   }, [isHovered, hoverProgress]);
 
@@ -76,7 +77,8 @@ export function NavItem({ item, collapsed = false, onNavigate }: NavItemProps) {
     onNavigate?.();
   };
 
-  const glowStyle = useAnimatedStyle(() => ({ opacity: pulse.value }));
+  const activePulseStyle = useAnimatedStyle(() => ({ opacity: pulse.value }));
+  const hoverOverlayStyle = useAnimatedStyle(() => ({ opacity: isActive ? 0 : hoverProgress.value }));
   const rowStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: collapsed ? 0 : hoverProgress.value * 2 }],
   }));
@@ -84,40 +86,10 @@ export function NavItem({ item, collapsed = false, onNavigate }: NavItemProps) {
     transform: [{ scale: 1 + hoverProgress.value * 0.1 }],
   }));
 
-  const iconColor = isActive || isHovered ? themeColors.brand.tideTeal : themeColors.text.muted;
-  const textColor = isActive ? 'accent' : isHovered ? 'primary' : 'secondary';
-
-  // Active/hover glow shadows — dramatically more luminous in dark mode per spec.
-  const activeGlow = isDark
-    ? {
-        shadowColor: themeColors.brand.tideTeal,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.35,
-        shadowRadius: 20,
-        elevation: 8,
-      }
-    : {
-        shadowColor: themeColors.brand.tideTeal,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 10,
-        elevation: 4,
-      };
-  const hoverGlow = isDark
-    ? {
-        shadowColor: themeColors.brand.tideTeal,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.18,
-        shadowRadius: 14,
-        elevation: 5,
-      }
-    : {
-        shadowColor: themeColors.brand.tideTeal,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 2,
-      };
+  // Icon color always matches the label's text color (spec: "icon color matches text
+  // color") — default state is text-secondary-equivalent (readable, not muted), not the
+  // app's dimmer text-muted token, so idle nav items stay clearly legible.
+  const textAndIconColor = isActive || isHovered ? palette.navAccentText : palette.navDefaultText;
 
   if (collapsed) {
     return (
@@ -132,18 +104,16 @@ export function NavItem({ item, collapsed = false, onNavigate }: NavItemProps) {
             <Animated.View
               pointerEvents="none"
               className="absolute inset-0 rounded-xl"
-              style={[{ backgroundColor: hexToRgba(themeColors.brand.tideTeal, isDark ? 0.15 : 0.08) }, activeGlow, glowStyle]}
+              style={[{ backgroundColor: palette.navActiveBg }, palette.navActiveGlow, activePulseStyle]}
             />
           )}
-          {!isActive && isHovered && (
-            <View
-              pointerEvents="none"
-              className="absolute inset-0 rounded-xl"
-              style={[{ backgroundColor: hexToRgba(themeColors.brand.tideTeal, isDark ? 0.1 : 0.05) }, hoverGlow]}
-            />
-          )}
+          <Animated.View
+            pointerEvents="none"
+            className="absolute inset-0 rounded-xl"
+            style={[{ backgroundColor: palette.navHoverBg }, palette.navHoverGlow, hoverOverlayStyle]}
+          />
           <Animated.View style={iconScaleStyle} className="shrink-0">
-            <Icon name={item.icon} size={20} color={iconColor} />
+            <Icon name={item.icon} size={20} color={textAndIconColor} />
           </Animated.View>
         </Pressable>
       </Tooltip>
@@ -157,32 +127,29 @@ export function NavItem({ item, collapsed = false, onNavigate }: NavItemProps) {
           <Animated.View
             pointerEvents="none"
             className="absolute inset-0 rounded-xl"
-            style={[{ backgroundColor: hexToRgba(themeColors.brand.tideTeal, isDark ? 0.15 : 0.08) }, activeGlow, glowStyle]}
+            style={[{ backgroundColor: palette.navActiveBg }, palette.navActiveGlow, activePulseStyle]}
           />
         )}
-        {!isActive && isHovered && (
-          <View
-            pointerEvents="none"
-            className="absolute inset-0 rounded-xl"
-            style={[{ backgroundColor: hexToRgba(themeColors.brand.tideTeal, isDark ? 0.1 : 0.05) }, hoverGlow]}
-          />
-        )}
+        <Animated.View
+          pointerEvents="none"
+          className="absolute inset-0 rounded-xl"
+          style={[{ backgroundColor: palette.navHoverBg }, palette.navHoverGlow, hoverOverlayStyle]}
+        />
         {isActive && (
           <View
             pointerEvents="none"
             className="absolute bottom-1.5 left-0 top-1.5 w-[3px] rounded-full"
-            style={{ backgroundColor: themeColors.brand.tideTeal }}
+            style={[{ backgroundColor: palette.navAccentBar }, palette.navAccentBarGlow]}
           />
         )}
 
         <Animated.View style={iconScaleStyle} className="shrink-0">
-          <Icon name={item.icon} size={20} color={iconColor} />
+          <Icon name={item.icon} size={20} color={textAndIconColor} />
         </Animated.View>
         <Text
           variant="body"
-          color={textColor}
           className={cn('shrink text-base font-medium', isActive && 'font-semibold')}
-          style={{ letterSpacing: isHovered ? 0.2 : 0 }}
+          style={{ color: textAndIconColor, letterSpacing: isHovered ? 0.2 : 0 }}
           numberOfLines={1}
         >
           {item.label}

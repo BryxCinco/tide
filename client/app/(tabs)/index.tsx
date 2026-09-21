@@ -18,7 +18,6 @@ import {
   TodaysTasks,
   WidgetGrid,
 } from '@/components/dashboard';
-import { SearchBar } from '@/components/search';
 import { TaskFormModal } from '@/components/tasks';
 import { Button, EmptyState, GuestBanner, ResponsiveContainer } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
@@ -83,8 +82,6 @@ export default function DashboardScreen() {
         <ProfileHeader />
 
         <ResponsiveContainer className="mt-6 gap-6">
-          <SearchBar />
-
           <WidgetGrid widgets={visibleWidgets} renderWidget={renderWidget} />
 
           <Button

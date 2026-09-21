@@ -11,6 +11,7 @@ import { useThemeStore } from '../../store/themeStore';
 import { useUiStore } from '../../store/uiStore';
 import { cn } from '../../utils/cn';
 import { hexToRgba } from '../../utils/color';
+import { getSidebarNavPalette } from '../../utils/sidebarNavTheme';
 import { Avatar, Icon, Text, ThemeToggle, Tooltip } from '../ui';
 import { NAV_ITEMS, NavItem } from './NavItem';
 
@@ -54,42 +55,20 @@ export function Sidebar({ collapsed: forcedCollapsed = false }: SidebarProps) {
     router.replace('/(auth)/login');
   };
 
-  // Right-edge separation from the main content — subtle in light mode, more luminous in
-  // dark (per spec: 2px 0 24px @ 4% light, 2px 0 32px @ 10% dark).
-  const edgeGlowStyle = isDark
-    ? {
-        shadowColor: themeColors.brand.tideTeal,
-        shadowOffset: { width: 2, height: 0 },
-        shadowOpacity: 0.1,
-        shadowRadius: 32,
-        elevation: 12,
-      }
-    : {
-        shadowColor: themeColors.brand.tideTeal,
-        shadowOffset: { width: 2, height: 0 },
-        shadowOpacity: 0.04,
-        shadowRadius: 24,
-        elevation: 4,
-      };
-  const edgeBorderColor = hexToRgba(themeColors.brand.tideTeal, isDark ? 0.15 : 0.08);
+  // Single source of truth (shared with NavItem.tsx and MobileDrawer.tsx) for the exact
+  // background/border/glow values — see sidebarNavTheme.ts.
+  const palette = getSidebarNavPalette(isDark);
   const dividerColor = hexToRgba(themeColors.brand.tideTeal, 0.1);
-  // Distinct from the main content's flat bg-base, so the sidebar reads as its own panel
-  // rather than blending into the page — a hair lighter than bg-base in dark mode, a hair
-  // cooler/off-white in light mode, each a top-to-bottom gradient for subtle depth.
-  const sidebarGradientColors: [string, string] = isDark ? ['#0D1319', '#0A0E14'] : ['#FFFFFF', '#FAFBFC'];
 
   return (
     <Animated.View
-      style={[widthStyle, { borderRightWidth: 1, borderRightColor: edgeBorderColor }, edgeGlowStyle]}
+      style={[
+        widthStyle,
+        { backgroundColor: palette.background, borderRightWidth: 1, borderRightColor: palette.borderColor },
+        palette.edgeGlow,
+      ]}
       className="h-full"
     >
-      <LinearGradient
-        colors={sidebarGradientColors}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-      />
-
       <View className="flex-1 flex-col">
         {/* FIXED TOP — brand mark, profile. Generous top padding so "TIDE" has room to
             breathe instead of crowding the sidebar's top edge. */}

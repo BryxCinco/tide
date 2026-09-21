@@ -14,13 +14,19 @@ import { SidebarCollapseToggle } from './SidebarCollapseToggle';
 export interface AppLayoutProps {
   children: ReactNode;
   /**
-   * Shows the floating hamburger button on phone. Defaults to true for top-level
-   * destinations (Dashboard, Timer, Journal list, ...). Screens that already render
-   * their own BackButton header (Tasks, Activities, the Journal editor) pass `false` —
-   * the Back affordance already gets them out, and a second nav control top-left would
-   * collide visually with it.
+   * Shows the floating hamburger button on phone. Defaults to true. Every screen needs
+   * some way to reach the nav drawer on mobile — screens with their own inline
+   * BackButton (Tasks, Activities) keep it, just moved to the opposite corner (see
+   * `mobileMenuPosition`) so the two don't overlap.
    */
   showMobileMenuButton?: boolean;
+  /**
+   * Which corner the floating hamburger sits in on phone. Defaults to `left`. Screens
+   * that already render their own inline BackButton at top-left (Tasks, Activities) pass
+   * `right`, since BackButton sits in the scrollable content flow while this hamburger is
+   * a fixed overlay — at top-left they'd land in almost the same spot on first paint.
+   */
+  mobileMenuPosition?: 'left' | 'right';
 }
 
 /**
@@ -29,7 +35,11 @@ export interface AppLayoutProps {
  * non-tabs screen (activities, tasks, the journal editor) so the sidebar/drawer are
  * consistent everywhere rather than only inside the tab group.
  */
-export function AppLayout({ children, showMobileMenuButton = true }: AppLayoutProps) {
+export function AppLayout({
+  children,
+  showMobileMenuButton = true,
+  mobileMenuPosition = 'left',
+}: AppLayoutProps) {
   const { isPhone, isTablet } = useResponsive();
   const openDrawer = useUiStore((s) => s.openDrawer);
   const insets = useSafeAreaInsets();
@@ -44,7 +54,11 @@ export function AppLayout({ children, showMobileMenuButton = true }: AppLayoutPr
           <Pressable
             onPress={openDrawer}
             className="absolute h-10 w-10 items-center justify-center rounded-full border border-subtle bg-base"
-            style={[{ left: 16, top: insets.top + 12 }, shadows.sm]}
+            style={[
+              { top: insets.top + 12 },
+              mobileMenuPosition === 'right' ? { right: 16 } : { left: 16 },
+              shadows.sm,
+            ]}
           >
             <Icon name="Menu" size={20} color={themeColors.text.primary} />
           </Pressable>

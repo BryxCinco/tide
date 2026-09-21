@@ -35,7 +35,7 @@ export default function TasksScreen() {
   };
 
   return (
-    <AppLayout showMobileMenuButton={false}>
+    <AppLayout mobileMenuPosition="right">
       <SafeAreaView className="flex-1 bg-base">
         <ScrollView className="flex-1" contentContainerClassName="pb-24 pt-4 md:pt-6 lg:pt-8">
           <ResponsiveContainer className="gap-6">
