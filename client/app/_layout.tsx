@@ -18,7 +18,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ChatPanel } from '@/components/chat';
 import { SearchModal } from '@/components/search';
-import { Loader } from '@/components/ui';
+import { Loader, Toast } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
@@ -66,6 +66,10 @@ export default function RootLayout() {
             whichever CSS custom properties are applied here (see themeVars.ts). */}
         <View className="flex-1 bg-base" style={theme === 'dark' ? darkVars : lightVars}>
           {isRestoring ? <Loader fullScreen /> : <RootNavigator />}
+          {/* Always mounted, not gated by auth — a toast fired right before/during a
+              redirect (e.g. "Account deleted" just ahead of the /login replace) should
+              still be visible to land. */}
+          <Toast />
           <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
         </View>
       </SafeAreaProvider>
@@ -107,6 +111,7 @@ function RootNavigator() {
           <Stack.Screen name="activities" />
           <Stack.Screen name="tasks" />
           <Stack.Screen name="journal" />
+          <Stack.Screen name="legal" />
           <Stack.Screen name="chat" />
         </Stack.Protected>
 

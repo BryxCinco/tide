@@ -26,7 +26,15 @@
       "expo-router",
       "expo-secure-store",
       "expo-font",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Tide needs access to your photos so you can set an avatar and cover photo.",
+          "cameraPermission": "Tide needs access to your camera so you can take a new avatar or cover photo."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { useTranslation, type TranslationKey } from '../../i18n';
 import { useThemeStore } from '../../store/themeStore';
 import { cn } from '../../utils/cn';
 import { getSidebarNavPalette } from '../../utils/sidebarNavTheme';
@@ -16,20 +17,25 @@ import { Icon, Text, Tooltip, type IconName } from '../ui';
 
 export interface NavItemConfig {
   href: string;
+  /** English fallback — used verbatim if `labelKey` has no translation for the current
+   * language (see translate() in i18n/index.ts), and as-is for items with no labelKey. */
   label: string;
+  /** Resolved through useTranslation() when present. Not every item has one — full nav
+   * translation only covers the items translations.ts actually lists strings for. */
+  labelKey?: TranslationKey;
   icon: IconName;
 }
 
 /** Shared between the persistent/collapsed Sidebar and the mobile drawer. */
 export const NAV_ITEMS: NavItemConfig[] = [
-  { href: '/', label: 'Dashboard', icon: 'Home' },
-  { href: '/timer', label: 'Timer', icon: 'Clock' },
-  { href: '/journal', label: 'Journal', icon: 'Book' },
-  { href: '/tasks', label: 'Tasks', icon: 'CheckSquare' },
-  { href: '/activities', label: 'Activities', icon: 'Layers' },
-  { href: '/insights', label: 'Insights', icon: 'BarChart3' },
-  { href: '/chat', label: 'AI Coach', icon: 'Sparkles' },
-  { href: '/profile', label: 'Profile', icon: 'User' },
+  { href: '/', label: 'Dashboard', labelKey: 'nav.dashboard', icon: 'Home' },
+  { href: '/timer', label: 'Timer', labelKey: 'nav.timer', icon: 'Clock' },
+  { href: '/journal', label: 'Journal', labelKey: 'nav.journal', icon: 'Book' },
+  { href: '/tasks', label: 'Tasks', labelKey: 'nav.tasks', icon: 'CheckSquare' },
+  { href: '/activities', label: 'Activities', labelKey: 'nav.activities', icon: 'Layers' },
+  { href: '/insights', label: 'Insights', labelKey: 'nav.insights', icon: 'BarChart3' },
+  { href: '/chat', label: 'AI Coach', labelKey: 'nav.aiCoach', icon: 'Sparkles' },
+  { href: '/profile', label: 'Profile', labelKey: 'nav.profile', icon: 'User' },
 ];
 
 export interface NavItemProps {
@@ -48,6 +54,8 @@ export function NavItem({ item, collapsed = false, onNavigate }: NavItemProps) {
   const [isHovered, setIsHovered] = useState(false);
   const isDark = useThemeStore((s) => s.theme === 'dark');
   const palette = getSidebarNavPalette(isDark);
+  const { t } = useTranslation();
+  const label = item.labelKey ? t(item.labelKey) : item.label;
 
   // onHoverIn/Out only ever fire on web (pointer devices) — a no-op on touch, so this is
   // safe to wire up unconditionally rather than branching on Platform.OS.
@@ -94,7 +102,7 @@ export function NavItem({ item, collapsed = false, onNavigate }: NavItemProps) {
 
   if (collapsed) {
     return (
-      <Tooltip label={item.label} visible={isHovered}>
+      <Tooltip label={label} visible={isHovered}>
         <Pressable
           onPress={handlePress}
           onHoverIn={() => setIsHovered(true)}
@@ -153,7 +161,7 @@ export function NavItem({ item, collapsed = false, onNavigate }: NavItemProps) {
           style={{ color: textAndIconColor, letterSpacing: isHovered ? 0.2 : 0 }}
           numberOfLines={1}
         >
-          {item.label}
+          {label}
         </Text>
       </Animated.View>
     </Pressable>

@@ -1,47 +1,214 @@
 import { router } from 'expo-router';
-import { View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Avatar, BackButton, Button, ResponsiveContainer, Text, ThemeToggle } from '@/components/ui';
+import {
+  AboutSection,
+  AvatarPickerModal,
+  ChangePasswordModal,
+  DeleteAccountModal,
+  EditProfileModal,
+  FeedbackModal,
+  LanguageModal,
+  LogoutModal,
+  OptionPickerModal,
+  ProfileCover,
+  SettingsItem,
+  SettingsSection,
+  SettingsSwitch,
+  StatsRow,
+} from '@/components/profile';
+import { Button, Icon, ResponsiveContainer, Text, ThemeToggle } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import { LANGUAGES, useTranslation } from '@/i18n';
+import { useSettingsStore } from '@/store/settingsStore';
+import { useThemeStore } from '@/store/themeStore';
+import { showToast } from '@/store/toastStore';
+import { cn } from '@/utils/cn';
+import { clearCache } from '@/utils/clearCache';
+import { confirmAsync } from '@/utils/confirm';
+import { deleteAccountLocally } from '@/utils/deleteAccount';
+import { exportUserData } from '@/utils/exportData';
+import type { WeekStart } from '@/types/settings';
 
-// Placeholder — a later phase builds the real Profile/Settings screen.
-// Keeps logout reachable now that the dashboard itself is the real thing (it used to live there as a placeholder).
+const WEEK_START_LABELS: Record<WeekStart, string> = { monday: 'Monday', sunday: 'Sunday' };
+
+/** Compact text-pill toggle — "12h"/"24h" doesn't have a natural icon pair, so this stays
+ * text-based rather than icon-only like the segmented controls elsewhere in this app. */
+function TimeFormatSegmented({ value, onChange }: { value: '12h' | '24h'; onChange: (v: '12h' | '24h') => void }) {
+  return (
+    <View className="flex-row gap-1 rounded-full border border-subtle bg-base p-1">
+      {(['12h', '24h'] as const).map((option) => {
+        const selected = option === value;
+        return (
+          <Pressable key={option} onPress={() => onChange(option)} className={cn('rounded-full px-2.5 py-1', selected && 'bg-tide-teal')}>
+            <Text variant="caption" color={selected ? 'inverse' : 'muted'} className="normal-case tracking-normal">
+              {option}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function ProfileScreen() {
-  const { user, isGuest, logout } = useAuth();
+  const { logout } = useAuth();
+  const themeColors = useThemeColors();
+  const { t } = useTranslation();
+  const settings = useSettingsStore((s) => s.settings);
+  const updateSetting = useSettingsStore((s) => s.updateSetting);
+  const appliedTheme = useThemeStore((s) => s.theme);
+  const isMatchingSystem = settings.theme === 'system';
+
+  const [editVisible, setEditVisible] = useState(false);
+  const [avatarPickerVisible, setAvatarPickerVisible] = useState(false);
+  const [changePasswordVisible, setChangePasswordVisible] = useState(false);
+  const [logoutVisible, setLogoutVisible] = useState(false);
+  const [deleteVisible, setDeleteVisible] = useState(false);
+  const [feedbackVisible, setFeedbackVisible] = useState(false);
+  const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
+  const [weekStartPickerVisible, setWeekStartPickerVisible] = useState(false);
+
+  const currentLanguageName = LANGUAGES.find((l) => l.code === settings.language)?.nativeName ?? 'English';
 
   const handleLogout = async () => {
     await logout();
+    setLogoutVisible(false);
     router.replace('/(auth)/login');
   };
 
+  const handleDeleteAccount = async () => {
+    await deleteAccountLocally();
+    setDeleteVisible(false);
+    router.replace('/(auth)/login');
+    // Toast is always mounted at the app root (see app/_layout.tsx), not gated by auth, so
+    // this still lands on the login screen even though the profile screen it fired from
+    // has just unmounted.
+    showToast('Account deleted');
+  };
+
+  const handleClearCache = async () => {
+    const confirmed = await confirmAsync(
+      'Clear cache?',
+      'Clears your recent search history and AI Coach conversation. Your activities, tasks, and journal entries are not affected.',
+      'Clear',
+    );
+    if (confirmed) clearCache();
+  };
+
   return (
-    <SafeAreaView className="flex-1 bg-base">
-      <ResponsiveContainer className="flex-row items-center gap-3 py-4 md:py-6 lg:py-8">
-        <BackButton onPress={() => router.push('/')} />
-        <Text variant="h3" color="primary">
-          Profile
-        </Text>
-      </ResponsiveContainer>
+    <SafeAreaView className="flex-1 bg-base" edges={['top']}>
+      <ScrollView className="flex-1" contentContainerClassName="pb-24">
+        <ProfileCover onAvatarPress={() => setAvatarPickerVisible(true)} />
 
-      <View className="flex-1 items-center justify-center gap-3 px-6">
-        <Avatar name={user?.name} source={user?.avatar} size="xl" />
-        <Text variant="h2" color="primary" className="mt-2">
-          {user?.name ?? 'Guest'}
-        </Text>
-        <Text variant="body" color="muted" className="mb-2 text-center">
-          {isGuest ? 'Guest session — full profile settings coming soon.' : user?.email}
-        </Text>
+        <ResponsiveContainer className="mt-6 gap-4">
+          <StatsRow />
 
-        <View className="mb-4 flex-row items-center gap-3 rounded-xl border border-subtle bg-elevated px-4 py-3">
-          <Text variant="body" color="secondary" className="font-medium">
-            Dark Mode
-          </Text>
-          <ThemeToggle />
-        </View>
+          {/* Bento grid, matching Insights' layout: Account/Data pair up as half-width
+              tiles, Preferences and About get the full-width `wide` tile since they carry
+              far more rows than a half-width card comfortably fits. */}
+          <View className="gap-4 md:grid md:grid-cols-2 md:gap-4">
+            <SettingsSection title={t('profile.account')} icon="User" size="sm">
+              <SettingsItem icon="User" label={t('profile.editProfile')} onPress={() => setEditVisible(true)} />
+              <SettingsItem icon="Lock" label={t('profile.changePassword')} onPress={() => setChangePasswordVisible(true)} />
+            </SettingsSection>
 
-        <Button title="Log out" variant="secondary" onPress={handleLogout} />
-      </View>
+            <SettingsSection title={t('profile.data')} icon="Database" size="sm">
+              <SettingsItem icon="Download" label={t('profile.exportData')} description="Download a copy as JSON" onPress={exportUserData} />
+              <SettingsItem icon="Trash" label={t('profile.clearCache')} description="Recent searches & AI conversation" onPress={handleClearCache} />
+              <SettingsItem icon="UserX" label={t('profile.deleteAccount')} danger onPress={() => setDeleteVisible(true)} />
+            </SettingsSection>
+
+            <SettingsSection title={t('profile.preferences')} icon="SlidersHorizontal" size="wide">
+              {/* Same `ThemeToggle` component (and circular-reveal animation) as the
+                  sidebar — not a lookalike, the literal same one — so switching themes
+                  here and there feels identical. "Match System" is its own row instead of
+                  a 3rd toggle state, since a binary pill switch can't represent 3 values;
+                  turning it on hands appearance to the OS, turning it off locks in
+                  whichever theme is currently applied. */}
+              <SettingsItem icon="Palette" label={t('profile.appearance')} description={appliedTheme === 'dark' ? 'Dark' : 'Light'} right={<ThemeToggle />} />
+              <SettingsItem
+                icon="Monitor"
+                label={t('profile.matchSystem')}
+                description="Follow your device's setting"
+                right={<SettingsSwitch value={isMatchingSystem} onValueChange={(v) => updateSetting('theme', v ? 'system' : appliedTheme)} />}
+              />
+              <SettingsItem
+                icon="Bell"
+                label={t('profile.notifications')}
+                right={<SettingsSwitch value={settings.notifications} onValueChange={(v) => updateSetting('notifications', v)} />}
+              />
+              <SettingsItem
+                icon="Volume2"
+                label={t('profile.soundEffects')}
+                right={<SettingsSwitch value={settings.soundEffects} onValueChange={(v) => updateSetting('soundEffects', v)} />}
+              />
+              <SettingsItem
+                icon="Globe"
+                label={t('profile.language')}
+                onPress={() => setLanguagePickerVisible(true)}
+                right={
+                  <View className="flex-row items-center gap-2">
+                    <Text variant="body" color="muted" className="normal-case tracking-normal">
+                      {currentLanguageName}
+                    </Text>
+                    <Icon name="ChevronRight" size={18} color={themeColors.text.disabled} />
+                  </View>
+                }
+              />
+              <SettingsItem
+                icon="Calendar"
+                label={t('profile.weekStartsOn')}
+                onPress={() => setWeekStartPickerVisible(true)}
+                right={
+                  <View className="flex-row items-center gap-2">
+                    <Text variant="body" color="muted" className="normal-case tracking-normal">
+                      {WEEK_START_LABELS[settings.weekStartsOn]}
+                    </Text>
+                    <Icon name="ChevronRight" size={18} color={themeColors.text.disabled} />
+                  </View>
+                }
+              />
+              <SettingsItem
+                icon="Clock"
+                label={t('profile.timeFormat')}
+                right={<TimeFormatSegmented value={settings.timeFormat} onChange={(v) => updateSetting('timeFormat', v)} />}
+              />
+            </SettingsSection>
+
+            <AboutSection onFeedbackPress={() => setFeedbackVisible(true)} />
+          </View>
+
+          <Button title={t('profile.logOut')} variant="danger" size="lg" icon="LogOut" fullWidth onPress={() => setLogoutVisible(true)} className="mt-2" />
+        </ResponsiveContainer>
+      </ScrollView>
+
+      <EditProfileModal
+        visible={editVisible}
+        onClose={() => setEditVisible(false)}
+        onChangeAvatar={() => {
+          setEditVisible(false);
+          setAvatarPickerVisible(true);
+        }}
+      />
+      <AvatarPickerModal visible={avatarPickerVisible} onClose={() => setAvatarPickerVisible(false)} />
+      <ChangePasswordModal visible={changePasswordVisible} onClose={() => setChangePasswordVisible(false)} />
+      <LogoutModal visible={logoutVisible} onClose={() => setLogoutVisible(false)} onConfirm={handleLogout} />
+      <DeleteAccountModal visible={deleteVisible} onClose={() => setDeleteVisible(false)} onConfirm={handleDeleteAccount} />
+      <FeedbackModal visible={feedbackVisible} onClose={() => setFeedbackVisible(false)} />
+
+      <LanguageModal visible={languagePickerVisible} onClose={() => setLanguagePickerVisible(false)} />
+      <OptionPickerModal
+        visible={weekStartPickerVisible}
+        onClose={() => setWeekStartPickerVisible(false)}
+        title={t('profile.weekStartsOn')}
+        value={settings.weekStartsOn}
+        options={(Object.keys(WEEK_START_LABELS) as WeekStart[]).map((value) => ({ value, label: WEEK_START_LABELS[value] }))}
+        onSelect={(value) => updateSetting('weekStartsOn', value)}
+      />
     </SafeAreaView>
   );
 }

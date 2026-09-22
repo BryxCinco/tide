@@ -26,7 +26,14 @@ export const DEFAULT_COVER_GRADIENT_ID = COVER_GRADIENTS[0].id;
 interface UserActions {
   updateProfile: (updates: { name?: string; bio?: string }) => void;
   updateAvatar: (avatarUri: string) => void;
+  /** Distinct from `updateAvatar('')` — sets the field to `undefined` rather than an empty
+   * string, so it round-trips cleanly through storage/export instead of leaving a stray "". */
+  removeAvatar: () => void;
   updateCover: (coverType: CoverType, coverValue: string) => void;
+  /** Clears both cover fields back to `undefined` — CoverPhoto/ProfileCover already fall
+   * back to the default gradient preset when either is unset, so "remove" and "reset to
+   * default" are the same action rather than a separate blank state to design for. */
+  removeCover: () => void;
 }
 
 /**
@@ -40,5 +47,7 @@ interface UserActions {
 export const useUserStore = create<UserActions>()(() => ({
   updateProfile: (updates) => useAuthStore.getState().updateUser(updates),
   updateAvatar: (avatarUri) => useAuthStore.getState().updateUser({ avatar: avatarUri }),
+  removeAvatar: () => useAuthStore.getState().updateUser({ avatar: undefined }),
   updateCover: (coverType, coverValue) => useAuthStore.getState().updateUser({ coverType, coverValue }),
+  removeCover: () => useAuthStore.getState().updateUser({ coverType: undefined, coverValue: undefined }),
 }));

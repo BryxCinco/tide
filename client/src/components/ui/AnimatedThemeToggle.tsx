@@ -3,6 +3,7 @@ import { Platform, Pressable, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { useSettingsStore } from '../../store/settingsStore';
 import { useThemeStore } from '../../store/themeStore';
 import { measureInWindow } from '../../utils/measure';
 import { revealThemeChange } from '../../utils/themeTransition';
@@ -32,7 +33,11 @@ export interface AnimatedThemeToggleProps {
  */
 export function AnimatedThemeToggle({ className, collapsed = false }: AnimatedThemeToggleProps) {
   const theme = useThemeStore((s) => s.theme);
-  const setTheme = useThemeStore((s) => s.setTheme);
+  // Routed through settingsStore (not themeStore.setTheme directly) so a manual toggle here
+  // also exits "system" mode in Preferences — otherwise the next OS appearance change would
+  // silently override whatever the user just picked by hand.
+  const updateThemeSetting = useSettingsStore((s) => s.updateSetting);
+  const setTheme = (target: 'light' | 'dark') => updateThemeSetting('theme', target);
   const themeColors = useThemeColors();
   const isDark = theme === 'dark';
   const pressableRef = useRef<View>(null);

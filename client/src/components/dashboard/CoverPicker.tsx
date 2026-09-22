@@ -1,29 +1,91 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
 
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { PRESET_COLORS } from '../../mocks/mockActivities';
-import { COVER_GRADIENTS } from '../../store/userStore';
+import { showToast } from '../../store/toastStore';
+import { COVER_GRADIENTS, useUserStore } from '../../store/userStore';
 import type { CoverType } from '../../types/user';
+import { cn } from '../../utils/cn';
+import { pickImage, type ImageSource } from '../../utils/imageUpload';
 import { colors } from '../../utils/theme';
-import { Button, Icon, Modal, Text } from '../ui';
+import { Icon, Modal, Text, type IconName } from '../ui';
 
 export interface CoverPickerProps {
   visible: boolean;
   onClose: () => void;
   currentType: CoverType;
   currentValue: string;
-  onSelect: (coverType: CoverType, coverValue: string) => void;
 }
 
-/** Bottom-sheet-on-phone / centered-on-desktop picker (via the shared Modal) for the
- * Dashboard cover: a gradient preset or a solid color. Image upload needs
- * expo-image-picker, which isn't installed — the button below is a disabled placeholder
- * rather than a silent new dependency. */
-export function CoverPicker({ visible, onClose, currentType, currentValue, onSelect }: CoverPickerProps) {
+function OptionRow({ icon, label, danger, onPress }: { icon: IconName; label: string; danger?: boolean; onPress: () => void }) {
+  const themeColors = useThemeColors();
+  return (
+    <Pressable onPress={onPress} className="flex-row items-center gap-3 rounded-xl px-3 py-3 hover:bg-elevated">
+      <Icon name={icon} size={18} color={danger ? themeColors.status.error : themeColors.text.secondary} />
+      <Text variant="body" color="primary" className={cn('normal-case tracking-normal', danger && 'text-error')}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+/**
+ * Owns its update/remove actions directly (userStore) instead of taking an `onSelect`
+ * callback the caller has to wire up — both call sites (ProfileHeader on the Dashboard,
+ * ProfileCover on Profile) want the exact same behavior for every option here, so there
+ * was nothing for a callback prop to actually vary between them. Take Photo/Choose from
+ * Library use the same `pickImage` util and 2MB cap as AvatarPickerModal; gradients/solid
+ * colors are the original preset pickers this component already had.
+ */
+export function CoverPicker({ visible, onClose, currentType, currentValue }: CoverPickerProps) {
+  const updateCover = useUserStore((s) => s.updateCover);
+  const removeCover = useUserStore((s) => s.removeCover);
+  const themeColors = useThemeColors();
+  const [isPicking, setIsPicking] = useState(false);
+
+  const handlePick = async (source: ImageSource) => {
+    setIsPicking(true);
+    const result = await pickImage(source);
+    setIsPicking(false);
+
+    if (result.ok) {
+      updateCover('image', result.uri);
+      onClose();
+      showToast('Cover photo updated');
+      return;
+    }
+
+    if (result.reason === 'too-large') showToast('That image is over 2MB — try a smaller one.', 'error');
+    else if (result.reason === 'permission-denied') showToast('Permission denied — enable photo access in your device settings.', 'error');
+  };
+
+  const handleRemove = () => {
+    removeCover();
+    onClose();
+    showToast('Cover photo removed');
+  };
+
+  const handleSelectPreset = (type: CoverType, value: string) => {
+    updateCover(type, value);
+    onClose();
+  };
+
   return (
     <Modal visible={visible} onClose={onClose} title="Change Cover" size="md">
       <View className="gap-5">
-        <Button title="Upload a photo" variant="secondary" icon="Upload" disabled fullWidth />
+        {isPicking ? (
+          <View className="items-center py-6">
+            <ActivityIndicator color={themeColors.brand.tideTeal} />
+          </View>
+        ) : (
+          <View className="gap-1">
+            {Platform.OS !== 'web' && <OptionRow icon="Camera" label="Take Photo" onPress={() => handlePick('camera')} />}
+            <OptionRow icon="Image" label="Choose from Library" onPress={() => handlePick('library')} />
+            {currentType === 'image' && <OptionRow icon="Trash2" label="Remove Cover" danger onPress={handleRemove} />}
+          </View>
+        )}
 
         <View className="gap-2">
           <Text variant="label" color="muted">
@@ -35,7 +97,7 @@ export function CoverPicker({ visible, onClose, currentType, currentValue, onSel
               return (
                 <Pressable
                   key={gradient.id}
-                  onPress={() => onSelect('gradient', gradient.id)}
+                  onPress={() => handleSelectPreset('gradient', gradient.id)}
                   className="h-14 w-14 overflow-hidden rounded-xl"
                   style={{ borderWidth: isSelected ? 2 : 0, borderColor: colors.brand.tideTeal }}
                 >
@@ -61,7 +123,7 @@ export function CoverPicker({ visible, onClose, currentType, currentValue, onSel
               return (
                 <Pressable
                   key={hex}
-                  onPress={() => onSelect('solid', hex)}
+                  onPress={() => handleSelectPreset('solid', hex)}
                   className="h-10 w-10 items-center justify-center rounded-full"
                   style={{ backgroundColor: hex, borderWidth: isSelected ? 2 : 0, borderColor: colors.brand.tideTeal }}
                 >

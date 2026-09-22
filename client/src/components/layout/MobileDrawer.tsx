@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '../../hooks/useAuth';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { useTranslation } from '../../i18n';
 import { useThemeStore } from '../../store/themeStore';
 import { useUiStore } from '../../store/uiStore';
 import { hexToRgba } from '../../utils/color';
@@ -30,6 +31,7 @@ export function MobileDrawer() {
   const { width: screenWidth } = useWindowDimensions();
   const themeColors = useThemeColors();
   const isDark = useThemeStore((s) => s.theme === 'dark');
+  const { t } = useTranslation();
 
   const drawerWidth = Math.min(screenWidth * 0.8, MAX_WIDTH);
   const translateX = useSharedValue(-drawerWidth);
@@ -120,11 +122,11 @@ export function MobileDrawer() {
               <View className="shrink-0 px-3 pb-4 pt-2">
                 <View className="mb-2 h-px" style={{ backgroundColor: hexToRgba(themeColors.brand.tideTeal, 0.1) }} />
 
-                <NavItem item={{ href: '/profile', label: 'Settings', icon: 'Settings' }} onNavigate={closeDrawer} />
+                <NavItem item={{ href: '/profile', label: 'Settings', labelKey: 'nav.settings', icon: 'Settings' }} onNavigate={closeDrawer} />
 
                 <View className="mt-2 flex-row items-center justify-between px-3 py-1">
                   <Text variant="caption" color="muted" className="normal-case tracking-normal">
-                    Theme
+                    {t('nav.theme')}
                   </Text>
                   <ThemeToggle />
                 </View>
@@ -132,7 +134,7 @@ export function MobileDrawer() {
                 <Pressable onPress={handleLogout} className="flex-row items-center gap-3 rounded-xl py-2.5 pl-3 pr-4">
                   <Icon name="LogOut" size={19} color={themeColors.status.error} />
                   <Text variant="body" className="font-medium" style={{ color: themeColors.status.error }}>
-                    Log Out
+                    {t('nav.logout')}
                   </Text>
                 </Pressable>
               </View>

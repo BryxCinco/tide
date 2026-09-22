@@ -4,7 +4,7 @@ import { Pressable, View } from 'react-native';
 
 import { useAuth } from '../../hooks/useAuth';
 import { useResponsive } from '../../hooks/useResponsive';
-import { DEFAULT_COVER_GRADIENT_ID, useUserStore } from '../../store/userStore';
+import { DEFAULT_COVER_GRADIENT_ID } from '../../store/userStore';
 import { Avatar, Button, Icon, ResponsiveContainer, Text } from '../ui';
 import { CoverPhoto } from './CoverPhoto';
 import { CoverPicker } from './CoverPicker';
@@ -13,7 +13,6 @@ import { CoverPicker } from './CoverPicker';
  * name/bio/edit — the centerpiece of the redesigned Dashboard. */
 export function ProfileHeader() {
   const { user } = useAuth();
-  const updateCover = useUserStore((s) => s.updateCover);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [avatarHovered, setAvatarHovered] = useState(false);
   const { isDesktop, isTablet } = useResponsive();
@@ -88,16 +87,7 @@ export function ProfileHeader() {
         </View>
       </ResponsiveContainer>
 
-      <CoverPicker
-        visible={pickerVisible}
-        onClose={() => setPickerVisible(false)}
-        currentType={coverType}
-        currentValue={coverValue}
-        onSelect={(type, value) => {
-          updateCover(type, value);
-          setPickerVisible(false);
-        }}
-      />
+      <CoverPicker visible={pickerVisible} onClose={() => setPickerVisible(false)} currentType={coverType} currentValue={coverValue} />
     </View>
   );
 }

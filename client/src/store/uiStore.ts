@@ -15,9 +15,9 @@ interface UiState {
   isSidebarCollapsed: boolean;
   toggleSidebar: () => void;
 
-  /** The AI Coach side-panel's open state (desktop/tablet) — transient, not persisted,
-   * same reasoning as isDrawerOpen. Mobile doesn't use this at all; the FAB there
-   * navigates to the full-screen /chat route instead (see ChatbotFAB.tsx). */
+  /** The AI Coach overlay's (ChatPanel.tsx) open state — transient, not persisted, same
+   * reasoning as isDrawerOpen. Drives the one chat UI used at every screen width; see
+   * ChatPanel.tsx's own header comment for why there used to be a phone-only fallback here. */
   isChatOpen: boolean;
   openChat: () => void;
   closeChat: () => void;

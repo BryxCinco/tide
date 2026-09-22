@@ -16,4 +16,5 @@ export * from './ProgressBar';
 export * from './ResponsiveContainer';
 export * from './Text';
 export * from './ThemeToggle';
+export * from './Toast';
 export * from './Tooltip';

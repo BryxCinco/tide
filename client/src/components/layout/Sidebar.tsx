@@ -7,6 +7,7 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from '
 import { useAuth } from '../../hooks/useAuth';
 import { useResponsive } from '../../hooks/useResponsive';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { useTranslation } from '../../i18n';
 import { useThemeStore } from '../../store/themeStore';
 import { useUiStore } from '../../store/uiStore';
 import { cn } from '../../utils/cn';
@@ -38,6 +39,7 @@ export function Sidebar({ collapsed: forcedCollapsed = false }: SidebarProps) {
   const { isDesktop } = useResponsive();
   const isSidebarCollapsed = useUiStore((s) => s.isSidebarCollapsed);
   const [logoutHovered, setLogoutHovered] = useState(false);
+  const { t } = useTranslation();
 
   const collapsed = forcedCollapsed || (isDesktop && isSidebarCollapsed);
 
@@ -152,7 +154,7 @@ export function Sidebar({ collapsed: forcedCollapsed = false }: SidebarProps) {
         <View className={cn('shrink-0 px-3 pb-4 pt-2', collapsed && 'items-center px-0')}>
           <View className="mb-2 h-px" style={{ backgroundColor: dividerColor, width: collapsed ? 40 : undefined }} />
 
-          <NavItem item={{ href: '/profile', label: 'Settings', icon: 'Settings' }} collapsed={collapsed} />
+          <NavItem item={{ href: '/profile', label: 'Settings', labelKey: 'nav.settings', icon: 'Settings' }} collapsed={collapsed} />
 
           {collapsed ? (
             <View className="mt-2 items-center">
@@ -161,14 +163,14 @@ export function Sidebar({ collapsed: forcedCollapsed = false }: SidebarProps) {
           ) : (
             <View className="mt-3 flex-row items-center justify-between px-3">
               <Text variant="caption" color="muted" className="normal-case tracking-normal">
-                Theme
+                {t('nav.theme')}
               </Text>
               <ThemeToggle />
             </View>
           )}
 
           {collapsed ? (
-            <Tooltip label="Log Out" visible={logoutHovered}>
+            <Tooltip label={t('nav.logout')} visible={logoutHovered}>
               <Pressable
                 onPress={handleLogout}
                 onHoverIn={() => setLogoutHovered(true)}
@@ -185,7 +187,7 @@ export function Sidebar({ collapsed: forcedCollapsed = false }: SidebarProps) {
             >
               <Icon name="LogOut" size={19} color={themeColors.status.error} />
               <Text variant="body" className="font-medium" style={{ color: themeColors.status.error }}>
-                Log Out
+                {t('nav.logout')}
               </Text>
             </Pressable>
           )}
