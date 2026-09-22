@@ -32,7 +32,7 @@ export const mockQuickActions: QuickActionItem[] = [
   { id: 'start-timer', label: 'Start Timer', icon: 'Play', tint: 'teal', href: '/timer' },
   { id: 'write-journal', label: 'Write Journal', icon: 'PenLine', tint: 'blue', href: '/journal/new' },
   { id: 'view-insights', label: 'View Insights', icon: 'BarChart3', tint: 'purple', href: '/insights' },
-  { id: 'chat-coach', label: 'Chat with Coach', icon: 'MessageCircle', tint: 'teal', href: '#chat' },
+  { id: 'chat-coach', label: 'Chat with Coach', icon: 'Sparkles', tint: 'teal', href: '/chat' },
 ];
 
 export const mockRecentActivity: TimeLogEntry[] = [

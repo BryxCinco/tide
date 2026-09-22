@@ -28,6 +28,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { href: '/tasks', label: 'Tasks', icon: 'CheckSquare' },
   { href: '/activities', label: 'Activities', icon: 'Layers' },
   { href: '/insights', label: 'Insights', icon: 'BarChart3' },
+  { href: '/chat', label: 'AI Coach', icon: 'Sparkles' },
   { href: '/profile', label: 'Profile', icon: 'User' },
 ];
 

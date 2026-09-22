@@ -18,22 +18,19 @@ const tintClasses: Record<AccentTone, { bg: string; icon?: string }> = {
 
 export interface QuickActionsProps {
   actions: QuickActionItem[];
-  /** Called instead of navigating for the item whose `href` is `"#chat"`. */
-  onChatPress?: () => void;
 }
 
 /** 2x2 on phone, 4-across from tablet (md, 768px+) up. */
-export function QuickActions({ actions, onChatPress }: QuickActionsProps) {
+export function QuickActions({ actions }: QuickActionsProps) {
   return (
     <View className="flex-row flex-wrap gap-3">
       {actions.map((action) => {
         const tone = tintClasses[action.tint];
-        const isChat = action.href === '#chat';
 
         return (
           <Pressable
             key={action.id}
-            onPress={() => (isChat ? onChatPress?.() : router.push(action.href as Href))}
+            onPress={() => router.push(action.href as Href)}
             className={cn(
               'items-center gap-3 rounded-xl border border-subtle bg-base p-4',
               'basis-[47%] md:basis-0 md:min-w-[140px] md:flex-1',

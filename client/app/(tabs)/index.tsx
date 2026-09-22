@@ -34,8 +34,7 @@ import { getVisibleWidgets, useDashboardStore } from '@/store/dashboardStore';
 import type { WidgetId } from '@/types/dashboard';
 
 export default function DashboardScreen() {
-  const { user, isGuest } = useAuth();
-  const [chatVisible, setChatVisible] = useState(false);
+  const { isGuest } = useAuth();
   const [taskModalVisible, setTaskModalVisible] = useState(false);
   const [customizeVisible, setCustomizeVisible] = useState(false);
 
@@ -55,7 +54,7 @@ export default function DashboardScreen() {
       case 'quote':
         return <QuoteCard />;
       case 'quickActions':
-        return <QuickActions actions={mockQuickActions} onChatPress={() => setChatVisible(true)} />;
+        return <QuickActions actions={mockQuickActions} />;
       case 'recentActivity':
         return <RecentActivity entries={mockRecentActivity} />;
       case 'recentJournal':
@@ -94,12 +93,7 @@ export default function DashboardScreen() {
         </ResponsiveContainer>
       </ScrollView>
 
-      <ChatbotFAB
-        userName={user?.name}
-        visible={chatVisible}
-        onOpen={() => setChatVisible(true)}
-        onClose={() => setChatVisible(false)}
-      />
+      <ChatbotFAB />
 
       <TaskFormModal visible={taskModalVisible} onClose={() => setTaskModalVisible(false)} />
       <CustomizeDashboardModal visible={customizeVisible} onClose={() => setCustomizeVisible(false)} />
