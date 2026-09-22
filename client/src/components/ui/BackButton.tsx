@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable } from 'react-native';
+import { Pressable } from './SoundPressable';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { cn } from '../../utils/cn';

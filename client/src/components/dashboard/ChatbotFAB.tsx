@@ -1,6 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect } from 'react';
-import { Platform, Pressable } from 'react-native';
+import { Platform } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
 import { useThemeColors } from '../../hooks/useThemeColors';

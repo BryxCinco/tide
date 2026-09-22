@@ -1,4 +1,5 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 
 import type { TaskFilter, TaskSort } from '../../store/taskStore';
 import { cn } from '../../utils/cn';

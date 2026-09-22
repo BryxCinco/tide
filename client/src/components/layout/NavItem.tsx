@@ -5,6 +5,7 @@ import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
@@ -13,6 +14,7 @@ import { useTranslation, type TranslationKey } from '../../i18n';
 import { useThemeStore } from '../../store/themeStore';
 import { cn } from '../../utils/cn';
 import { getSidebarNavPalette } from '../../utils/sidebarNavTheme';
+import { soundManager } from '../../utils/soundManager';
 import { Icon, Text, Tooltip, type IconName } from '../ui';
 
 export interface NavItemConfig {
@@ -43,12 +45,18 @@ export interface NavItemProps {
   /** Icons-only rail (tablet collapsed sidebar) — shows a hover tooltip instead of an inline label. */
   collapsed?: boolean;
   onNavigate?: () => void;
+  /** Position within the list it's rendered in — purely for staggering the entrance
+   * animation below (each item ~35ms behind the last). Omit for a one-off item (Sidebar's
+   * standalone "Settings" row) that isn't part of a mapped list. */
+  index?: number;
 }
 
 const HOVER_DURATION = 200;
 const PULSE_MIN_OPACITY = 0.95;
+const ENTRANCE_DURATION = 320;
+const ENTRANCE_STAGGER_MS = 35;
 
-export function NavItem({ item, collapsed = false, onNavigate }: NavItemProps) {
+export function NavItem({ item, collapsed = false, onNavigate, index = 0 }: NavItemProps) {
   const pathname = usePathname();
   const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
   const [isHovered, setIsHovered] = useState(false);
@@ -61,6 +69,15 @@ export function NavItem({ item, collapsed = false, onNavigate }: NavItemProps) {
   // safe to wire up unconditionally rather than branching on Platform.OS.
   const hoverProgress = useSharedValue(0);
   const pulse = useSharedValue(1);
+  // Runs once per mount, not per render — Sidebar/MobileDrawer's NavItems are what "each
+  // appearance on the navigation" refers to: the drawer unmounts its content on close (see
+  // MobileDrawer.tsx's own header comment), so every open re-mounts and re-stages this.
+  const entrance = useSharedValue(0);
+
+  useEffect(() => {
+    entrance.value = withDelay(index * ENTRANCE_STAGGER_MS, withTiming(1, { duration: ENTRANCE_DURATION, easing: Easing.out(Easing.cubic) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     // 200ms ease-out for every hover/active transition per spec — this same shared value
@@ -82,10 +99,15 @@ export function NavItem({ item, collapsed = false, onNavigate }: NavItemProps) {
   }, [isActive, isDark, pulse]);
 
   const handlePress = () => {
+    soundManager.play('tap');
     router.push(item.href as Href);
     onNavigate?.();
   };
 
+  const entranceStyle = useAnimatedStyle(() => ({
+    opacity: entrance.value,
+    transform: [{ translateX: (1 - entrance.value) * (collapsed ? 0 : -12) }, { translateY: (1 - entrance.value) * (collapsed ? 8 : 0) }],
+  }));
   const activePulseStyle = useAnimatedStyle(() => ({ opacity: pulse.value }));
   const hoverOverlayStyle = useAnimatedStyle(() => ({ opacity: isActive ? 0 : hoverProgress.value }));
   const rowStyle = useAnimatedStyle(() => ({
@@ -102,13 +124,39 @@ export function NavItem({ item, collapsed = false, onNavigate }: NavItemProps) {
 
   if (collapsed) {
     return (
-      <Tooltip label={label} visible={isHovered}>
-        <Pressable
-          onPress={handlePress}
-          onHoverIn={() => setIsHovered(true)}
-          onHoverOut={() => setIsHovered(false)}
-          className="h-11 w-11 items-center justify-center rounded-xl"
-        >
+      <Animated.View style={entranceStyle}>
+        <Tooltip label={label} visible={isHovered}>
+          <Pressable
+            onPress={handlePress}
+            onHoverIn={() => setIsHovered(true)}
+            onHoverOut={() => setIsHovered(false)}
+            className="h-11 w-11 items-center justify-center rounded-xl"
+          >
+            {isActive && (
+              <Animated.View
+                pointerEvents="none"
+                className="absolute inset-0 rounded-xl"
+                style={[{ backgroundColor: palette.navActiveBg }, palette.navActiveGlow, activePulseStyle]}
+              />
+            )}
+            <Animated.View
+              pointerEvents="none"
+              className="absolute inset-0 rounded-xl"
+              style={[{ backgroundColor: palette.navHoverBg }, palette.navHoverGlow, hoverOverlayStyle]}
+            />
+            <Animated.View style={iconScaleStyle} className="shrink-0">
+              <Icon name={item.icon} size={20} color={textAndIconColor} />
+            </Animated.View>
+          </Pressable>
+        </Tooltip>
+      </Animated.View>
+    );
+  }
+
+  return (
+    <Animated.View style={entranceStyle}>
+      <Pressable onPress={handlePress} onHoverIn={() => setIsHovered(true)} onHoverOut={() => setIsHovered(false)}>
+        <Animated.View style={rowStyle} className="relative flex-row items-center gap-3 rounded-xl px-4 py-3">
           {isActive && (
             <Animated.View
               pointerEvents="none"
@@ -121,49 +169,27 @@ export function NavItem({ item, collapsed = false, onNavigate }: NavItemProps) {
             className="absolute inset-0 rounded-xl"
             style={[{ backgroundColor: palette.navHoverBg }, palette.navHoverGlow, hoverOverlayStyle]}
           />
+          {isActive && (
+            <View
+              pointerEvents="none"
+              className="absolute bottom-1.5 left-0 top-1.5 w-[3px] rounded-full"
+              style={[{ backgroundColor: palette.navAccentBar }, palette.navAccentBarGlow]}
+            />
+          )}
+
           <Animated.View style={iconScaleStyle} className="shrink-0">
             <Icon name={item.icon} size={20} color={textAndIconColor} />
           </Animated.View>
-        </Pressable>
-      </Tooltip>
-    );
-  }
-
-  return (
-    <Pressable onPress={handlePress} onHoverIn={() => setIsHovered(true)} onHoverOut={() => setIsHovered(false)}>
-      <Animated.View style={rowStyle} className="relative flex-row items-center gap-3 rounded-xl px-4 py-3">
-        {isActive && (
-          <Animated.View
-            pointerEvents="none"
-            className="absolute inset-0 rounded-xl"
-            style={[{ backgroundColor: palette.navActiveBg }, palette.navActiveGlow, activePulseStyle]}
-          />
-        )}
-        <Animated.View
-          pointerEvents="none"
-          className="absolute inset-0 rounded-xl"
-          style={[{ backgroundColor: palette.navHoverBg }, palette.navHoverGlow, hoverOverlayStyle]}
-        />
-        {isActive && (
-          <View
-            pointerEvents="none"
-            className="absolute bottom-1.5 left-0 top-1.5 w-[3px] rounded-full"
-            style={[{ backgroundColor: palette.navAccentBar }, palette.navAccentBarGlow]}
-          />
-        )}
-
-        <Animated.View style={iconScaleStyle} className="shrink-0">
-          <Icon name={item.icon} size={20} color={textAndIconColor} />
+          <Text
+            variant="body"
+            className={cn('shrink text-base font-medium', isActive && 'font-semibold')}
+            style={{ color: textAndIconColor, letterSpacing: isHovered ? 0.2 : 0 }}
+            numberOfLines={1}
+          >
+            {label}
+          </Text>
         </Animated.View>
-        <Text
-          variant="body"
-          className={cn('shrink text-base font-medium', isActive && 'font-semibold')}
-          style={{ color: textAndIconColor, letterSpacing: isHovered ? 0.2 : 0 }}
-          numberOfLines={1}
-        >
-          {label}
-        </Text>
-      </Animated.View>
-    </Pressable>
+      </Pressable>
+    </Animated.View>
   );
 }

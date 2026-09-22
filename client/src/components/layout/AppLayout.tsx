@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useResponsive } from '../../hooks/useResponsive';

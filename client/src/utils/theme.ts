@@ -173,6 +173,20 @@ export const shadows = {
     elevation: 8,
   },
   /**
+   * Deliberately heavier than `lg` — Modal.tsx's own dedicated shadow (spec: "0 20px 60px
+   * rgba(0,0,0,0.15)"). RN's shadowRadius becomes the CSS blur radius verbatim once
+   * react-native-web translates it, so shadowRadius: 60 here really does produce a 60px
+   * blur, not half of it — a bigger, softer lift than any of the other tiers, appropriate
+   * for a modal floating above a darkened backdrop rather than a card sitting on the page.
+   */
+  modal: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.15,
+    shadowRadius: 60,
+    elevation: 24,
+  },
+  /**
    * Colored "glow" shadows for premium CTAs (primary button, danger button, FAB).
    * RN shadow* props (not CSS box-shadow) so the tint renders on native too —
    * react-native-web already translates these into an equivalent box-shadow on web.
@@ -227,6 +241,18 @@ export const shadows = {
     elevation: 5,
   },
 } as const;
+
+/**
+ * Dedicated dark-mode surface for modal chrome (Modal.tsx, ChatPanel.tsx, SearchModal.tsx)
+ * — a true neutral grey rather than `colors.background.surface`'s navy-tinted `#161D2A`.
+ * Explicit design feedback asked for modals to read as grey, not near-black, in dark mode;
+ * the rest of the app's dark palette stays navy-tinted, this is scoped to modal surfaces
+ * only. `hover` is the matching neutral-grey chip background for things like the close
+ * button, instead of `colors.background.hover`'s navy `#1E2633`, which would look
+ * mismatched against this lighter grey. Light mode is unchanged (solid white).
+ */
+export const modalSurface = { light: '#FFFFFF', dark: '#27272A' } as const;
+export const modalHover = { light: '#F3F4F6', dark: '#3A3A3F' } as const;
 
 export const theme = {
   colors,

@@ -1,9 +1,10 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 
 import type { Activity } from '../../types/activity';
 import { hexToRgba } from '../../utils/color';
 import { colors } from '../../utils/theme';
-import { Badge, Icon, Text, type IconName } from '../ui';
+import { Badge, Icon, Text, VisibleDeleteButton, type IconName } from '../ui';
 
 export interface ActivityRowProps {
   activity: Activity;
@@ -13,6 +14,14 @@ export interface ActivityRowProps {
   onMoveDown: () => void;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  /** Custom activities only — deletePermanently removes it (activityStore.deleteActivity
+   * already refuses anything that isn't category:'custom', this just controls whether the
+   * button renders at all). */
+  onDelete: () => void;
+  /** Predefined activities get "Hide" (archive) instead of delete — they can't be removed,
+   * only kept out of the active pickers. Toggles isArchived; already-archived rows call
+   * this to un-hide instead. */
+  onToggleHide: () => void;
 }
 
 export function ActivityRow({
@@ -23,7 +32,10 @@ export function ActivityRow({
   onMoveDown,
   canMoveUp,
   canMoveDown,
+  onDelete,
+  onToggleHide,
 }: ActivityRowProps) {
+  const isCustom = activity.category === 'custom';
   return (
     <View className="flex-row items-center gap-3 rounded-xl border border-subtle bg-base p-3">
       <View
@@ -59,6 +71,15 @@ export function ActivityRow({
         <Pressable onPress={onEdit} hitSlop={6} className="ml-1">
           <Icon name="Pencil" size={18} />
         </Pressable>
+        {isCustom ? (
+          <VisibleDeleteButton
+            onConfirm={onDelete}
+            confirmTitle="Delete activity?"
+            confirmMessage={`"${activity.name}" will be removed. Past sessions logged under it keep their record.`}
+          />
+        ) : (
+          !activity.isArchived && <VisibleDeleteButton variant="hide" onConfirm={onToggleHide} />
+        )}
       </View>
     </View>
   );

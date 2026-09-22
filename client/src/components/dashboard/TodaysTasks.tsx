@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 
 import { useTaskStore } from '../../store/taskStore';
 import type { TaskPriority } from '../../types/task';

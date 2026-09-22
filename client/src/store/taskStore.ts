@@ -11,6 +11,15 @@ interface TaskState {
   tasks: Task[];
   filter: TaskFilter;
   sort: TaskSort;
+  /**
+   * Count only, not a per-task `withdrawn` flag on Task itself — `deleteTask` really
+   * removes the row (Fix 1's visible delete button relies on that: tap trash, it's gone,
+   * everywhere, immediately), so there's no live Task record left to carry a flag on.
+   * This increments right before that removal, whenever the task being deleted wasn't
+   * already done — enough for Insights' "Tasks Withdrawn" stat without turning delete into
+   * a soft-delete/undelete system.
+   */
+  withdrawnCount: number;
 
   addTask: (input: {
     title: string;
@@ -36,6 +45,7 @@ export const useTaskStore = create<TaskState>()(
       tasks: [],
       filter: 'all',
       sort: 'priority',
+      withdrawnCount: 0,
 
       addTask: (input) => {
         const task: Task = {
@@ -54,7 +64,14 @@ export const useTaskStore = create<TaskState>()(
       },
 
       deleteTask: (id) => {
-        set((state) => ({ tasks: state.tasks.filter((t) => t.id !== id) }));
+        set((state) => {
+          const task = state.tasks.find((t) => t.id === id);
+          const wasWithdrawn = task != null && task.status !== 'done';
+          return {
+            tasks: state.tasks.filter((t) => t.id !== id),
+            withdrawnCount: wasWithdrawn ? state.withdrawnCount + 1 : state.withdrawnCount,
+          };
+        });
       },
 
       toggleTaskStatus: (id) => {
@@ -75,7 +92,7 @@ export const useTaskStore = create<TaskState>()(
       storage: createJSONStorage(() => storage),
       // Filter/sort are view state, not data — persisting them would make the screen
       // "remember" a stale view instead of defaulting to All/Priority each session.
-      partialize: (state) => ({ tasks: state.tasks }),
+      partialize: (state) => ({ tasks: state.tasks, withdrawnCount: state.withdrawnCount }),
     },
   ),
 );

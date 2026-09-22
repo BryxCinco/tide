@@ -1,4 +1,5 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 
 import { LANGUAGES, setLanguage, useTranslation } from '../../i18n';
 import { showToast } from '../../store/toastStore';
@@ -29,7 +30,7 @@ export function LanguageModal({ visible, onClose }: LanguageModalProps) {
   };
 
   return (
-    <Modal visible={visible} onClose={onClose} title="Language" size="sm">
+    <Modal visible={visible} onClose={onClose} title="Language" icon="Globe" size="sm">
       <View className="gap-1">
         {LANGUAGES.map((option) => {
           const selected = option.code === language;

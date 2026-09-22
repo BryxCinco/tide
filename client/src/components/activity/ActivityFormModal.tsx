@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import { ScrollView, useWindowDimensions, View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 
 import { ICON_OPTIONS, PRESET_COLORS } from '../../mocks/mockActivities';
 import { useActivityStore } from '../../store/activityStore';
@@ -73,9 +74,9 @@ export function ActivityFormModal({ visible, onClose, activity, onSaved }: Activ
   };
 
   return (
-    <Modal visible={visible} onClose={onClose} title={isEditing ? 'Edit Activity' : 'New Activity'} size="md">
+    <Modal visible={visible} onClose={onClose} title={isEditing ? 'Edit Activity' : 'New Activity'} icon="Layers" size="md">
       <ScrollView style={{ maxHeight: height * 0.6 }} showsVerticalScrollIndicator={false}>
-        <View className="gap-5 pb-1">
+        <View className="gap-6 pb-1">
           <Input
             label="Name"
             placeholder="e.g. Reading"
@@ -99,11 +100,11 @@ export function ActivityFormModal({ visible, onClose, activity, onSaved }: Activ
                     key={option}
                     onPress={() => setIcon(option)}
                     className={cn(
-                      'h-10 w-10 items-center justify-center rounded-full border',
-                      isSelected ? 'border-tide-teal bg-tide-teal/10' : 'border-subtle bg-surface',
+                      'h-11 w-11 items-center justify-center rounded-full border-2 transition-transform duration-150 hover:scale-110',
+                      isSelected ? 'border-tide-teal bg-tide-teal/10' : 'border-subtle bg-surface hover:border-default',
                     )}
                   >
-                    <Icon name={option as IconName} size={18} color={isSelected ? color : undefined} />
+                    <Icon name={option as IconName} size={19} color={isSelected ? color : undefined} />
                   </Pressable>
                 );
               })}
@@ -121,7 +122,7 @@ export function ActivityFormModal({ visible, onClose, activity, onSaved }: Activ
                   <Pressable
                     key={option}
                     onPress={() => setColor(option)}
-                    className="h-9 w-9 items-center justify-center rounded-full"
+                    className="h-10 w-10 items-center justify-center rounded-full transition-transform duration-150 hover:scale-110"
                     style={{
                       backgroundColor: option,
                       borderWidth: isSelected ? 2 : 0,

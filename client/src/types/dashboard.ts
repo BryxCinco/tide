@@ -77,13 +77,23 @@ export type WidgetId =
   | 'recentActivity'
   | 'recentJournal'
   | 'insights'
-  | 'habits';
+  | 'habits'
+  | 'time'
+  | 'calendar'
+  | 'weather'
+  | 'weeklyProgress'
+  | 'streak';
 
 export interface WidgetConfig {
   id: WidgetId;
   enabled: boolean;
   /** Lower renders first. Not necessarily contiguous — reorder rewrites all of them. */
   order: number;
+  /** 'compact' widgets (the small Fix-8 tiles: Time/Calendar/Weather/Weekly Progress/
+   * Streak) wrap multiple-per-row in WidgetGrid instead of each taking a full row like
+   * every other widget ('full', the default when omitted — every widget from before this
+   * field existed). */
+  size?: 'full' | 'compact';
 }
 
 export interface DashboardPreferences {

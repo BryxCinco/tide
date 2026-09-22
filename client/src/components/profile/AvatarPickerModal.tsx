@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
+import { ActivityIndicator, Platform, View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 
 import { useAuth } from '../../hooks/useAuth';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -61,7 +62,7 @@ export function AvatarPickerModal({ visible, onClose }: AvatarPickerModalProps) 
   ];
 
   return (
-    <Modal visible={visible} onClose={onClose} title="Change Avatar" size="sm">
+    <Modal visible={visible} onClose={onClose} title="Change Avatar" icon="Camera" size="sm">
       <View className="gap-4">
         <View className="items-center">
           <Avatar name={user?.name} source={user?.avatar} size="xl" ring ringColor="teal" />

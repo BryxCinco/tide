@@ -2,14 +2,13 @@ import { useState } from 'react';
 import { View } from 'react-native';
 
 import { formatDuration } from '../../utils/formatTime';
+import { soundManager } from '../../utils/soundManager';
 import { Button, Modal, Text } from '../ui';
 import type { TimerRingStatus } from './CircularTimer';
 
 export interface TimerControlsProps {
   status: TimerRingStatus;
   seconds: number;
-  /** Whether an activity has been picked yet — gates the idle "Start Session" button. */
-  canStart: boolean;
   onStart: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -20,7 +19,6 @@ export interface TimerControlsProps {
 export function TimerControls({
   status,
   seconds,
-  canStart,
   onStart,
   onPause,
   onResume,
@@ -28,8 +26,29 @@ export function TimerControls({
 }: TimerControlsProps) {
   const [confirmVisible, setConfirmVisible] = useState(false);
 
+  const handleStart = () => {
+    soundManager.play('timerStart');
+    onStart();
+  };
+
+  const handlePause = () => {
+    soundManager.play('timerPause');
+    onPause();
+  };
+
+  const handleResume = () => {
+    soundManager.play('timerStart');
+    onResume();
+  };
+
   const handleSave = () => {
     setConfirmVisible(false);
+    // This app's Timer is a stopwatch with no duration goal to "complete", so unlike
+    // start/pause there's no natural place for the more prominent `timerComplete` alarm —
+    // it stays implemented in soundManager.ts (`RECIPES.timerComplete`) and ready to wire
+    // up if a Pomodoro-style countdown target is ever added. Saving a finished session is
+    // this screen's real "stop" moment, so it gets `timerStop`.
+    soundManager.play('timerStop');
     onConfirmStop();
   };
 
@@ -41,8 +60,7 @@ export function TimerControls({
         size="lg"
         fullWidth
         icon="Play"
-        disabled={!canStart}
-        onPress={onStart}
+        onPress={handleStart}
       />
     );
   }
@@ -51,9 +69,9 @@ export function TimerControls({
     <>
       <View className="flex-row gap-3">
         {status === 'running' ? (
-          <Button title="Pause" variant="secondary" size="lg" icon="Pause" onPress={onPause} className="flex-1" />
+          <Button title="Pause" variant="secondary" size="lg" icon="Pause" onPress={handlePause} className="flex-1" />
         ) : (
-          <Button title="Resume" variant="primary" size="lg" icon="Play" onPress={onResume} className="flex-1" />
+          <Button title="Resume" variant="primary" size="lg" icon="Play" onPress={handleResume} className="flex-1" />
         )}
         <Button
           title="Stop"
@@ -65,7 +83,7 @@ export function TimerControls({
         />
       </View>
 
-      <Modal visible={confirmVisible} onClose={() => setConfirmVisible(false)} title="End this session?" size="sm">
+      <Modal visible={confirmVisible} onClose={() => setConfirmVisible(false)} title="End this session?" icon="Clock" size="sm">
         <Text variant="body" color="secondary" className="mb-6">
           You&apos;ve tracked {formatDuration(seconds)}. Save this session?
         </Text>

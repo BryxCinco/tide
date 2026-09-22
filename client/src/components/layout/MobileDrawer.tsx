@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect } from 'react';
-import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
+import { ScrollView, View, useWindowDimensions } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -113,8 +114,8 @@ export function MobileDrawer() {
                 contentContainerClassName="gap-1 pb-4"
                 showsVerticalScrollIndicator={false}
               >
-                {NAV_ITEMS.map((item) => (
-                  <NavItem key={item.href} item={item} onNavigate={closeDrawer} />
+                {NAV_ITEMS.map((item, index) => (
+                  <NavItem key={item.href} item={item} onNavigate={closeDrawer} index={index} />
                 ))}
               </ScrollView>
 

@@ -1,7 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { useAuth } from '../../hooks/useAuth';
@@ -145,8 +146,8 @@ export function Sidebar({ collapsed: forcedCollapsed = false }: SidebarProps) {
           contentContainerClassName={cn('gap-1', collapsed ? 'items-center pb-4' : 'pb-4')}
           showsVerticalScrollIndicator={false}
         >
-          {NAV_ITEMS.map((item) => (
-            <NavItem key={item.href} item={item} collapsed={collapsed} />
+          {NAV_ITEMS.map((item, index) => (
+            <NavItem key={item.href} item={item} collapsed={collapsed} index={index} />
           ))}
         </ScrollView>
 

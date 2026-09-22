@@ -39,7 +39,7 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
   };
 
   return (
-    <Modal visible={visible} onClose={onClose} title="Send Feedback" size="md">
+    <Modal visible={visible} onClose={onClose} title="Send Feedback" icon="MessageSquare" size="md">
       <View className="gap-5">
         <View className="gap-1">
           <Input

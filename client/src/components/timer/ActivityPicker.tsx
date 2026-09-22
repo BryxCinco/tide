@@ -1,4 +1,5 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 
 import type { Activity } from '../../types/activity';
 import { cn } from '../../utils/cn';
@@ -13,12 +14,15 @@ export interface ActivityPickerProps {
   disabled?: boolean;
   /** Renders a trailing "+ Custom" chip that opens the create-activity modal. Omit to hide it. */
   onAddCustom?: () => void;
+  /** Shows an X badge on the selected chip and lets re-tapping it deselect — only sensible
+   * while idle, since a running/paused session always needs an activity to log against. */
+  onDeselect?: () => void;
 }
 
 /** 2-across on phone, 3-across on tablet (md, 768px+), 6-across on desktop (lg, 1024px+).
  * Single-select. Colors are arbitrary hex (custom activities), so tinting goes through
  * inline style via hexToRgba rather than Tailwind classes. */
-export function ActivityPicker({ activities, selectedId, onSelect, disabled = false, onAddCustom }: ActivityPickerProps) {
+export function ActivityPicker({ activities, selectedId, onSelect, disabled = false, onAddCustom, onDeselect }: ActivityPickerProps) {
   return (
     <View className="flex-row flex-wrap gap-3">
       {activities.map((activity) => {
@@ -28,13 +32,22 @@ export function ActivityPicker({ activities, selectedId, onSelect, disabled = fa
           <Pressable
             key={activity.id}
             disabled={disabled}
-            onPress={() => onSelect(activity)}
+            onPress={() => (isSelected && onDeselect ? onDeselect() : onSelect(activity))}
             className={cn(
-              'basis-[47%] items-center gap-2 rounded-xl border p-3 md:basis-[30%] lg:basis-[14%]',
+              'relative basis-[47%] items-center gap-2 rounded-xl border p-3 md:basis-[30%] lg:basis-[14%]',
               isSelected ? 'border-tide-teal bg-tide-teal/5' : 'border-subtle bg-base',
               disabled && !isSelected && 'opacity-50',
             )}
           >
+            {isSelected && onDeselect && (
+              <Pressable
+                onPress={onDeselect}
+                hitSlop={8}
+                className="absolute right-1.5 top-1.5 h-5 w-5 items-center justify-center rounded-full bg-tide-teal"
+              >
+                <Icon name="X" size={11} color="#FFFFFF" />
+              </Pressable>
+            )}
             <View
               className="h-11 w-11 items-center justify-center rounded-full"
               style={{ backgroundColor: hexToRgba(activity.color, 0.1) }}

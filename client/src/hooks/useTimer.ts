@@ -16,16 +16,22 @@ export function useTimer() {
   const seconds = useTimerStore((s) => s.seconds);
   const isRunning = useTimerStore((s) => s.isRunning);
   const isPaused = useTimerStore((s) => s.isPaused);
+  const mode = useTimerStore((s) => s.mode);
+  const countdownDurationSeconds = useTimerStore((s) => s.countdownDurationSeconds);
   const todaySessions = useTimerStore((s) => s.todaySessions);
   const activityTotals = useTimerStore((s) => s.activityTotals);
 
   const setActivity = useTimerStore((s) => s.setActivity);
+  const clearActivity = useTimerStore((s) => s.clearActivity);
   const toggleTag = useTimerStore((s) => s.toggleTag);
   const setNotes = useTimerStore((s) => s.setNotes);
+  const setMode = useTimerStore((s) => s.setMode);
+  const setCountdownDuration = useTimerStore((s) => s.setCountdownDuration);
   const start = useTimerStore((s) => s.start);
   const pause = useTimerStore((s) => s.pause);
   const resume = useTimerStore((s) => s.resume);
   const stop = useTimerStore((s) => s.stop);
+  const reset = useTimerStore((s) => s.reset);
   const tick = useTimerStore((s) => s.tick);
 
   useEffect(() => {
@@ -34,6 +40,8 @@ export function useTimer() {
     return () => clearInterval(interval);
   }, [isRunning, tick]);
 
+  const secondsRemaining = mode === 'countdown' && countdownDurationSeconds != null ? Math.max(0, countdownDurationSeconds - seconds) : null;
+
   return {
     currentActivity,
     selectedTags,
@@ -41,14 +49,21 @@ export function useTimer() {
     seconds,
     isRunning,
     isPaused,
+    mode,
+    countdownDurationSeconds,
+    secondsRemaining,
     todaySessions,
     activityTotals,
     setActivity,
+    clearActivity,
     toggleTag,
     setNotes,
+    setMode,
+    setCountdownDuration,
     start,
     pause,
     resume,
     stop,
+    reset,
   };
 }

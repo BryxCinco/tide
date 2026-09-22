@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 
 import { CoverPhoto, CoverPicker } from '../dashboard';
 import { useAuth } from '../../hooks/useAuth';

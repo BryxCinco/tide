@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { DailyQuestCard } from '@/components/dashboard';
 import { AppLayout } from '@/components/layout';
 import { TaskCard, TaskFilters, TaskFormModal } from '@/components/tasks';
 import { BackButton, Button, EmptyState, ResponsiveContainer, Text } from '@/components/ui';
@@ -16,6 +17,7 @@ export default function TasksScreen() {
   const setFilter = useTaskStore((s) => s.setFilter);
   const setSort = useTaskStore((s) => s.setSort);
   const toggleTaskStatus = useTaskStore((s) => s.toggleTaskStatus);
+  const deleteTask = useTaskStore((s) => s.deleteTask);
 
   const activities = useActivityStore((s) => s.activities);
 
@@ -47,6 +49,8 @@ export default function TasksScreen() {
               <Button title="New" variant="primary" size="sm" icon="Plus" onPress={openCreate} />
             </View>
 
+            <DailyQuestCard />
+
             <TaskFilters filter={filter} sort={sort} onFilterChange={setFilter} onSortChange={setSort} />
 
             {visibleTasks.length === 0 ? (
@@ -66,6 +70,7 @@ export default function TasksScreen() {
                       activityName={activities.find((a) => a.id === task.linkedActivityId)?.name}
                       onToggle={() => toggleTaskStatus(task.id)}
                       onEdit={() => openEdit(task)}
+                      onDelete={() => deleteTask(task.id)}
                     />
                   </View>
                 ))}

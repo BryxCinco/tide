@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 
 import { getFormattedDate, getGreeting } from '../../utils/greeting';
 import { Avatar, Icon, Text } from '../ui';

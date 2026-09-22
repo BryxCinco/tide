@@ -27,6 +27,12 @@ export interface CircularTimerProps {
   activityLabel?: string;
   /** Diameter in px. Defaults to 280 (the spec's minimum). */
   size?: number;
+  /** Countdown mode (Fix 8): purple/blue ring instead of the stopwatch's teal gradient,
+   * and the ring fills once toward 100% over `countdownDurationSeconds` instead of
+   * sweeping one lap every 60s. `displaySeconds` is what's shown as text — the caller
+   * passes the remaining time, not the elapsed `seconds` the ring math still needs. */
+  countdownDurationSeconds?: number;
+  displaySeconds?: number;
 }
 
 const statusLabels: Record<TimerRingStatus, string> = {
@@ -35,15 +41,19 @@ const statusLabels: Record<TimerRingStatus, string> = {
   paused: 'Paused',
 };
 
-/** The hero: a live circular stopwatch. Not tied to a fixed target duration, so the ring
- * sweeps one full lap every 60s — tangible progress feedback tied to the visible seconds
- * digit, rather than an arbitrary percentage of nothing. */
-export function CircularTimer({ seconds, status, activityLabel, size = 280 }: CircularTimerProps) {
+/** The hero: a live circular timer. Stopwatch mode isn't tied to a fixed target duration,
+ * so the ring sweeps one full lap every 60s — tangible progress feedback tied to the
+ * visible seconds digit, rather than an arbitrary percentage of nothing. Countdown mode
+ * has a real target, so its ring fills once toward 100% instead (see the prop doc above). */
+export function CircularTimer({ seconds, status, activityLabel, size = 280, countdownDurationSeconds, displaySeconds }: CircularTimerProps) {
   const themeColors = useThemeColors();
+  const isCountdown = countdownDurationSeconds != null;
   const strokeWidth = Math.max(10, Math.round(size * 0.045));
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const lapProgress = ((seconds % 60) / 60) * 100;
+  const lapProgress = isCountdown
+    ? Math.min(100, (seconds / Math.max(countdownDurationSeconds, 1)) * 100)
+    : ((seconds % 60) / 60) * 100;
 
   const animatedProgress = useSharedValue(0);
   useEffect(() => {
@@ -92,6 +102,10 @@ export function CircularTimer({ seconds, status, activityLabel, size = 280 }: Ci
             <Stop offset="0%" stopColor={colors.brand.tideTeal} />
             <Stop offset="100%" stopColor={colors.brand.oceanBlue} />
           </LinearGradient>
+          <LinearGradient id="circularTimerGradientCountdown" x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor={colors.brand.deepPurple} />
+            <Stop offset="100%" stopColor={colors.brand.oceanBlue} />
+          </LinearGradient>
         </Defs>
 
         <Circle cx={size / 2} cy={size / 2} r={radius} stroke={themeColors.background.hover} strokeWidth={strokeWidth} fill="none" />
@@ -101,7 +115,7 @@ export function CircularTimer({ seconds, status, activityLabel, size = 280 }: Ci
             cx={size / 2}
             cy={size / 2}
             r={radius}
-            stroke={status === 'paused' ? colors.status.warning : 'url(#circularTimerGradient)'}
+            stroke={status === 'paused' ? colors.status.warning : isCountdown ? 'url(#circularTimerGradientCountdown)' : 'url(#circularTimerGradient)'}
             strokeWidth={strokeWidth}
             strokeLinecap="round"
             fill="none"
@@ -115,7 +129,7 @@ export function CircularTimer({ seconds, status, activityLabel, size = 280 }: Ci
       <View className="absolute inset-0 items-center justify-center">
         <Animated.View style={tickStyle}>
           <Text variant="display" color="primary" style={{ fontVariant: ['tabular-nums'] }}>
-            {formatClock(seconds)}
+            {formatClock(displaySeconds ?? seconds)}
           </Text>
         </Animated.View>
         <Text variant="body" color="secondary" className="mt-2 font-medium">

@@ -7,7 +7,6 @@ import { EmptyJournal, JournalCard, JournalFilters, SearchBar } from '@/componen
 import { BackButton, FAB, ResponsiveContainer, Text } from '@/components/ui';
 import { useResponsive } from '@/hooks/useResponsive';
 import { getVisibleEntries, useJournalStore } from '@/store/journalStore';
-import { confirmAsync } from '@/utils/confirm';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -43,11 +42,6 @@ export default function JournalScreen() {
   const openNewEntry = () => router.push('/journal/new');
   const openEntry = (id: string) => router.push(`/journal/${id}`);
 
-  const handleDelete = async (id: string, title: string) => {
-    const confirmed = await confirmAsync('Delete entry?', `"${title || 'This entry'}" will be removed. This can't be undone.`);
-    if (confirmed) deleteEntry(id);
-  };
-
   const columns = isDesktop ? 3 : isTablet ? 2 : 1;
   const basisClass = columns === 3 ? 'basis-full md:basis-[48%] lg:basis-[31%]' : columns === 2 ? 'basis-full md:basis-[48%]' : 'basis-full';
 
@@ -81,7 +75,7 @@ export default function JournalScreen() {
                     entry={entry}
                     onPress={() => openEntry(entry.id)}
                     onToggleFavorite={() => toggleFavorite(entry.id)}
-                    onDelete={() => handleDelete(entry.id, entry.title)}
+                    onDelete={() => deleteEntry(entry.id)}
                   />
                 </View>
               ))}

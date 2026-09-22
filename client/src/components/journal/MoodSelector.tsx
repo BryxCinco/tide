@@ -1,4 +1,5 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 
 import { MOOD_ORDER, type Mood } from '../../types/journal';
 import { cn } from '../../utils/cn';

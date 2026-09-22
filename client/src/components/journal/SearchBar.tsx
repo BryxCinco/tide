@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { View } from 'react-native';
+import { TextInput } from '../ui/SoundTextInput';
+import { Pressable } from '../ui/SoundPressable';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useThemeStore } from '../../store/themeStore';

@@ -1,10 +1,12 @@
 import { forwardRef, useState } from 'react';
-import { Pressable, Text as RNText, TextInput, View, type TextInputProps } from 'react-native';
+import { Text as RNText, TextInput, View, type TextInputProps } from 'react-native';
+import { Pressable } from './SoundPressable';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useThemeStore } from '../../store/themeStore';
 import { cn } from '../../utils/cn';
-import { shadows } from '../../utils/theme';
+import { soundManager } from '../../utils/soundManager';
+import { colors, shadows } from '../../utils/theme';
 import { Icon, type IconName } from './Icon';
 import { Text } from './Text';
 
@@ -83,7 +85,10 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
         <TextInput
           ref={ref}
           value={value}
-          onChangeText={onChangeText}
+          onChangeText={(text) => {
+            soundManager.play('typing');
+            onChangeText?.(text);
+          }}
           placeholder={placeholder}
           placeholderTextColor={themeColors.text.disabled}
           editable={editable}
@@ -94,7 +99,9 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
             setIsFocused(false);
             onBlur?.();
           }}
-          className="flex-1 font-sans text-body text-primary"
+          selectionColor={colors.brand.tideTeal}
+          cursorColor={colors.brand.tideTeal}
+          className="flex-1 font-sans text-body text-primary caret-tide-teal outline-none"
           style={multiline ? { textAlignVertical: 'top' } : undefined}
           {...rest}
         />

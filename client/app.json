@@ -34,7 +34,8 @@
           "photosPermission": "Tide needs access to your photos so you can set an avatar and cover photo.",
           "cameraPermission": "Tide needs access to your camera so you can take a new avatar or cover photo."
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true

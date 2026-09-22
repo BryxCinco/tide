@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 
+import { soundManager } from '../utils/soundManager';
+
 export type ToastVariant = 'success' | 'error' | 'info';
+
+const TOAST_SOUND: Record<ToastVariant, 'success' | 'error' | 'notification'> = {
+  success: 'success',
+  error: 'error',
+  info: 'notification',
+};
 
 interface ToastState {
   message: string | null;
@@ -23,7 +31,10 @@ export const useToastStore = create<ToastState>()((set) => ({
   variant: 'success',
   key: 0,
 
-  show: (message, variant = 'success') => set((state) => ({ message, variant, key: state.key + 1 })),
+  show: (message, variant = 'success') => {
+    soundManager.play(TOAST_SOUND[variant]);
+    set((state) => ({ message, variant, key: state.key + 1 }));
+  },
   hide: () => set({ message: null }),
 }));
 

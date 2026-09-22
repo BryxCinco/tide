@@ -1,6 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
+import { ActivityIndicator, Platform, View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { PRESET_COLORS } from '../../mocks/mockActivities';
@@ -73,7 +74,7 @@ export function CoverPicker({ visible, onClose, currentType, currentValue }: Cov
   };
 
   return (
-    <Modal visible={visible} onClose={onClose} title="Change Cover" size="md">
+    <Modal visible={visible} onClose={onClose} title="Change Cover" icon="Image" size="md">
       <View className="gap-5">
         {isPicking ? (
           <View className="items-center py-6">

@@ -15,6 +15,15 @@ const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'recentJournal', enabled: false, order: 7 },
   { id: 'insights', enabled: false, order: 8 },
   { id: 'habits', enabled: false, order: 9 },
+  // Fix 8's small tile widgets — Time and Streak on by default (an always-useful clock and
+  // the Daily Quests streak restated as a glanceable tile), the other three off since they
+  // either need a permission (Weather) or duplicate a screen that already exists (Calendar,
+  // Weekly Progress vs. the Insights tab) until the user opts in.
+  { id: 'time', enabled: true, order: 10, size: 'compact' },
+  { id: 'streak', enabled: true, order: 11, size: 'compact' },
+  { id: 'calendar', enabled: false, order: 12, size: 'compact' },
+  { id: 'weather', enabled: false, order: 13, size: 'compact' },
+  { id: 'weeklyProgress', enabled: false, order: 14, size: 'compact' },
 ];
 
 interface DashboardState {
@@ -50,6 +59,21 @@ export const useDashboardStore = create<DashboardState>()(
     {
       name: 'tide_dashboard_prefs',
       storage: createJSONStorage(() => storage),
+      // A widget added to DEFAULT_WIDGETS after a user's prefs were already persisted
+      // (e.g. Fix 8's 5 new tiles) would otherwise never appear for them — the persist
+      // middleware's default shallow merge replaces `preferences` wholesale with whatever
+      // was saved. This appends any default widget missing from the persisted list instead
+      // of dropping it, while leaving that user's existing enabled/order choices untouched.
+      merge: (persisted, current) => {
+        const persistedWidgets = (persisted as Partial<DashboardState>)?.preferences?.widgets ?? [];
+        const persistedIds = new Set(persistedWidgets.map((w) => w.id));
+        const missingDefaults = DEFAULT_WIDGETS.filter((w) => !persistedIds.has(w.id));
+        return {
+          ...current,
+          ...(persisted as Partial<DashboardState>),
+          preferences: { widgets: [...persistedWidgets, ...missingDefaults] },
+        };
+      },
     },
   ),
 );

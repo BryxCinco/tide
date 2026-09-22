@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 
 import type { JournalPreview } from '../../types/dashboard';
 import { Badge, Text } from '../ui';

@@ -45,27 +45,22 @@ function mondayFirstIndex(date: Date): number {
 const WEEK_HOURS_PATTERN = [3.2, 4.4, 2.8, 4.2, 3.6, 1.4, 0.8]; // Mon..Sun, most-recent-first below
 const MOOD_PATTERN: Mood[] = ['good', 'great', 'okay', 'good', 'good', 'bad', 'okay'];
 
-function buildWeeklyTime(): DayTimeEntry[] {
-  // Index 0 = 6 days ago (Monday-of-this-window) .. index 6 = today, so bars read
-  // left-to-right chronologically ending on "today" regardless of what day it actually is.
-  return Array.from({ length: 7 }, (_, i) => {
-    const date = daysAgo(6 - i);
-    return {
-      label: WEEKDAY_LABELS[mondayFirstIndex(date)],
-      date: isoDate(date),
-      seconds: Math.round(WEEK_HOURS_PATTERN[i] * 3600),
-    };
-  });
-}
-
-function buildMonthlyTime(): DayTimeEntry[] {
-  return Array.from({ length: 30 }, (_, i) => {
-    const date = daysAgo(29 - i);
-    // Gentle wave + weekday pattern so the chart isn't flat, still deterministic.
+/**
+ * Generalized replacement for the old separate buildWeeklyTime()/buildMonthlyTime() — Fix
+ * 4 needs arbitrary-length ranges (today/week/month/year/all/custom), not just those two
+ * fixed windows, so this takes a day count instead. `days <= 7` keeps the old weekday-label
+ * behavior (bars read left-to-right ending on "today"); longer ranges label by day-of-month,
+ * same as the old monthly builder.
+ */
+function buildTimeSeries(days: number): DayTimeEntry[] {
+  return Array.from({ length: days }, (_, i) => {
+    const date = daysAgo(days - 1 - i);
     const weekdayFactor = WEEK_HOURS_PATTERN[mondayFirstIndex(date)];
-    const wave = 1 + 0.15 * Math.sin(i / 3);
+    // Gentle wave on top of the weekday pattern so longer ranges aren't flat-repeating,
+    // still deterministic (not Math.random) so it's stable across reloads/hot-refresh.
+    const wave = days <= 7 ? 1 : 1 + 0.15 * Math.sin(i / 3);
     return {
-      label: String(date.getDate()),
+      label: days <= 7 ? WEEKDAY_LABELS[mondayFirstIndex(date)] : String(date.getDate()),
       date: isoDate(date),
       seconds: Math.round(weekdayFactor * wave * 3600),
     };
@@ -89,12 +84,12 @@ function buildMoodTrend(days: number): MoodTrendPoint[] {
 }
 
 const activityBreakdown: ActivityBreakdownSlice[] = [
-  { id: 'deep-work', label: 'Deep Work', seconds: 8 * 3600 + 20 * 60, color: CHART_COLORS.teal },
-  { id: 'meetings', label: 'Meetings', seconds: 3 * 3600 + 10 * 60, color: CHART_COLORS.oceanBlue },
-  { id: 'learning', label: 'Learning', seconds: 2 * 3600 + 40 * 60, color: CHART_COLORS.purple },
-  { id: 'exercise', label: 'Exercise', seconds: 1 * 3600 + 50 * 60, color: CHART_COLORS.orange },
-  { id: 'journaling', label: 'Journaling', seconds: 45 * 60, color: CHART_COLORS.pink },
-  { id: 'other', label: 'Other', seconds: 1 * 3600 + 15 * 60, color: CHART_COLORS.gray },
+  { id: 'deep-work', label: 'Deep Work', seconds: 8 * 3600 + 20 * 60, color: CHART_COLORS.teal, trendPercent: 14, lastSessionDate: isoDate(daysAgo(0)) },
+  { id: 'meetings', label: 'Meetings', seconds: 3 * 3600 + 10 * 60, color: CHART_COLORS.oceanBlue, trendPercent: -6, lastSessionDate: isoDate(daysAgo(1)) },
+  { id: 'learning', label: 'Learning', seconds: 2 * 3600 + 40 * 60, color: CHART_COLORS.purple, trendPercent: 22, lastSessionDate: isoDate(daysAgo(0)) },
+  { id: 'exercise', label: 'Exercise', seconds: 1 * 3600 + 50 * 60, color: CHART_COLORS.orange, trendPercent: 5, lastSessionDate: isoDate(daysAgo(2)) },
+  { id: 'journaling', label: 'Journaling', seconds: 45 * 60, color: CHART_COLORS.pink, trendPercent: -18, lastSessionDate: isoDate(daysAgo(3)) },
+  { id: 'other', label: 'Other', seconds: 1 * 3600 + 15 * 60, color: CHART_COLORS.gray, trendPercent: 0, lastSessionDate: isoDate(daysAgo(4)) },
 ];
 
 const productivityScore: ProductivityScoreBreakdown = {
@@ -112,8 +107,8 @@ const weeklySummary: WeeklySummaryItem[] = [
   { id: 'task-rate', label: 'Task Completion', value: '73%', icon: 'CheckSquare', tint: 'muted' },
 ];
 
-function buildHeatmap(): HeatmapDay[] {
-  return buildMonthlyTime().map(({ date, seconds }) => {
+function buildHeatmap(days: number): HeatmapDay[] {
+  return buildTimeSeries(days).map(({ date, seconds }) => {
     const hours = seconds / 3600;
     const level: HeatmapDay['level'] = hours >= 5 ? 4 : hours >= 3.5 ? 3 : hours >= 2 ? 2 : hours > 0 ? 1 : 0;
     return { date, level, seconds };
@@ -121,15 +116,31 @@ function buildHeatmap(): HeatmapDay[] {
 }
 
 export const mockInsightsData: InsightsData = {
-  weeklyTime: buildWeeklyTime(),
-  monthlyTime: buildMonthlyTime(),
+  weeklyTime: buildTimeSeries(7),
+  monthlyTime: buildTimeSeries(30),
   activityBreakdown,
   moodTrendWeek: buildMoodTrend(7),
   moodTrendMonth: buildMoodTrend(30),
   productivityScore,
   weeklySummary,
-  heatmap: buildHeatmap(),
+  heatmap: buildHeatmap(30),
   totalTimeTrend: '+12%',
 };
+
+/**
+ * Fix 4's range filter (TimeFilter.tsx) needs arbitrary day counts (Today=1 through
+ * All Time), not just the two fixed 7/30-day windows above — this generates all of a
+ * range's chart data from the same deterministic patterns, so every chart on the Insights
+ * screen (time chart, mood trend, heatmap) recomputes consistently for whatever range is
+ * selected instead of only Week/Month having real data.
+ */
+export function buildInsightsForRange(days: number): { time: DayTimeEntry[]; mood: MoodTrendPoint[]; heatmap: HeatmapDay[] } {
+  const clampedDays = Math.max(1, days);
+  return {
+    time: buildTimeSeries(clampedDays),
+    mood: buildMoodTrend(clampedDays),
+    heatmap: buildHeatmap(clampedDays),
+  };
+}
 
 export { CHART_COLORS };

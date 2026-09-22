@@ -1,4 +1,5 @@
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 
 import { cn } from '../../utils/cn';
 import { Text } from '../ui';

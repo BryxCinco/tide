@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, TextInput, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
+import { TextInput } from '../ui/SoundTextInput';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useJournalStore } from '../../store/journalStore';

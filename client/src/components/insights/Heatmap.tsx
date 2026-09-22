@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
 import type { HeatmapDay } from '../../types/insights';
@@ -13,6 +14,16 @@ export interface HeatmapProps {
 
 const CELL_GAP = 6;
 const COLUMNS = 10;
+
+/** Reference used to turn a day's tracked seconds into a "productivity %" — 6 focused
+ * hours reads as a full day, matching the existing level-4 bucket's own >=5h threshold
+ * below (a 5h day already reads as "practically full" before this, so 6h=100% keeps that
+ * feel rather than requiring an unrealistic 8+ hour day just to hit 100%). */
+const DAILY_GOAL_SECONDS = 6 * 3600;
+
+function productivityPercent(seconds: number): number {
+  return Math.min(100, Math.round((seconds / DAILY_GOAL_SECONDS) * 100));
+}
 
 /** GitHub-style contribution grid — 30 cells, opacity-scaled teal per level (0-4). Cells
  * are `flex: 1, aspectRatio: 1` (stretch to fill the row, stay square) rather than a
@@ -45,24 +56,49 @@ export function Heatmap({ days }: HeatmapProps) {
       <View style={{ gap: CELL_GAP }}>
         {rows.map((row, rowIndex) => (
           <View key={rowIndex} style={{ flexDirection: 'row', gap: CELL_GAP }}>
-            {row.map((day) => (
-              <Pressable
-                key={day.date}
-                onHoverIn={() => setHoveredDate(day.date)}
-                onHoverOut={() => setHoveredDate(null)}
-                style={{
-                  flex: 1,
-                  aspectRatio: 1,
-                  borderRadius: 4,
-                  backgroundColor:
-                    day.level === 0
-                      ? themeColors.background.hover
-                      : hexToRgba(themeColors.brand.tideTeal, levelOpacity[day.level]),
-                  borderWidth: hoveredDate === day.date ? 1.5 : 0,
-                  borderColor: themeColors.text.primary,
-                }}
-              />
-            ))}
+            {row.map((day) => {
+              const percent = productivityPercent(day.seconds);
+              // A day this saturated (level 3-4, teal opacity >= 0.75) is dark enough that
+              // white reads better than the theme's near-black text-primary; lighter cells
+              // (levels 0-2, including the empty theme.background.hover cell) keep
+              // text-primary instead. Always visible >=50% per spec; below that it only
+              // shows on hover, alongside the exact time in the tooltip line above.
+              const isHovered = hoveredDate === day.date;
+              const showPercent = percent >= 50 || isHovered;
+
+              return (
+                <Pressable
+                  key={day.date}
+                  onHoverIn={() => setHoveredDate(day.date)}
+                  onHoverOut={() => setHoveredDate(null)}
+                  className="items-center justify-center"
+                  style={{
+                    flex: 1,
+                    aspectRatio: 1,
+                    borderRadius: 4,
+                    backgroundColor:
+                      day.level === 0
+                        ? themeColors.background.hover
+                        : hexToRgba(themeColors.brand.tideTeal, levelOpacity[day.level]),
+                    borderWidth: isHovered ? 1.5 : 0,
+                    borderColor: themeColors.text.primary,
+                  }}
+                >
+                  {showPercent && day.seconds > 0 && (
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        lineHeight: 12,
+                        fontWeight: '600',
+                        color: day.level >= 3 ? '#FFFFFF' : themeColors.text.primary,
+                      }}
+                    >
+                      {percent}%
+                    </Text>
+                  )}
+                </Pressable>
+              );
+            })}
           </View>
         ))}
       </View>

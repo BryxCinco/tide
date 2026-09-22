@@ -3,7 +3,13 @@ import type { IconName } from '@/components/ui';
 import type { AccentTone } from './dashboard';
 import type { Mood } from './journal';
 
-export type InsightsRange = 'week' | 'month';
+export type InsightsRange = 'today' | 'week' | 'month' | 'year' | 'all' | 'custom';
+
+/** Local "YYYY-MM-DD" keys (see utils/formatDate.ts's toDateKey), inclusive on both ends. */
+export interface CustomInsightsRange {
+  start: string;
+  end: string;
+}
 
 /** One bar in the time-tracked chart. */
 export interface DayTimeEntry {
@@ -23,6 +29,12 @@ export interface ActivityBreakdownSlice {
    * custom colors, so the legend stays readable regardless of how many custom activities
    * the user has created. */
   color: string;
+  /** % change vs. the previous equal-length period — same illustrative-mock convention as
+   * `InsightsData.totalTimeTrend`, since this whole slice list is already mock data (see
+   * ActivityHistory.tsx). Positive = up. */
+  trendPercent: number;
+  /** ISO date of the most recent session logged under this activity. */
+  lastSessionDate: string;
 }
 
 /** One point on the mood-trend line. `score` is null for a day with no journal entry —

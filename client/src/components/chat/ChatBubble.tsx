@@ -24,7 +24,7 @@ export function ChatBubble({ message }: ChatBubbleProps) {
           isUser ? 'rounded-br-sm bg-tide-teal' : 'rounded-bl-sm bg-elevated',
         )}
       >
-        <Text variant="body" color={isUser ? 'inverse' : 'primary'}>
+        <Text variant="body" color={isUser ? 'inverse' : 'primary'} selectable>
           {message.content}
         </Text>
       </View>

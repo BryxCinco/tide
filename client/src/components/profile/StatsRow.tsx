@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 
 import { useJournalStore } from '../../store/journalStore';
+import { useQuestStore } from '../../store/questStore';
 import { MOCK_PROFILE_STATS } from '../../mocks/mockUser';
 import { Icon, Text, type IconName } from '../ui';
 import { colors } from '../../utils/theme';
@@ -17,12 +18,16 @@ interface MiniStat {
  * count-up animation (Profile is a settings screen, not the Dashboard's hero surface). */
 export function StatsRow() {
   const journalCount = useJournalStore((s) => s.entries.length);
+  // Real daily-quest streak (questStore.ts), not MOCK_PROFILE_STATS.currentStreak — this
+  // is the "also visible on profile" half of the Daily Quests feature's streak counter,
+  // and must be the same number DailyQuestCard shows on the dashboard.
+  const streak = useQuestStore((s) => s.streak);
 
   const stats: MiniStat[] = [
     { id: 'focus-time', icon: 'Timer', value: MOCK_PROFILE_STATS.totalFocusTime, label: 'Focus Time' },
     { id: 'sessions', icon: 'Zap', value: MOCK_PROFILE_STATS.sessions, label: 'Sessions' },
     { id: 'journal', icon: 'BookOpen', value: String(journalCount), label: 'Journal Entries' },
-    { id: 'streak', icon: 'Flame', value: MOCK_PROFILE_STATS.currentStreak, label: 'Current Streak' },
+    { id: 'streak', icon: 'Flame', value: `${streak}d`, label: 'Quest Streak' },
   ];
 
   return (

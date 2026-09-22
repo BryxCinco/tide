@@ -1,4 +1,4 @@
-import { Pressable } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 import Animated, {
   interpolateColor,
   useAnimatedStyle,
@@ -18,12 +18,17 @@ const TRAVEL = WIDTH - THUMB_SIZE - PADDING * 2;
 export interface SettingsSwitchProps {
   value: boolean;
   onValueChange: (value: boolean) => void;
+  /** For a sub-setting whose parent toggle is off (e.g. Typing Sounds under Sound Effects)
+   * — the row itself dims via SettingsItem's own `disabled` prop, but that only affects
+   * SettingsItem's Pressable wrapper, not this independently-interactive switch, so it
+   * needs its own disabled handling to actually block the press. */
+  disabled?: boolean;
 }
 
 /** Compact teal-when-on/gray-when-off toggle for boolean preference rows (Notifications,
  * Sound Effects) — same pill+sliding-thumb shape as AnimatedThemeToggle, just without the
  * Sun/Moon icons or the circular-reveal press behavior that toggle uses for theme specifically. */
-export function SettingsSwitch({ value, onValueChange }: SettingsSwitchProps) {
+export function SettingsSwitch({ value, onValueChange, disabled = false }: SettingsSwitchProps) {
   const themeColors = useThemeColors();
   const progress = useSharedValue(value ? 1 : 0);
 
@@ -44,10 +49,10 @@ export function SettingsSwitch({ value, onValueChange }: SettingsSwitchProps) {
   }));
 
   return (
-    <Pressable onPress={() => onValueChange(!value)} hitSlop={8}>
+    <Pressable onPress={() => onValueChange(!value)} disabled={disabled} hitSlop={8}>
       <Animated.View
         style={[
-          { width: WIDTH, height: HEIGHT, borderRadius: HEIGHT / 2, padding: PADDING, justifyContent: 'center' },
+          { width: WIDTH, height: HEIGHT, borderRadius: HEIGHT / 2, padding: PADDING, justifyContent: 'center', opacity: disabled ? 0.5 : 1 },
           trackStyle,
         ]}
       >

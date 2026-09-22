@@ -147,6 +147,18 @@ export default function ProfileScreen() {
                 right={<SettingsSwitch value={settings.soundEffects} onValueChange={(v) => updateSetting('soundEffects', v)} />}
               />
               <SettingsItem
+                icon="Keyboard"
+                label={t('profile.typingSounds')}
+                disabled={!settings.soundEffects}
+                right={
+                  <SettingsSwitch
+                    value={settings.typingSounds}
+                    onValueChange={(v) => updateSetting('typingSounds', v)}
+                    disabled={!settings.soundEffects}
+                  />
+                }
+              />
+              <SettingsItem
                 icon="Globe"
                 label={t('profile.language')}
                 onPress={() => setLanguagePickerVisible(true)}
@@ -205,6 +217,7 @@ export default function ProfileScreen() {
         visible={weekStartPickerVisible}
         onClose={() => setWeekStartPickerVisible(false)}
         title={t('profile.weekStartsOn')}
+        icon="Calendar"
         value={settings.weekStartsOn}
         options={(Object.keys(WEEK_START_LABELS) as WeekStart[]).map((value) => ({ value, label: WEEK_START_LABELS[value] }))}
         onSelect={(value) => updateSetting('weekStartsOn', value)}

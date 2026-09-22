@@ -46,7 +46,7 @@ export function ChangePasswordModal({ visible, onClose }: ChangePasswordModalPro
   };
 
   return (
-    <Modal visible={visible} onClose={onClose} title="Change Password" size="sm">
+    <Modal visible={visible} onClose={onClose} title="Change Password" icon="Lock" size="sm">
       <View className="gap-4">
         <Input label="Current password" value={current} onChangeText={setCurrent} secureTextEntry />
         <Input

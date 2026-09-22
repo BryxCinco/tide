@@ -3,6 +3,7 @@ export * from './CircularProgress';
 export * from './CoverPhoto';
 export * from './CoverPicker';
 export * from './CustomizeDashboardModal';
+export * from './DailyQuestCard';
 export * from './FocusFlow';
 export * from './HabitTracker';
 export * from './Header';

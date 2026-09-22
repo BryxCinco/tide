@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   theme: 'light',
   notifications: true,
   soundEffects: true,
+  typingSounds: true,
   language: 'en',
   weekStartsOn: 'monday',
   timeFormat: '12h',
@@ -57,6 +58,14 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'tide_settings',
       storage: createJSONStorage(() => storage),
+      // Deep-merges `settings` instead of the persist middleware's default shallow merge,
+      // so a field added to DEFAULT_SETTINGS after a user's store was already persisted
+      // (e.g. typingSounds) actually gets its default instead of coming back `undefined`.
+      merge: (persisted, current) => ({
+        ...current,
+        ...(persisted as Partial<SettingsState>),
+        settings: { ...current.settings, ...(persisted as Partial<SettingsState>)?.settings },
+      }),
       onRehydrateStorage: () => (state) => {
         if (state) useThemeStore.getState().setTheme(resolveTheme(state.settings.theme));
       },

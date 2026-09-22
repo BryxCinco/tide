@@ -7,6 +7,10 @@ export interface UserSettings {
   theme: ThemePreference;
   notifications: boolean;
   soundEffects: boolean;
+  /** Sub-toggle of soundEffects — a keystroke tick on every character can get old faster
+   * than the other UI sounds, so it gets its own opt-out without needing to mute
+   * everything else. Only takes effect when soundEffects is also on (see soundManager.ts). */
+  typingSounds: boolean;
   language: Language;
   weekStartsOn: WeekStart;
   timeFormat: TimeFormat;

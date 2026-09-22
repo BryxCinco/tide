@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -9,6 +10,7 @@ import {
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useThemeStore } from '../../store/themeStore';
 import { cn } from '../../utils/cn';
+import { soundManager } from '../../utils/soundManager';
 import { shadows } from '../../utils/theme';
 import { Icon, type IconName } from './Icon';
 
@@ -68,7 +70,10 @@ const textColorClasses: Record<ButtonVariant, string> = {
   danger: 'text-inverse',
 };
 
-/** Primary call-to-action control with solid/outline/ghost/danger variants. */
+/** Primary call-to-action control with solid/outline/ghost/danger variants. Grows slightly
+ * and its glow intensifies on hover (web), and settles with a quick squash on press — both
+ * layered on top of the existing per-variant hover background/border className swaps,
+ * not replacing them. */
 export function Button({
   title,
   onPress,
@@ -84,6 +89,7 @@ export function Button({
   const isDisabled = disabled || loading;
   const themeColors = useThemeColors();
   const isDark = useThemeStore((s) => s.theme === 'dark');
+  const [isHovered, setIsHovered] = useState(false);
 
   // primary/danger labels sit on a solid brand-colored fill (unchanged by theme), so they
   // stay white in both themes; only ghost's muted tone actually shifts with theme.
@@ -96,26 +102,45 @@ export function Button({
 
   // Only primary/danger get a permanent colored glow — secondary/ghost stay flat so the
   // glow reads as "this is the important action" rather than decorating every button.
-  // Dark mode gets the more dramatic glow variant per the design spec.
-  const variantShadow: Partial<Record<ButtonVariant, object>> = {
+  // Dark mode gets the more dramatic glow variant per the design spec. Hovering intensifies
+  // it further (bigger radius, higher opacity) — an `onHoverIn`/`onHoverOut` boolean rather
+  // than a CSS-only trick, since RN's shadow* props are inline style, not classNames a
+  // `hover:` variant can target.
+  const restShadow: Partial<Record<ButtonVariant, object>> = {
     primary: isDark ? shadows.glowTealDark : shadows.glowTeal,
     danger: isDark ? shadows.glowErrorDark : shadows.glowError,
+  };
+  const hoverShadow: Partial<Record<ButtonVariant, object>> = {
+    primary: { ...restShadow.primary, shadowOpacity: isDark ? 0.65 : 0.4, shadowRadius: isDark ? 32 : 20 },
+    danger: { ...restShadow.danger, shadowOpacity: isDark ? 0.55 : 0.35, shadowRadius: isDark ? 28 : 18 },
+  };
+  const activeShadow = isHovered ? hoverShadow[variant] : restShadow[variant];
+
+  const handlePress = (event: GestureResponderEvent) => {
+    // Every Button in the app plays this — the one shared tap point that gives the whole
+    // UI a consistent "click" the same way a native OS's system button sound would,
+    // without needing to wire it into dozens of individual Pressables by hand.
+    soundManager.play('tap');
+    onPress?.(event);
   };
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={handlePress}
       disabled={isDisabled}
+      onHoverIn={() => setIsHovered(true)}
+      onHoverOut={() => setIsHovered(false)}
       className={cn(
-        'group flex-row items-center justify-center rounded-xl',
+        'group flex-row items-center justify-center rounded-xl transition-transform duration-200',
         sizeClasses[size],
         variantClasses[variant],
         fullWidth ? 'w-full' : 'self-start',
+        !isDisabled && 'hover:scale-[1.02]',
         isDisabled && 'opacity-50',
         className,
       )}
       style={({ pressed }) => [
-        !isDisabled && variantShadow[variant],
+        !isDisabled && activeShadow,
         pressed && !isDisabled && { transform: [{ scale: 0.98 }] },
       ]}
     >

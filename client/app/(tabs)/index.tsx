@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ChatbotFAB,
   CustomizeDashboardModal,
+  DailyQuestCard,
   FocusFlow,
   HabitTracker,
   HeroCard,
@@ -18,6 +19,7 @@ import {
   TodaysTasks,
   WidgetGrid,
 } from '@/components/dashboard';
+import { CalendarWidget, StreakWidget, TimeWidget, WeatherWidget, WeeklyProgressWidget } from '@/components/dashboard/widgets';
 import { TaskFormModal } from '@/components/tasks';
 import { Button, EmptyState, GuestBanner, ResponsiveContainer } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
@@ -64,6 +66,16 @@ export default function DashboardScreen() {
         return <EmptyState icon="BarChart3" title="Weekly Insights" description="Coming soon — trends across your time and mood." />;
       case 'habits':
         return <HabitTracker />;
+      case 'time':
+        return <TimeWidget />;
+      case 'calendar':
+        return <CalendarWidget />;
+      case 'weather':
+        return <WeatherWidget />;
+      case 'weeklyProgress':
+        return <WeeklyProgressWidget />;
+      case 'streak':
+        return <StreakWidget />;
       default:
         return null;
     }
@@ -81,6 +93,8 @@ export default function DashboardScreen() {
         <ProfileHeader />
 
         <ResponsiveContainer className="mt-6 gap-6">
+          <DailyQuestCard />
+
           <WidgetGrid widgets={visibleWidgets} renderWidget={renderWidget} />
 
           <Button

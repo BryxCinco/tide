@@ -30,7 +30,7 @@ export function DeleteAccountModal({ visible, onClose, onConfirm }: DeleteAccoun
   const canDelete = confirmText.trim() === CONFIRM_WORD;
 
   return (
-    <Modal visible={visible} onClose={onClose} title="Delete Account" size="sm">
+    <Modal visible={visible} onClose={onClose} title="Delete Account" icon="UserX" tone="danger" size="sm">
       <View className="gap-5">
         <View className="flex-row gap-3 rounded-xl border border-error/20 bg-error/5 p-3">
           <Icon name="TriangleAlert" size={18} color={colors.status.error} />

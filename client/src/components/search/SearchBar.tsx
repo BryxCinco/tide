@@ -2,11 +2,12 @@ import { useRef, useState } from 'react';
 import {
   Platform,
   ScrollView,
-  TextInput,
   View,
   type NativeSyntheticEvent,
+  type TextInput as RNTextInputHandle,
   type TextInputKeyPressEventData,
 } from 'react-native';
+import { TextInput } from '../ui/SoundTextInput';
 
 import { MIN_QUERY_LENGTH, useSearchController } from '../../hooks/useSearch';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -28,7 +29,7 @@ const isMac =
  */
 export function SearchBar() {
   const [isFocused, setIsFocused] = useState(false);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<RNTextInputHandle>(null);
   const blurTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const themeColors = useThemeColors();

@@ -23,6 +23,27 @@ export const ICON_OPTIONS: string[] = [
   'MapPin', 'Star', 'Zap', 'Sun', 'Moon', 'Leaf',
 ];
 
+/**
+ * The Timer's fallback when a session is started with no activity picked (Fix 3: "allow
+ * starting without an activity"). A real `Activity` object, not a bare string default, so
+ * it flows through the exact same code paths as any other activity — Today's Sessions,
+ * Activity Breakdown, Insights — instead of needing special-cased handling at every call
+ * site that reads `Session.activityId`. Deliberately NOT part of `createSeedActivities()`:
+ * that array only seeds a brand-new user's persisted `activityStore`, and this constant
+ * needs to exist even for existing users whose store was already persisted before this
+ * activity was added.
+ */
+export const DEFAULT_FOCUS_ACTIVITY: Activity = {
+  id: 'focus-session',
+  name: 'Focus Session',
+  icon: 'Target',
+  color: '#14B8A6',
+  category: 'predefined',
+  isFavorite: false,
+  isArchived: false,
+  createdAt: new Date(0).toISOString(),
+};
+
 /** The 6 activities Phase 5 shipped with, now living as `category: 'predefined'` rows
  * in activityStore instead of a separate static list. */
 export function createSeedActivities(): Activity[] {

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
+import { ScrollView, Text as RNText, useWindowDimensions, View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
+import { TextInput } from '../ui/SoundTextInput';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useThemeStore } from '../../store/themeStore';
@@ -8,8 +10,9 @@ import { useTaskStore } from '../../store/taskStore';
 import type { Task, TaskPriority, TaskStatus } from '../../types/task';
 import { cn } from '../../utils/cn';
 import { confirmAsync } from '../../utils/confirm';
+import { formatDateKeyShort } from '../../utils/formatDate';
 import { shadows } from '../../utils/theme';
-import { Button, Icon, Input, Modal, Text } from '../ui';
+import { Button, CalendarPicker, Icon, Input, Modal, Text, type IconName } from '../ui';
 
 export interface TaskFormModalProps {
   visible: boolean;
@@ -45,17 +48,27 @@ function PillOption<T extends string>({
   return (
     <Pressable
       onPress={() => onPress(value)}
-      className={cn('rounded-full border px-3 py-1.5', selected ? 'border-tide-teal bg-tide-teal/10' : 'border-subtle bg-base')}
+      className={cn(
+        'rounded-full border-2 px-4 py-2.5 transition-transform duration-150 hover:scale-[1.03]',
+        selected ? 'border-tide-teal bg-tide-teal/10' : 'border-subtle bg-base hover:border-default',
+      )}
+      style={({ pressed }) => [pressed && { transform: [{ scale: 0.97 }] }]}
     >
-      <Text variant="caption" color={selected ? 'accent' : 'secondary'} className="normal-case tracking-normal">
+      <Text variant="body" color={selected ? 'accent' : 'secondary'} className={cn('normal-case tracking-normal', selected && 'font-semibold')}>
         {label}
       </Text>
     </Pressable>
   );
 }
 
-/** No native date picker or dropdown in this phase — due date is free text and activity
- * linking is a chip-select — to avoid pulling in a new cross-platform picker dependency. */
+/**
+ * Activity Type is the existing Activity system (predefined + user's custom activities),
+ * not a separate parallel enum — Insights/analytics already group everything by
+ * `linkedActivityId`, so a disconnected "Work/Personal/Learning/..." string field would
+ * fragment analytics into two incompatible taxonomies instead of feeding the one that
+ * already exists. Required, like Title: no default is pre-selected, so picking one is a
+ * deliberate choice rather than something to silently default past.
+ */
 export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
   const addTask = useTaskStore((s) => s.addTask);
   const updateTask = useTaskStore((s) => s.updateTask);
@@ -76,6 +89,8 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
   const [tagDraft, setTagDraft] = useState('');
   const [isTagFocused, setIsTagFocused] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activityError, setActivityError] = useState<string | null>(null);
+  const [calendarVisible, setCalendarVisible] = useState(false);
 
   const isEditing = Boolean(task);
 
@@ -90,6 +105,8 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
     setTags(task?.tags ?? []);
     setTagDraft('');
     setError(null);
+    setActivityError(null);
+    setCalendarVisible(false);
   }, [visible, task]);
 
   const addTagFromDraft = () => {
@@ -102,10 +119,17 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
 
   const handleSave = () => {
     const trimmedTitle = title.trim();
+    let hasError = false;
+
+    if (!linkedActivityId) {
+      setActivityError('Pick an activity type.');
+      hasError = true;
+    }
     if (!trimmedTitle) {
       setError('Give this task a title.');
-      return;
+      hasError = true;
     }
+    if (hasError) return;
 
     const payload = {
       title: trimmedTitle,
@@ -134,9 +158,44 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
   };
 
   return (
-    <Modal visible={visible} onClose={onClose} title={isEditing ? 'Edit Task' : 'New Task'} size="md">
+    <Modal visible={visible} onClose={onClose} title={isEditing ? 'Edit Task' : 'New Task'} icon="CheckSquare" size="md">
       <ScrollView style={{ maxHeight: height * 0.65 }} showsVerticalScrollIndicator={false}>
-        <View className="gap-5 pb-1">
+        <View className="gap-6 pb-1">
+          <View className="gap-2">
+            <Text variant="label" color="muted">
+              Activity Type
+            </Text>
+            <View className="flex-row flex-wrap gap-2">
+              {activities.map((activity) => {
+                const selected = linkedActivityId === activity.id;
+                return (
+                  <Pressable
+                    key={activity.id}
+                    onPress={() => {
+                      setLinkedActivityId(activity.id);
+                      if (activityError) setActivityError(null);
+                    }}
+                    className={cn(
+                      'flex-row items-center gap-2 rounded-full border-2 py-2 pl-2.5 pr-4 transition-transform duration-150 hover:scale-[1.03]',
+                      selected ? 'border-tide-teal bg-tide-teal/10' : 'border-subtle bg-base hover:border-default',
+                    )}
+                  >
+                    <View
+                      className="h-6 w-6 items-center justify-center rounded-full"
+                      style={{ backgroundColor: `${activity.color}26` }}
+                    >
+                      <Icon name={activity.icon as IconName} size={13} color={activity.color} />
+                    </View>
+                    <Text variant="body" color={selected ? 'accent' : 'secondary'} className={cn('normal-case tracking-normal', selected && 'font-semibold')}>
+                      {activity.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {activityError && <RNText className="text-caption text-error">{activityError}</RNText>}
+          </View>
+
           <Input
             label="Title"
             placeholder="e.g. Finish onboarding flow"
@@ -178,43 +237,25 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
             </View>
           </View>
 
-          <Input label="Due date" placeholder="e.g. 2026-09-25" value={dueDate} onChangeText={setDueDate} />
-
-          {activities.length > 0 && (
-            <View className="gap-2">
-              <Text variant="label" color="muted">
-                Link to activity
+          <View className="gap-2">
+            <Text variant="label" color="muted">
+              Due date
+            </Text>
+            <Pressable
+              onPress={() => setCalendarVisible(true)}
+              className="h-11 flex-row items-center gap-2.5 rounded-xl border border-subtle bg-base px-3.5 hover:border-default"
+            >
+              <Icon name="Calendar" size={16} color={dueDate ? themeColors.brand.tideTeal : themeColors.text.disabled} />
+              <Text variant="body" color={dueDate ? 'primary' : 'muted'} className="flex-1 normal-case tracking-normal">
+                {dueDate ? formatDateKeyShort(dueDate) : 'Select a date'}
               </Text>
-              <View className="flex-row flex-wrap gap-2">
-                <Pressable
-                  onPress={() => setLinkedActivityId(undefined)}
-                  className={cn('rounded-full border px-3 py-1.5', !linkedActivityId ? 'border-tide-teal bg-tide-teal/10' : 'border-subtle bg-base')}
-                >
-                  <Text variant="caption" color={!linkedActivityId ? 'accent' : 'secondary'} className="normal-case tracking-normal">
-                    None
-                  </Text>
+              {dueDate && (
+                <Pressable onPress={() => setDueDate('')} hitSlop={8} className="h-6 w-6 items-center justify-center rounded-full hover:bg-elevated">
+                  <Icon name="X" size={14} color={themeColors.text.muted} />
                 </Pressable>
-                {activities.map((activity) => (
-                  <Pressable
-                    key={activity.id}
-                    onPress={() => setLinkedActivityId(activity.id)}
-                    className={cn(
-                      'rounded-full border px-3 py-1.5',
-                      linkedActivityId === activity.id ? 'border-tide-teal bg-tide-teal/10' : 'border-subtle bg-base',
-                    )}
-                  >
-                    <Text
-                      variant="caption"
-                      color={linkedActivityId === activity.id ? 'accent' : 'secondary'}
-                      className="normal-case tracking-normal"
-                    >
-                      {activity.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          )}
+              )}
+            </Pressable>
+          </View>
 
           <View className="gap-2">
             <Text variant="label" color="muted">
@@ -263,6 +304,31 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
           {isEditing && <Button title="Delete Task" variant="danger" size="md" fullWidth onPress={handleDelete} />}
         </View>
       </ScrollView>
+
+      {/* Nested modal — RNModal portals independently, so stacking this on top of the
+          already-open task form modal is safe (last-mounted renders on top). */}
+      <Modal visible={calendarVisible} onClose={() => setCalendarVisible(false)} title="Due Date" icon="Calendar" size="sm">
+        <View className="items-center gap-4">
+          <CalendarPicker
+            value={dueDate || undefined}
+            onChange={(key) => {
+              setDueDate(key);
+              setCalendarVisible(false);
+            }}
+          />
+          {dueDate && (
+            <Button
+              title="Clear date"
+              variant="ghost"
+              size="sm"
+              onPress={() => {
+                setDueDate('');
+                setCalendarVisible(false);
+              }}
+            />
+          )}
+        </View>
+      </Modal>
     </Modal>
   );
 }

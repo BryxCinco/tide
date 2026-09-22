@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
+import { Pressable } from './SoundPressable';
 
 import { cn } from '../../utils/cn';
 import { colors } from '../../utils/theme';

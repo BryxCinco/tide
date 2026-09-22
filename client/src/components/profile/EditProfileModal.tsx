@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 
 import { useAuth } from '../../hooks/useAuth';
 import { useTranslation } from '../../i18n';
@@ -49,7 +50,7 @@ export function EditProfileModal({ visible, onClose, onChangeAvatar }: EditProfi
   };
 
   return (
-    <Modal visible={visible} onClose={onClose} title="Edit Profile" size="md">
+    <Modal visible={visible} onClose={onClose} title="Edit Profile" icon="User" size="md">
       <View className="gap-5">
         <Pressable onPress={onChangeAvatar} className="items-center gap-2">
           <View className="relative">

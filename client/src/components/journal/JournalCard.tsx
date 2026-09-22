@@ -1,16 +1,20 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
 import type { JournalEntry } from '../../types/journal';
+import { confirmAsync } from '../../utils/confirm';
 import { formatTime, formatWeekdayMonthDay } from '../../utils/formatDate';
-import { Badge, Card, Icon, Text } from '../ui';
+import { Badge, Card, Icon, Text, VisibleDeleteButton } from '../ui';
 import { MOOD_ICON_MAP } from './MoodIcon';
 
 export interface JournalCardProps {
   entry: JournalEntry;
   onPress: () => void;
   onToggleFavorite: () => void;
-  /** Long-press quick action — the list has no per-row menu, so long-press is the delete shortcut. */
+  /** Raw delete — no confirmation of its own. Both the long-press shortcut below and the
+   * always-visible VisibleDeleteButton confirm before calling this, so it stays a plain
+   * "just delete" action rather than each caller needing to know it's pre-guarded. */
   onDelete: () => void;
 }
 
@@ -18,8 +22,13 @@ export function JournalCard({ entry, onPress, onToggleFavorite, onDelete }: Jour
   const mood = entry.mood ? MOOD_ICON_MAP[entry.mood] : undefined;
   const themeColors = useThemeColors();
 
+  const handleLongPressDelete = async () => {
+    const confirmed = await confirmAsync('Delete entry?', `"${entry.title || 'This entry'}" will be removed. This can't be undone.`);
+    if (confirmed) onDelete();
+  };
+
   return (
-    <Pressable onPress={onPress} onLongPress={onDelete}>
+    <Pressable onPress={onPress} onLongPress={handleLongPressDelete}>
       <Card variant="default" padding="lg" className="gap-3 border-subtle bg-base hover:shadow-sm">
         <View className="flex-row items-start justify-between">
           <View>
@@ -30,14 +39,21 @@ export function JournalCard({ entry, onPress, onToggleFavorite, onDelete }: Jour
               {formatTime(entry.createdAt)}
             </Text>
           </View>
-          <Pressable onPress={onToggleFavorite} hitSlop={8}>
-            <Icon
-              name="Star"
-              size={18}
-              color={entry.isFavorite ? themeColors.status.warning : themeColors.text.disabled}
-              fill={entry.isFavorite ? themeColors.status.warning : 'none'}
+          <View className="flex-row items-center gap-1">
+            <Pressable onPress={onToggleFavorite} hitSlop={8} className="h-8 w-8 items-center justify-center rounded-full hover:bg-elevated">
+              <Icon
+                name="Star"
+                size={18}
+                color={entry.isFavorite ? themeColors.status.warning : themeColors.text.disabled}
+                fill={entry.isFavorite ? themeColors.status.warning : 'none'}
+              />
+            </Pressable>
+            <VisibleDeleteButton
+              onConfirm={onDelete}
+              confirmTitle="Delete entry?"
+              confirmMessage={`"${entry.title || 'This entry'}" will be removed. This can't be undone.`}
             />
-          </Pressable>
+          </View>
         </View>
 
         {mood && (

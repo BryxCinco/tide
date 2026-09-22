@@ -14,9 +14,11 @@ interface GroupProps {
   onEdit: (activity: Activity) => void;
   onToggleFavorite: (id: string) => void;
   onReorder: (id: string, swapWithId: string) => void;
+  onDelete: (id: string) => void;
+  onToggleHide: (id: string, archived: boolean) => void;
 }
 
-function ActivityGroup({ title, items, onEdit, onToggleFavorite, onReorder }: GroupProps) {
+function ActivityGroup({ title, items, onEdit, onToggleFavorite, onReorder, onDelete, onToggleHide }: GroupProps) {
   if (items.length === 0) return null;
 
   return (
@@ -35,6 +37,8 @@ function ActivityGroup({ title, items, onEdit, onToggleFavorite, onReorder }: Gr
             onMoveDown={() => index < items.length - 1 && onReorder(activity.id, items[index + 1].id)}
             canMoveUp={index > 0}
             canMoveDown={index < items.length - 1}
+            onDelete={() => onDelete(activity.id)}
+            onToggleHide={() => onToggleHide(activity.id, !activity.isArchived)}
           />
         ))}
       </View>
@@ -46,6 +50,8 @@ export default function ActivitiesScreen() {
   const activities = useActivityStore((s) => s.activities);
   const toggleFavorite = useActivityStore((s) => s.toggleFavorite);
   const reorderActivity = useActivityStore((s) => s.reorderActivity);
+  const deleteActivity = useActivityStore((s) => s.deleteActivity);
+  const setArchived = useActivityStore((s) => s.setArchived);
 
   const [search, setSearch] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
@@ -98,6 +104,8 @@ export default function ActivitiesScreen() {
                   onEdit={openEdit}
                   onToggleFavorite={toggleFavorite}
                   onReorder={reorderActivity}
+                  onDelete={deleteActivity}
+                  onToggleHide={setArchived}
                 />
                 <ActivityGroup
                   title="Custom"
@@ -105,6 +113,8 @@ export default function ActivitiesScreen() {
                   onEdit={openEdit}
                   onToggleFavorite={toggleFavorite}
                   onReorder={reorderActivity}
+                  onDelete={deleteActivity}
+                  onToggleHide={setArchived}
                 />
                 <ActivityGroup
                   title="Pre-defined"
@@ -112,6 +122,8 @@ export default function ActivitiesScreen() {
                   onEdit={openEdit}
                   onToggleFavorite={toggleFavorite}
                   onReorder={reorderActivity}
+                  onDelete={deleteActivity}
+                  onToggleHide={setArchived}
                 />
                 <ActivityGroup
                   title="Archived"
@@ -119,6 +131,8 @@ export default function ActivitiesScreen() {
                   onEdit={openEdit}
                   onToggleFavorite={toggleFavorite}
                   onReorder={reorderActivity}
+                  onDelete={deleteActivity}
+                  onToggleHide={setArchived}
                 />
               </View>
             )}

@@ -1,9 +1,10 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../ui/SoundPressable';
 
 import type { Task, TaskPriority } from '../../types/task';
 import { cn } from '../../utils/cn';
 import { colors } from '../../utils/theme';
-import { Badge, Icon, Text, type BadgeVariant } from '../ui';
+import { Badge, Icon, Text, VisibleDeleteButton, type BadgeVariant } from '../ui';
 
 const PRIORITY_BADGE: Record<TaskPriority, { label: string; variant: BadgeVariant }> = {
   low: { label: 'Low', variant: 'default' },
@@ -18,9 +19,10 @@ export interface TaskCardProps {
   activityName?: string;
   onToggle: () => void;
   onEdit: () => void;
+  onDelete: () => void;
 }
 
-export function TaskCard({ task, activityName, onToggle, onEdit }: TaskCardProps) {
+export function TaskCard({ task, activityName, onToggle, onEdit, onDelete }: TaskCardProps) {
   const isDone = task.status === 'done';
   const priority = PRIORITY_BADGE[task.priority];
 
@@ -59,9 +61,16 @@ export function TaskCard({ task, activityName, onToggle, onEdit }: TaskCardProps
         </View>
       </Pressable>
 
-      <Pressable onPress={onEdit} hitSlop={6}>
-        <Icon name="Pencil" size={16} />
-      </Pressable>
+      <View className="flex-row items-center gap-1">
+        <Pressable onPress={onEdit} hitSlop={6} className="h-8 w-8 items-center justify-center rounded-full hover:bg-elevated">
+          <Icon name="Pencil" size={16} />
+        </Pressable>
+        <VisibleDeleteButton
+          onConfirm={onDelete}
+          confirmTitle="Delete task?"
+          confirmMessage={`"${task.title}" will be removed. This can't be undone.`}
+        />
+      </View>
     </View>
   );
 }

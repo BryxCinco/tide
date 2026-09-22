@@ -41,6 +41,20 @@
   background: transparent;
 }
 
+/* Clean text-input cursor (web) — a thin teal caret instead of the browser's default black
+ * one, and no focus outline/highlight box, on every input/textarea RNW renders a TextInput
+ * as. Belt-and-suspenders alongside the `caret-tide-teal outline-none` classes SoundTextInput
+ * and Input.tsx already apply per-field: this catches any input those two don't wrap. */
+input,
+textarea {
+  caret-color: #14B8A6;
+  outline: none;
+}
+input::selection,
+textarea::selection {
+  background: rgba(20, 184, 166, 0.2);
+}
+
 /* Backs the circular theme-reveal in themeTransition.ts. Suppress the browser's default
  * cross-fade for the view transition's pseudo-elements so only our own clip-path circle
  * animation (run via `.animate()` in themeTransition.ts) is visible. */
