@@ -48,7 +48,7 @@ export function TaskFilters({ filter, sort, onFilterChange, onSortChange }: Task
         ))}
       </View>
 
-      <View className="flex-row items-center gap-3">
+      <View className="flex-row flex-wrap items-center gap-3">
         <Text variant="caption" color="muted" className="normal-case tracking-normal">
           Sort by
         </Text>

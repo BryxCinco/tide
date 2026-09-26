@@ -4,7 +4,7 @@ import { Pressable } from '../ui/SoundPressable';
 
 import { useTaskStore } from '../../store/taskStore';
 import type { TaskPriority } from '../../types/task';
-import { Badge, Button, Text, type BadgeVariant } from '../ui';
+import { Badge, Button, SkeletonRow, Text, type BadgeVariant } from '../ui';
 
 const PRIORITY_BADGE: Record<TaskPriority, { label: string; variant: BadgeVariant }> = {
   low: { label: 'Low', variant: 'default' },
@@ -24,6 +24,7 @@ export interface TodaysTasksProps {
  * (it's filtered to non-done tasks), which is the point of a quick dashboard widget. */
 export function TodaysTasks({ onAddTask }: TodaysTasksProps) {
   const tasks = useTaskStore((s) => s.tasks);
+  const isLoading = useTaskStore((s) => s.isLoading);
   const toggleTaskStatus = useTaskStore((s) => s.toggleTaskStatus);
 
   const topTasks = tasks
@@ -44,7 +45,12 @@ export function TodaysTasks({ onAddTask }: TodaysTasksProps) {
         </Pressable>
       </View>
 
-      {topTasks.length === 0 ? (
+      {isLoading && tasks.length === 0 ? (
+        <View className="gap-2">
+          <SkeletonRow />
+          <SkeletonRow />
+        </View>
+      ) : topTasks.length === 0 ? (
         <Text variant="body" color="muted">
           No open tasks. Nice work!
         </Text>

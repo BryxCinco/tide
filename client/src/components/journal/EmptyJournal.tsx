@@ -20,8 +20,8 @@ export function EmptyJournal({ hasActiveFilters, onNewEntry }: EmptyJournalProps
   return (
     <EmptyState
       icon="BookOpen"
-      title="Start your journal"
-      description="Write your first entry to begin capturing your days."
+      title="No entries yet"
+      description="Write your first journal!"
       actionLabel="New Entry"
       onAction={onNewEntry}
     />

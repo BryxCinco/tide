@@ -20,7 +20,11 @@ export function useTimer() {
   const countdownDurationSeconds = useTimerStore((s) => s.countdownDurationSeconds);
   const todaySessions = useTimerStore((s) => s.todaySessions);
   const activityTotals = useTimerStore((s) => s.activityTotals);
+  const isLoading = useTimerStore((s) => s.isLoading);
+  const error = useTimerStore((s) => s.error);
 
+  const fetchTodaySessions = useTimerStore((s) => s.fetchTodaySessions);
+  const clearError = useTimerStore((s) => s.clearError);
   const setActivity = useTimerStore((s) => s.setActivity);
   const clearActivity = useTimerStore((s) => s.clearActivity);
   const toggleTag = useTimerStore((s) => s.toggleTag);
@@ -54,6 +58,10 @@ export function useTimer() {
     secondsRemaining,
     todaySessions,
     activityTotals,
+    isLoading,
+    error,
+    fetchTodaySessions,
+    clearError,
     setActivity,
     clearActivity,
     toggleTag,

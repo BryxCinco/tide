@@ -1,8 +1,11 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import { getApiErrorMessage } from '../services/api';
+import { taskService } from '../services/task.service';
 import type { Task, TaskPriority, TaskStatus } from '../types/task';
 import { storage } from '../utils/storage';
+import { showToast } from './toastStore';
 
 export type TaskFilter = 'all' | 'today' | 'done';
 export type TaskSort = 'priority' | 'dueDate' | 'created';
@@ -11,16 +14,20 @@ interface TaskState {
   tasks: Task[];
   filter: TaskFilter;
   sort: TaskSort;
+  isLoading: boolean;
+  error: string | null;
   /**
    * Count only, not a per-task `withdrawn` flag on Task itself — `deleteTask` really
    * removes the row (Fix 1's visible delete button relies on that: tap trash, it's gone,
    * everywhere, immediately), so there's no live Task record left to carry a flag on.
    * This increments right before that removal, whenever the task being deleted wasn't
    * already done — enough for Insights' "Tasks Withdrawn" stat without turning delete into
-   * a soft-delete/undelete system.
+   * a soft-delete/undelete system. Local-only stat, not synced to the backend's
+   * (currently unused) `is_withdrawn` column.
    */
   withdrawnCount: number;
 
+  fetchTasks: () => Promise<void>;
   addTask: (input: {
     title: string;
     description?: string;
@@ -37,55 +44,102 @@ interface TaskState {
   toggleTaskStatus: (id: string) => void;
   setFilter: (filter: TaskFilter) => void;
   setSort: (sort: TaskSort) => void;
+  clearError: () => void;
+  /** Wipes local state back to empty — called from authStore on logout and before a fresh
+   * login/register, since this store persists to a single, non-user-scoped storage key
+   * ('tide_tasks'). Without this, switching accounts on the same browser/device would
+   * silently inherit whatever the previous session left behind. */
+  reset: () => void;
 }
 
 export const useTaskStore = create<TaskState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       tasks: [],
       filter: 'all',
       sort: 'priority',
+      isLoading: false,
+      error: null,
       withdrawnCount: 0,
 
+      fetchTasks: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const tasks = await taskService.list();
+          set({ tasks, isLoading: false });
+        } catch (err) {
+          set({ error: getApiErrorMessage(err), isLoading: false });
+        }
+      },
+
+      // Optimistic: the new task renders instantly under a temp id while the POST is still
+      // in flight, then gets swapped in-place for the server's real row on success. Nothing
+      // downstream captures the return value synchronously (unlike activityStore.addActivity),
+      // so a brief temp id is safe here.
       addTask: (input) => {
-        const task: Task = {
-          id: `task_${Date.now()}`,
-          createdAt: new Date().toISOString(),
-          ...input,
-        };
+        const tempId = `task_${Date.now()}`;
+        const task: Task = { id: tempId, createdAt: new Date().toISOString(), ...input };
         set((state) => ({ tasks: [task, ...state.tasks] }));
+
+        taskService.create(input).then(
+          (created) => set((state) => ({ tasks: state.tasks.map((t) => (t.id === tempId ? created : t)) })),
+          (err) => {
+            set((state) => ({ tasks: state.tasks.filter((t) => t.id !== tempId) }));
+            showToast(getApiErrorMessage(err), 'error');
+          },
+        );
+
         return task;
       },
 
       updateTask: (id, updates) => {
+        const previous = get().tasks;
         set((state) => ({
           tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
         }));
+        taskService.update(id, updates).catch((err) => {
+          set({ tasks: previous });
+          showToast(getApiErrorMessage(err), 'error');
+        });
       },
 
       deleteTask: (id) => {
-        set((state) => {
-          const task = state.tasks.find((t) => t.id === id);
-          const wasWithdrawn = task != null && task.status !== 'done';
-          return {
-            tasks: state.tasks.filter((t) => t.id !== id),
-            withdrawnCount: wasWithdrawn ? state.withdrawnCount + 1 : state.withdrawnCount,
-          };
+        const previous = get().tasks;
+        const task = previous.find((t) => t.id === id);
+        const wasWithdrawn = task != null && task.status !== 'done';
+
+        set((state) => ({
+          tasks: state.tasks.filter((t) => t.id !== id),
+          withdrawnCount: wasWithdrawn ? state.withdrawnCount + 1 : state.withdrawnCount,
+        }));
+        taskService.remove(id).catch((err) => {
+          set((state) => ({ tasks: previous, withdrawnCount: wasWithdrawn ? state.withdrawnCount - 1 : state.withdrawnCount }));
+          showToast(getApiErrorMessage(err), 'error');
         });
       },
 
       toggleTaskStatus: (id) => {
+        const previous = get().tasks;
+        const task = previous.find((t) => t.id === id);
+        if (!task) return;
+
+        const done = task.status === 'done';
+        const nextStatus: TaskStatus = done ? 'todo' : 'done';
+        const completedAt = done ? undefined : new Date().toISOString();
+
         set((state) => ({
-          tasks: state.tasks.map((t) => {
-            if (t.id !== id) return t;
-            const done = t.status === 'done';
-            return { ...t, status: done ? 'todo' : 'done', completedAt: done ? undefined : new Date().toISOString() };
-          }),
+          tasks: state.tasks.map((t) => (t.id === id ? { ...t, status: nextStatus, completedAt } : t)),
         }));
+        taskService.update(id, { status: nextStatus, completedAt: completedAt ?? null }).catch((err) => {
+          set({ tasks: previous });
+          showToast(getApiErrorMessage(err), 'error');
+        });
       },
 
       setFilter: (filter) => set({ filter }),
       setSort: (sort) => set({ sort }),
+      clearError: () => set({ error: null }),
+      reset: () => set({ tasks: [], withdrawnCount: 0, filter: 'all', sort: 'priority', isLoading: false, error: null }),
     }),
     {
       name: 'tide_tasks',

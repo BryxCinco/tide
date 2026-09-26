@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -19,11 +19,12 @@ import {
   SettingsSwitch,
   StatsRow,
 } from '@/components/profile';
-import { Button, Icon, ResponsiveContainer, Text, ThemeToggle } from '@/components/ui';
+import { Button, ErrorState, Icon, ResponsiveContainer, Text, ThemeToggle } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { LANGUAGES, useTranslation } from '@/i18n';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useStreakStore } from '@/store/streakStore';
 import { useThemeStore } from '@/store/themeStore';
 import { showToast } from '@/store/toastStore';
 import { cn } from '@/utils/cn';
@@ -43,7 +44,12 @@ function TimeFormatSegmented({ value, onChange }: { value: '12h' | '24h'; onChan
       {(['12h', '24h'] as const).map((option) => {
         const selected = option === value;
         return (
-          <Pressable key={option} onPress={() => onChange(option)} className={cn('rounded-full px-2.5 py-1', selected && 'bg-tide-teal')}>
+          <Pressable
+            key={option}
+            onPress={() => onChange(option)}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+            className={cn('rounded-full px-2.5 py-1', selected && 'bg-tide-teal')}
+          >
             <Text variant="caption" color={selected ? 'inverse' : 'muted'} className="normal-case tracking-normal">
               {option}
             </Text>
@@ -60,8 +66,25 @@ export default function ProfileScreen() {
   const { t } = useTranslation();
   const settings = useSettingsStore((s) => s.settings);
   const updateSetting = useSettingsStore((s) => s.updateSetting);
+  const settingsError = useSettingsStore((s) => s.error);
+  const fetchSettings = useSettingsStore((s) => s.fetchSettings);
+  const clearSettingsError = useSettingsStore((s) => s.clearError);
+  const fetchStreak = useStreakStore((s) => s.fetchStreak);
   const appliedTheme = useThemeStore((s) => s.theme);
   const isMatchingSystem = settings.theme === 'system';
+
+  useEffect(() => {
+    fetchSettings();
+    fetchStreak();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([fetchSettings(), fetchStreak()]);
+    setRefreshing(false);
+  };
 
   const [editVisible, setEditVisible] = useState(false);
   const [avatarPickerVisible, setAvatarPickerVisible] = useState(false);
@@ -101,10 +124,25 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-base" edges={['top']}>
-      <ScrollView className="flex-1" contentContainerClassName="pb-24">
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="pb-24"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         <ProfileCover onAvatarPress={() => setAvatarPickerVisible(true)} />
 
         <ResponsiveContainer className="mt-6 gap-4">
+          {settingsError && (
+            <ErrorState
+              message={`Settings didn't sync: ${settingsError}`}
+              onRetry={() => {
+                clearSettingsError();
+                fetchSettings();
+              }}
+              className="py-4"
+            />
+          )}
+
           <StatsRow />
 
           {/* Bento grid, matching Insights' layout: Account/Data pair up as half-width
@@ -163,8 +201,8 @@ export default function ProfileScreen() {
                 label={t('profile.language')}
                 onPress={() => setLanguagePickerVisible(true)}
                 right={
-                  <View className="flex-row items-center gap-2">
-                    <Text variant="body" color="muted" className="normal-case tracking-normal">
+                  <View className="flex-shrink flex-row items-center gap-2">
+                    <Text variant="body" color="muted" className="shrink normal-case tracking-normal" numberOfLines={1}>
                       {currentLanguageName}
                     </Text>
                     <Icon name="ChevronRight" size={18} color={themeColors.text.disabled} />
@@ -176,8 +214,8 @@ export default function ProfileScreen() {
                 label={t('profile.weekStartsOn')}
                 onPress={() => setWeekStartPickerVisible(true)}
                 right={
-                  <View className="flex-row items-center gap-2">
-                    <Text variant="body" color="muted" className="normal-case tracking-normal">
+                  <View className="flex-shrink flex-row items-center gap-2">
+                    <Text variant="body" color="muted" className="shrink normal-case tracking-normal" numberOfLines={1}>
                       {WEEK_START_LABELS[settings.weekStartsOn]}
                     </Text>
                     <Icon name="ChevronRight" size={18} color={themeColors.text.disabled} />

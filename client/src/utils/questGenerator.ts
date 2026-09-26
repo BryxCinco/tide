@@ -41,5 +41,9 @@ export function generateDailyQuests(dateKey: string): Quest[] {
     xp: template.xp,
     isCompleted: false,
     date: dateKey,
+    isCustom: false,
+    isActive: true,
+    isRecurring: false,
+    recurrenceType: null,
   }));
 }

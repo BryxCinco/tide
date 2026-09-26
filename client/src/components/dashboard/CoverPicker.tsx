@@ -5,6 +5,7 @@ import { Pressable } from '../ui/SoundPressable';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { PRESET_COLORS } from '../../mocks/mockActivities';
+import { getApiErrorMessage } from '../../services/api';
 import { showToast } from '../../store/toastStore';
 import { COVER_GRADIENTS, useUserStore } from '../../store/userStore';
 import type { CoverType } from '../../types/user';
@@ -45,38 +46,62 @@ export function CoverPicker({ visible, onClose, currentType, currentValue }: Cov
   const removeCover = useUserStore((s) => s.removeCover);
   const themeColors = useThemeColors();
   const [isPicking, setIsPicking] = useState(false);
+  // Distinct from isPicking — covers the PATCH /api/profile round trip once a photo/preset
+  // is chosen, so the spinner stays up until the change is actually saved server-side.
+  const [isSaving, setIsSaving] = useState(false);
+  const isBusy = isPicking || isSaving;
 
   const handlePick = async (source: ImageSource) => {
     setIsPicking(true);
     const result = await pickImage(source);
     setIsPicking(false);
 
-    if (result.ok) {
-      updateCover('image', result.uri);
-      onClose();
-      showToast('Cover photo updated');
+    if (!result.ok) {
+      if (result.reason === 'too-large') showToast('That image is over 2MB — try a smaller one.', 'error');
+      else if (result.reason === 'permission-denied') showToast('Permission denied — enable photo access in your device settings.', 'error');
       return;
     }
 
-    if (result.reason === 'too-large') showToast('That image is over 2MB — try a smaller one.', 'error');
-    else if (result.reason === 'permission-denied') showToast('Permission denied — enable photo access in your device settings.', 'error');
+    setIsSaving(true);
+    try {
+      await updateCover('image', result.uri);
+      onClose();
+      showToast('Cover photo updated');
+    } catch (err) {
+      showToast(getApiErrorMessage(err, "Couldn't save your cover photo. Please try again."), 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleRemove = () => {
-    removeCover();
-    onClose();
-    showToast('Cover photo removed');
+  const handleRemove = async () => {
+    setIsSaving(true);
+    try {
+      await removeCover();
+      onClose();
+      showToast('Cover photo removed');
+    } catch (err) {
+      showToast(getApiErrorMessage(err, "Couldn't remove your cover photo. Please try again."), 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleSelectPreset = (type: CoverType, value: string) => {
-    updateCover(type, value);
-    onClose();
+  const handleSelectPreset = async (type: CoverType, value: string) => {
+    setIsSaving(true);
+    try {
+      await updateCover(type, value);
+      onClose();
+    } catch (err) {
+      showToast(getApiErrorMessage(err, "Couldn't save your cover. Please try again."), 'error');
+      setIsSaving(false);
+    }
   };
 
   return (
     <Modal visible={visible} onClose={onClose} title="Change Cover" icon="Image" size="md">
       <View className="gap-5">
-        {isPicking ? (
+        {isBusy ? (
           <View className="items-center py-6">
             <ActivityIndicator color={themeColors.brand.tideTeal} />
           </View>
@@ -99,7 +124,8 @@ export function CoverPicker({ visible, onClose, currentType, currentValue }: Cov
                 <Pressable
                   key={gradient.id}
                   onPress={() => handleSelectPreset('gradient', gradient.id)}
-                  className="h-14 w-14 overflow-hidden rounded-xl"
+                  disabled={isBusy}
+                  className={cn('h-14 w-14 overflow-hidden rounded-xl', isBusy && 'opacity-50')}
                   style={{ borderWidth: isSelected ? 2 : 0, borderColor: colors.brand.tideTeal }}
                 >
                   <LinearGradient colors={gradient.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ flex: 1 }} />
@@ -125,7 +151,8 @@ export function CoverPicker({ visible, onClose, currentType, currentValue }: Cov
                 <Pressable
                   key={hex}
                   onPress={() => handleSelectPreset('solid', hex)}
-                  className="h-10 w-10 items-center justify-center rounded-full"
+                  disabled={isBusy}
+                  className={cn('h-10 w-10 items-center justify-center rounded-full', isBusy && 'opacity-50')}
                   style={{ backgroundColor: hex, borderWidth: isSelected ? 2 : 0, borderColor: colors.brand.tideTeal }}
                 >
                   {isSelected && <Icon name="Check" size={16} color="#FFFFFF" />}

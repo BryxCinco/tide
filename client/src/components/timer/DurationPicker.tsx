@@ -59,12 +59,14 @@ export function DurationPicker({ value, onSelect }: DurationPickerProps) {
       </View>
 
       {customOpen && (
-        <View className="flex-row items-center justify-center gap-6 rounded-xl border border-subtle bg-base p-4">
-          <Stepper label="hours" value={customHours} onChange={setCustomHours} max={12} />
-          <Text variant="h2" color="muted">
-            :
-          </Text>
-          <Stepper label="min" value={customMinutes} onChange={setCustomMinutes} max={59} step={5} />
+        <View className="flex-row flex-wrap items-center justify-center gap-x-4 gap-y-3 rounded-xl border border-subtle bg-base p-4">
+          <View className="flex-row items-center gap-4">
+            <Stepper label="hours" value={customHours} onChange={setCustomHours} max={12} />
+            <Text variant="h2" color="muted">
+              :
+            </Text>
+            <Stepper label="min" value={customMinutes} onChange={setCustomMinutes} max={59} step={5} />
+          </View>
           <Button title="Set" variant="primary" size="sm" onPress={applyCustom} />
         </View>
       )}

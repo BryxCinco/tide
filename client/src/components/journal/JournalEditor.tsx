@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { TextInput } from '../ui/SoundTextInput';
 
@@ -48,15 +48,30 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
   const isNew = !entry;
   const createdAt = entry?.createdAt ?? new Date().toISOString();
 
-  const persist = () => {
+  const isCreatingRef = useRef(false);
+
+  const persist = async () => {
     const trimmedTitle = title.trim() || 'Untitled';
     if (!title.trim() && !content.trim()) return;
 
     if (savedId) {
       updateEntry(savedId, { title: trimmedTitle, content, mood, tags });
-    } else {
-      const created = addEntry({ title: trimmedTitle, content, mood, tags });
+      return;
+    }
+
+    // Guards against the autosave timer and a manual Save firing the very first create
+    // twice (e.g. Save tapped right as the 3s autosave timer also elapses) — both would
+    // otherwise see savedId still unset and race to POST two separate entries.
+    if (isCreatingRef.current) return;
+    isCreatingRef.current = true;
+    try {
+      const created = await addEntry({ title: trimmedTitle, content, mood, tags });
       setSavedId(created.id);
+    } catch {
+      // Failure is silent here (autosave retries on the next tick); a manual Save's
+      // failure is surfaced via handleSave below instead.
+    } finally {
+      isCreatingRef.current = false;
     }
   };
 
@@ -64,8 +79,8 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
     if (!title.trim() && !content.trim()) return;
 
     setSaveState('saving');
-    const timeout = setTimeout(() => {
-      persist();
+    const timeout = setTimeout(async () => {
+      await persist();
       setSaveState('saved');
     }, AUTO_SAVE_DELAY);
 
@@ -75,8 +90,8 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, content, mood, tags]);
 
-  const handleSave = () => {
-    persist();
+  const handleSave = async () => {
+    await persist();
     onDone();
   };
 
@@ -95,7 +110,12 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
     <View className="flex-1 gap-5">
       <View className="flex-row items-center justify-between">
         <BackButton onPress={onDone} />
-        <Text variant="body" color="primary" className="font-semibold normal-case tracking-normal">
+        <Text
+          variant="body"
+          color="primary"
+          className="flex-1 px-2 text-center font-semibold normal-case tracking-normal"
+          numberOfLines={1}
+        >
           {isNew ? 'Today' : formatWeekdayMonthDay(createdAt)}
         </Text>
         <Button title="Save" variant="primary" size="sm" onPress={handleSave} />

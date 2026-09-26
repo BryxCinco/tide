@@ -9,6 +9,7 @@ export function useAuth() {
   const error = useAuthStore((s) => s.error);
   const login = useAuthStore((s) => s.login);
   const register = useAuthStore((s) => s.register);
+  const loginWithGoogle = useAuthStore((s) => s.loginWithGoogle);
   const loginAsGuest = useAuthStore((s) => s.loginAsGuest);
   const linkGuestToAccount = useAuthStore((s) => s.linkGuestToAccount);
   const logout = useAuthStore((s) => s.logout);
@@ -23,6 +24,7 @@ export function useAuth() {
     error,
     login,
     register,
+    loginWithGoogle,
     loginAsGuest,
     linkGuestToAccount,
     logout,

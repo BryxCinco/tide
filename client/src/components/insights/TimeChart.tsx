@@ -27,9 +27,18 @@ export function TimeChart({ data, height = 130 }: TimeChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const maxSeconds = Math.max(...data.map((d) => d.seconds), 1);
 
+  // A fixed 8px gap between every bar (RN `gap` reserves that space before any bar gets
+  // width) is fine for a week/month of bars, but a 62-point Custom range would burn ~488px
+  // of pure gap on a phone-width card before any bar renders — shrink the gap as the
+  // point count grows so bars stay the majority of the available width at any range.
+  const gap = data.length > 20 ? 1 : data.length > 10 ? 2 : 4;
+  // Thin the x-axis labels the same way MoodTrend.tsx does — one label per bar overlaps
+  // into an unreadable smear well before 62 bars.
+  const labelStep = Math.max(1, Math.ceil(data.length / 8));
+
   return (
     <View>
-      <View className="flex-row items-end gap-2" style={{ height }}>
+      <View className="flex-row items-end" style={{ height, gap }}>
         {data.map((entry, index) => (
           <Bar
             key={entry.date}
@@ -42,11 +51,11 @@ export function TimeChart({ data, height = 130 }: TimeChartProps) {
           />
         ))}
       </View>
-      <View className="mt-2 flex-row gap-2">
-        {data.map((entry) => (
+      <View className="mt-2 flex-row" style={{ gap }}>
+        {data.map((entry, index) => (
           <View key={entry.date} className="flex-1 items-center">
-            <Text variant="caption" color="muted" className="normal-case tracking-normal">
-              {entry.label}
+            <Text variant="caption" color="muted" className="normal-case tracking-normal" numberOfLines={1}>
+              {index % labelStep === 0 ? entry.label : ''}
             </Text>
           </View>
         ))}

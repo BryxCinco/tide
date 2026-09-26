@@ -74,6 +74,11 @@ export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
+/** "Jan 2026" — `month` is 1-12. Used by the Insights month/year picker. */
+export function formatMonthYear(month: number, year: number): string {
+  return new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
 export function countWords(text: string): number {
   const trimmed = text.trim();
   return trimmed ? trimmed.split(/\s+/).length : 0;

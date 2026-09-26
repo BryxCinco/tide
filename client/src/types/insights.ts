@@ -3,12 +3,21 @@ import type { IconName } from '@/components/ui';
 import type { AccentTone } from './dashboard';
 import type { Mood } from './journal';
 
-export type InsightsRange = 'today' | 'week' | 'month' | 'year' | 'all' | 'custom';
+export type InsightsRange = 'today' | 'week' | 'month' | 'monthYear' | 'custom';
 
 /** Local "YYYY-MM-DD" keys (see utils/formatDate.ts's toDateKey), inclusive on both ends. */
 export interface CustomInsightsRange {
   start: string;
   end: string;
+}
+
+/** A specific calendar month, e.g. { month: 1, year: 2026 } for "Jan 2026" — `month` is
+ * 1-12, not JS's native 0-11, since every call site formats/labels it rather than feeding
+ * it straight to `new Date(...)`. Replaces the old 'year'/'all' ranges, which pushed 365
+ * data points through charts built for a week/month's worth (see TimeFilter.tsx). */
+export interface MonthYearRange {
+  month: number;
+  year: number;
 }
 
 /** One bar in the time-tracked chart. */

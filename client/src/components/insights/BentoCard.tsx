@@ -47,7 +47,12 @@ export function BentoCard({ title, icon, size = 'md', children, className }: Ben
 
   return (
     <View
-      className={cn('gap-4 rounded-2xl border border-subtle p-6', SIZE_CLASSES[size], className)}
+      // `flex-1` so a card actually fills its grid row's height (CSS grid's default
+      // align-items:stretch sizes the *cell*, but this View's own children still need
+      // flex-1 to expand into it) — content that doesn't naturally fill the row (e.g.
+      // TotalHoursCard) otherwise stays top-pinned with dead space below, which is what
+      // made "Tracked Time" look broken next to the taller Productivity Score hero card.
+      className={cn('flex-1 gap-4 overflow-hidden rounded-2xl border border-subtle p-6', SIZE_CLASSES[size], className)}
       style={[{ backgroundColor: isDark ? themeColors.background.surface : '#FFFFFF' }, shadows.sm]}
     >
       {title && (

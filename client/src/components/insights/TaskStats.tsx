@@ -5,7 +5,7 @@ import { Pressable } from '../ui/SoundPressable';
 
 import { useActivityStore } from '../../store/activityStore';
 import { useTaskStore } from '../../store/taskStore';
-import type { CustomInsightsRange, InsightsRange } from '../../types/insights';
+import type { CustomInsightsRange, InsightsRange, MonthYearRange } from '../../types/insights';
 import type { TaskPriority } from '../../types/task';
 import { cn } from '../../utils/cn';
 import { toDateKey } from '../../utils/formatDate';
@@ -14,13 +14,22 @@ import { Card, Icon, Text, type IconName } from '../ui';
 export interface TaskStatsProps {
   range: InsightsRange;
   customRange?: CustomInsightsRange;
+  monthYearRange?: MonthYearRange;
 }
 
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const STATUS_COLORS = { done: '#14B8A6', 'in-progress': '#0EA5E9', todo: '#9CA3AF', overdue: '#EF4444' } as const;
 
-function rangeStartKey(range: InsightsRange, customRange?: CustomInsightsRange): string | null {
+function monthYearEndKey(monthYearRange: MonthYearRange): string {
+  const today = new Date();
+  const isCurrentMonth = monthYearRange.month === today.getMonth() + 1 && monthYearRange.year === today.getFullYear();
+  if (isCurrentMonth) return toDateKey(today);
+  const lastDay = new Date(monthYearRange.year, monthYearRange.month, 0).getDate();
+  return toDateKey(new Date(monthYearRange.year, monthYearRange.month - 1, lastDay));
+}
+
+function rangeStartKey(range: InsightsRange, customRange?: CustomInsightsRange, monthYearRange?: MonthYearRange): string | null {
   const today = new Date();
   const back = (days: number) => {
     const d = new Date(today);
@@ -34,18 +43,19 @@ function rangeStartKey(range: InsightsRange, customRange?: CustomInsightsRange):
       return back(6);
     case 'month':
       return back(29);
-    case 'year':
-      return back(364);
+    case 'monthYear':
+      return monthYearRange ? toDateKey(new Date(monthYearRange.year, monthYearRange.month - 1, 1)) : null;
     case 'custom':
       return customRange?.start ?? null;
-    case 'all':
     default:
       return null;
   }
 }
 
-function rangeEndKey(range: InsightsRange, customRange?: CustomInsightsRange): string {
-  return range === 'custom' && customRange ? customRange.end : toDateKey(new Date());
+function rangeEndKey(range: InsightsRange, customRange?: CustomInsightsRange, monthYearRange?: MonthYearRange): string {
+  if (range === 'custom' && customRange) return customRange.end;
+  if (range === 'monthYear' && monthYearRange) return monthYearEndKey(monthYearRange);
+  return toDateKey(new Date());
 }
 
 function StatCard({ icon, label, value, tint }: { icon: IconName; label: string; value: string; tint: string }) {
@@ -157,7 +167,7 @@ function CompletedBarChart({ counts }: { counts: { label: string; count: number 
  * snapshot to diff against — fabricating a plausible-looking percentage would be worse than
  * not showing one.
  */
-export function TaskStats({ range, customRange }: TaskStatsProps) {
+export function TaskStats({ range, customRange, monthYearRange }: TaskStatsProps) {
   const allTasks = useTaskStore((s) => s.tasks);
   const withdrawnCount = useTaskStore((s) => s.withdrawnCount);
   const activities = useActivityStore((s) => s.activities);
@@ -165,8 +175,8 @@ export function TaskStats({ range, customRange }: TaskStatsProps) {
   const [activityFilter, setActivityFilter] = useState<string | null>(null);
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | null>(null);
 
-  const startKey = rangeStartKey(range, customRange);
-  const endKey = rangeEndKey(range, customRange);
+  const startKey = rangeStartKey(range, customRange, monthYearRange);
+  const endKey = rangeEndKey(range, customRange, monthYearRange);
   const todayKey = toDateKey(new Date());
 
   const filteredTasks = useMemo(() => {

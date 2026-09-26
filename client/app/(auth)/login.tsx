@@ -15,10 +15,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Divider, Input, Text } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
+import { getApiErrorMessage } from '@/services/api';
+import { useAuthStore } from '@/store/authStore';
+import { showToast } from '@/store/toastStore';
 import { loginSchema, type LoginForm } from '@/utils/validation';
 
 export default function LoginScreen() {
-  const { login, loginAsGuest, isLoading, error, clearError } = useAuth();
+  const { login, loginWithGoogle, loginAsGuest, isLoading, error, clearError } = useAuth();
   const passwordRef = useRef<TextInput>(null);
 
   const {
@@ -47,6 +50,20 @@ export default function LoginScreen() {
       router.replace('/');
     } catch {
       // Failure is surfaced via useAuth().error below.
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    clearError();
+    try {
+      await loginWithGoogle();
+      // isAuthenticated only flips true on a real session — a cancelled browser popup
+      // resolves normally with no session, so this correctly no-ops instead of navigating.
+      if (useAuthStore.getState().isAuthenticated) {
+        router.replace('/');
+      }
+    } catch (err) {
+      showToast(getApiErrorMessage(err), 'error');
     }
   };
 
@@ -133,7 +150,14 @@ export default function LoginScreen() {
 
             <Divider label="OR" spacing="lg" />
 
-            <Button title="Continue with Google" variant="secondary" fullWidth icon="Globe" onPress={() => {}} />
+            <Button
+              title="Continue with Google"
+              variant="secondary"
+              fullWidth
+              icon="Globe"
+              loading={isLoading}
+              onPress={handleGoogleLogin}
+            />
 
             <Button
               title="Continue as Guest"

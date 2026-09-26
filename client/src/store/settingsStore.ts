@@ -2,8 +2,11 @@ import { Appearance } from 'react-native';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import { getApiErrorMessage } from '../services/api';
+import { settingsService } from '../services/settings.service';
 import type { UserSettings } from '../types/settings';
 import { storage } from '../utils/storage';
+import { showToast } from './toastStore';
 import { useThemeStore } from './themeStore';
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -18,14 +21,31 @@ const DEFAULT_SETTINGS: UserSettings = {
 
 interface SettingsState {
   settings: UserSettings;
+  isLoading: boolean;
+  error: string | null;
+  fetchSettings: () => Promise<void>;
   updateSetting: <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => void;
   resetSettings: () => void;
+  clearError: () => void;
 }
 
 /** `system` resolves through the OS's current scheme; light/dark pass through as-is. */
 function resolveTheme(pref: UserSettings['theme']): 'light' | 'dark' {
   if (pref !== 'system') return pref;
   return Appearance.getColorScheme() === 'dark' ? 'dark' : 'light';
+}
+
+const SETTINGS_DEBOUNCE_MS = 500;
+let pendingUpdate: Partial<UserSettings> = {};
+let pendingTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function flushPendingSettings(): void {
+  if (Object.keys(pendingUpdate).length === 0) return;
+  const toSend = pendingUpdate;
+  pendingUpdate = {};
+  settingsService.update(toSend).catch((err) => {
+    showToast(getApiErrorMessage(err), 'error');
+  });
 }
 
 /**
@@ -37,23 +57,52 @@ function resolveTheme(pref: UserSettings['theme']): 'light' | 'dark' {
  * immediately via `resolveTheme` and pushes the result into `useThemeStore.setTheme` —
  * there's no dedicated ThemeSync component; the push happens right where the preference is
  * set instead.
+ *
+ * `updateSetting` applies locally and to the persisted local cache immediately (so the UI
+ * never waits on the network for a toggle to visually flip), then debounces a PATCH to the
+ * server — several settings flipped in quick succession collapse into one request instead
+ * of one per toggle.
  */
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       settings: DEFAULT_SETTINGS,
+      isLoading: false,
+      error: null,
+
+      fetchSettings: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const settings = await settingsService.get();
+          set({ settings, isLoading: false });
+          useThemeStore.getState().setTheme(resolveTheme(settings.theme));
+        } catch (err) {
+          set({ error: getApiErrorMessage(err), isLoading: false });
+        }
+      },
 
       updateSetting: (key, value) => {
         set((state) => ({ settings: { ...state.settings, [key]: value } }));
         if (key === 'theme') {
           useThemeStore.getState().setTheme(resolveTheme(value as UserSettings['theme']));
         }
+
+        pendingUpdate = { ...pendingUpdate, [key]: value };
+        if (pendingTimeout) clearTimeout(pendingTimeout);
+        pendingTimeout = setTimeout(flushPendingSettings, SETTINGS_DEBOUNCE_MS);
       },
 
       resetSettings: () => {
         set({ settings: DEFAULT_SETTINGS });
         useThemeStore.getState().setTheme('light');
+        pendingUpdate = {};
+        if (pendingTimeout) clearTimeout(pendingTimeout);
+        settingsService.update(DEFAULT_SETTINGS).catch((err) => {
+          showToast(getApiErrorMessage(err), 'error');
+        });
       },
+
+      clearError: () => set({ error: null }),
     }),
     {
       name: 'tide_settings',

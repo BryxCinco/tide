@@ -4,6 +4,7 @@ import { Pressable } from '../ui/SoundPressable';
 
 import { useAuth } from '../../hooks/useAuth';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { getApiErrorMessage } from '../../services/api';
 import { useUserStore } from '../../store/userStore';
 import { showToast } from '../../store/toastStore';
 import { pickImage, type ImageSource } from '../../utils/imageUpload';
@@ -31,28 +32,47 @@ export function AvatarPickerModal({ visible, onClose }: AvatarPickerModalProps) 
   const removeAvatar = useUserStore((s) => s.removeAvatar);
   const themeColors = useThemeColors();
   const [isPicking, setIsPicking] = useState(false);
+  // Distinct from isPicking — this covers the PATCH /api/profile round trip after a photo
+  // is already chosen, so the spinner stays up until the change is actually saved
+  // server-side, not just until the picker UI closes.
+  const [isSaving, setIsSaving] = useState(false);
+  const isBusy = isPicking || isSaving;
 
   const handlePick = async (source: ImageSource) => {
     setIsPicking(true);
     const result = await pickImage(source);
     setIsPicking(false);
 
-    if (result.ok) {
-      updateAvatar(result.uri);
-      onClose();
-      showToast('Avatar updated');
+    if (!result.ok) {
+      if (result.reason === 'too-large') showToast('That image is over 2MB — try a smaller one.', 'error');
+      else if (result.reason === 'permission-denied') showToast('Permission denied — enable photo access in your device settings.', 'error');
+      // 'cancelled' / 'unsupported' — the user just backed out, nothing to report.
       return;
     }
 
-    if (result.reason === 'too-large') showToast('That image is over 2MB — try a smaller one.', 'error');
-    else if (result.reason === 'permission-denied') showToast('Permission denied — enable photo access in your device settings.', 'error');
-    // 'cancelled' / 'unsupported' — the user just backed out, nothing to report.
+    setIsSaving(true);
+    try {
+      await updateAvatar(result.uri);
+      onClose();
+      showToast('Avatar updated');
+    } catch (err) {
+      showToast(getApiErrorMessage(err, "Couldn't save your avatar. Please try again."), 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleRemove = () => {
-    removeAvatar();
-    onClose();
-    showToast('Avatar removed');
+  const handleRemove = async () => {
+    setIsSaving(true);
+    try {
+      await removeAvatar();
+      onClose();
+      showToast('Avatar removed');
+    } catch (err) {
+      showToast(getApiErrorMessage(err, "Couldn't remove your avatar. Please try again."), 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const options: RowOption[] = [
@@ -68,7 +88,7 @@ export function AvatarPickerModal({ visible, onClose }: AvatarPickerModalProps) 
           <Avatar name={user?.name} source={user?.avatar} size="xl" ring ringColor="teal" />
         </View>
 
-        {isPicking ? (
+        {isBusy ? (
           <View className="items-center py-6">
             <ActivityIndicator color={themeColors.brand.tideTeal} />
           </View>

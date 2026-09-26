@@ -1,10 +1,12 @@
+import { useEffect } from 'react';
 import { View } from 'react-native';
 
 import { useJournalStore } from '../../store/journalStore';
 import { useQuestStore } from '../../store/questStore';
-import { MOCK_PROFILE_STATS } from '../../mocks/mockUser';
+import { useTimerStore } from '../../store/timerStore';
 import { Icon, Text, type IconName } from '../ui';
 import { colors } from '../../utils/theme';
+import { formatDuration } from '../../utils/formatTime';
 
 interface MiniStat {
   id: string;
@@ -13,19 +15,33 @@ interface MiniStat {
   label: string;
 }
 
-/** 2x2 on phone, 4-across from tablet up — same breakpoint behavior as the Dashboard's
+/**
+ * 2x2 on phone, 4-across from tablet up — same breakpoint behavior as the Dashboard's
  * StatsRow, just a smaller/denser card since these four don't need trend lines or
- * count-up animation (Profile is a settings screen, not the Dashboard's hero surface). */
+ * count-up animation (Profile is a settings screen, not the Dashboard's hero surface).
+ *
+ * Focus Time / Sessions are TODAY's real numbers (timerStore), not an all-time total —
+ * there's no all-time aggregate endpoint yet, and showing today's honest number beats
+ * showing a fabricated lifetime one. Self-fetches on mount (via useTimerStore directly,
+ * not the useTimer() hook — that hook also mounts the ticking interval, and mounting it a
+ * second time here would double the timer's tick rate whenever Timer is open elsewhere).
+ */
 export function StatsRow() {
   const journalCount = useJournalStore((s) => s.entries.length);
-  // Real daily-quest streak (questStore.ts), not MOCK_PROFILE_STATS.currentStreak — this
-  // is the "also visible on profile" half of the Daily Quests feature's streak counter,
-  // and must be the same number DailyQuestCard shows on the dashboard.
   const streak = useQuestStore((s) => s.streak);
+  const todaySessions = useTimerStore((s) => s.todaySessions);
+  const activityTotals = useTimerStore((s) => s.activityTotals);
+  const fetchTodaySessions = useTimerStore((s) => s.fetchTodaySessions);
+
+  useEffect(() => {
+    fetchTodaySessions();
+  }, [fetchTodaySessions]);
+
+  const todayTotalSeconds = Object.values(activityTotals).reduce((sum, value) => sum + value, 0);
 
   const stats: MiniStat[] = [
-    { id: 'focus-time', icon: 'Timer', value: MOCK_PROFILE_STATS.totalFocusTime, label: 'Focus Time' },
-    { id: 'sessions', icon: 'Zap', value: MOCK_PROFILE_STATS.sessions, label: 'Sessions' },
+    { id: 'focus-time', icon: 'Timer', value: formatDuration(todayTotalSeconds), label: 'Focus Time Today' },
+    { id: 'sessions', icon: 'Zap', value: String(todaySessions.length), label: 'Sessions Today' },
     { id: 'journal', icon: 'BookOpen', value: String(journalCount), label: 'Journal Entries' },
     { id: 'streak', icon: 'Flame', value: `${streak}d`, label: 'Quest Streak' },
   ];

@@ -53,7 +53,7 @@ export function SettingsItem({ icon, label, description, danger = false, disable
         )}
       </View>
 
-      <View className="flex-row items-center gap-2">
+      <View className="flex-shrink flex-row items-center justify-end gap-2" style={{ maxWidth: '55%' }}>
         {right ?? (isPressable && <Icon name="ChevronRight" size={18} color={themeColors.text.disabled} />)}
       </View>
     </View>

@@ -4,6 +4,7 @@ import { Pressable } from '../ui/SoundPressable';
 
 import { useAuth } from '../../hooks/useAuth';
 import { useTranslation } from '../../i18n';
+import { getApiErrorMessage } from '../../services/api';
 import { showToast } from '../../store/toastStore';
 import { useUserStore } from '../../store/userStore';
 import { Avatar, Button, Icon, Input, Modal, Text } from '../ui';
@@ -29,6 +30,7 @@ export function EditProfileModal({ visible, onClose, onChangeAvatar }: EditProfi
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -37,16 +39,26 @@ export function EditProfileModal({ visible, onClose, onChangeAvatar }: EditProfi
     setError(null);
   }, [visible, user]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const trimmedName = name.trim();
     if (!trimmedName) {
       setError('Give yourself a name.');
       return;
     }
 
-    updateProfile({ name: trimmedName, bio: bio.trim() || undefined });
-    onClose();
-    showToast('Profile updated');
+    setIsSaving(true);
+    try {
+      // `null` (not `undefined`) for an emptied-out bio — undefined means "leave it
+      // untouched" to profileService/syncProfile, which would silently fail to clear a bio
+      // the user just deleted.
+      await updateProfile({ name: trimmedName, bio: bio.trim() || null });
+      onClose();
+      showToast('Profile updated');
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Couldn't save your profile. Please try again."));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -96,8 +108,8 @@ export function EditProfileModal({ visible, onClose, onChangeAvatar }: EditProfi
         </View>
 
         <View className="flex-row gap-3">
-          <Button title={t('common.cancel')} variant="secondary" fullWidth onPress={onClose} />
-          <Button title={t('common.save')} variant="primary" fullWidth onPress={handleSave} />
+          <Button title={t('common.cancel')} variant="secondary" fullWidth onPress={onClose} disabled={isSaving} />
+          <Button title={t('common.save')} variant="primary" fullWidth loading={isSaving} onPress={handleSave} />
         </View>
       </View>
     </Modal>

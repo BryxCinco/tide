@@ -1,10 +1,12 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { createSeedJournalEntries } from '../mocks/mockJournal';
+import { getApiErrorMessage } from '../services/api';
+import { journalService } from '../services/journal.service';
 import type { JournalEntry, Mood } from '../types/journal';
 import { countWords } from '../utils/formatDate';
 import { storage } from '../utils/storage';
+import { showToast } from './toastStore';
 
 export type JournalFilter = 'all' | 'week' | 'month' | 'favorites';
 
@@ -13,8 +15,11 @@ interface JournalState {
   searchQuery: string;
   filter: JournalFilter;
   moodFilter: Mood | null;
+  isLoading: boolean;
+  error: string | null;
 
-  addEntry: (entry: { title: string; content: string; mood: Mood | null; tags: string[] }) => JournalEntry;
+  fetchEntries: () => Promise<void>;
+  addEntry: (entry: { title: string; content: string; mood: Mood | null; tags: string[] }) => Promise<JournalEntry>;
   updateEntry: (id: string, updates: Partial<Pick<JournalEntry, 'title' | 'content' | 'mood' | 'tags' | 'isFavorite'>>) => void;
   deleteEntry: (id: string) => void;
   toggleFavorite: (id: string) => void;
@@ -22,34 +27,43 @@ interface JournalState {
   setFilter: (filter: JournalFilter) => void;
   setMoodFilter: (mood: Mood | null) => void;
   getEntryById: (id: string) => JournalEntry | undefined;
+  clearError: () => void;
+  /** Wipes local state back to empty — see taskStore.reset()'s comment for why this exists
+   * (a single non-user-scoped 'tide_journal' storage key otherwise leaks across accounts). */
+  reset: () => void;
 }
 
 export const useJournalStore = create<JournalState>()(
   persist(
     (set, get) => ({
-      entries: createSeedJournalEntries(),
+      entries: [],
       searchQuery: '',
       filter: 'all',
       moodFilter: null,
+      isLoading: false,
+      error: null,
 
-      addEntry: ({ title, content, mood, tags }) => {
-        const now = new Date().toISOString();
-        const newEntry: JournalEntry = {
-          id: `journal_${Date.now()}`,
-          title,
-          content,
-          mood,
-          tags,
-          isFavorite: false,
-          createdAt: now,
-          updatedAt: now,
-          wordCount: countWords(content),
-        };
+      fetchEntries: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const entries = await journalService.list();
+          set({ entries, isLoading: false });
+        } catch (err) {
+          set({ error: getApiErrorMessage(err), isLoading: false });
+        }
+      },
+
+      // Genuinely async (unlike taskStore.addTask) — JournalEditor captures the returned
+      // id in React state (savedId) and reuses it for every subsequent autosave, so a
+      // temporary local id swapped out later would silently break those follow-up saves.
+      addEntry: async ({ title, content, mood, tags }) => {
+        const newEntry = await journalService.create({ title, content, mood, tags });
         set((state) => ({ entries: [newEntry, ...state.entries] }));
         return newEntry;
       },
 
       updateEntry: (id, updates) => {
+        const previous = get().entries;
         set((state) => ({
           entries: state.entries.map((e) =>
             e.id === id
@@ -62,21 +76,39 @@ export const useJournalStore = create<JournalState>()(
               : e,
           ),
         }));
+        journalService.update(id, updates).catch((err) => {
+          set({ entries: previous });
+          showToast(getApiErrorMessage(err), 'error');
+        });
       },
 
       deleteEntry: (id) => {
+        const previous = get().entries;
         set((state) => ({ entries: state.entries.filter((e) => e.id !== id) }));
+        journalService.remove(id).catch((err) => {
+          set({ entries: previous });
+          showToast(getApiErrorMessage(err), 'error');
+        });
       },
 
       toggleFavorite: (id) => {
-        set((state) => ({
-          entries: state.entries.map((e) => (e.id === id ? { ...e, isFavorite: !e.isFavorite } : e)),
-        }));
+        const previous = get().entries;
+        const entry = previous.find((e) => e.id === id);
+        if (!entry) return;
+
+        const isFavorite = !entry.isFavorite;
+        set((state) => ({ entries: state.entries.map((e) => (e.id === id ? { ...e, isFavorite } : e)) }));
+        journalService.update(id, { isFavorite }).catch((err) => {
+          set({ entries: previous });
+          showToast(getApiErrorMessage(err), 'error');
+        });
       },
 
       setSearchQuery: (searchQuery) => set({ searchQuery }),
       setFilter: (filter) => set({ filter }),
       setMoodFilter: (moodFilter) => set({ moodFilter }),
+      clearError: () => set({ error: null }),
+      reset: () => set({ entries: [], searchQuery: '', filter: 'all', moodFilter: null, isLoading: false, error: null }),
 
       getEntryById: (id) => get().entries.find((e) => e.id === id),
     }),

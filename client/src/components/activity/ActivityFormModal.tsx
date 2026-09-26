@@ -43,7 +43,9 @@ export function ActivityFormModal({ visible, onClose, activity, onSaved }: Activ
   const isEditing = Boolean(activity);
   const canDelete = isEditing && activity?.category === 'custom';
 
-  const handleSave = () => {
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
     const trimmed = name.trim();
     if (!trimmed) {
       setError('Give this activity a name.');
@@ -53,10 +55,20 @@ export function ActivityFormModal({ visible, onClose, activity, onSaved }: Activ
     if (activity) {
       updateActivity(activity.id, { name: trimmed, icon, color });
       onSaved?.({ ...activity, name: trimmed, icon, color });
-    } else {
-      onSaved?.(addActivity({ name: trimmed, icon, color }));
+      onClose();
+      return;
     }
-    onClose();
+
+    setIsSaving(true);
+    try {
+      const created = await addActivity({ name: trimmed, icon, color });
+      onSaved?.(created);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save this activity. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleToggleArchive = () => {
@@ -136,7 +148,7 @@ export function ActivityFormModal({ visible, onClose, activity, onSaved }: Activ
             </View>
           </View>
 
-          <Button title="Save" variant="primary" size="lg" fullWidth onPress={handleSave} />
+          <Button title="Save" variant="primary" size="lg" fullWidth loading={isSaving} onPress={handleSave} />
 
           {isEditing && (
             <Button

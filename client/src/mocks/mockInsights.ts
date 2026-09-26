@@ -24,8 +24,8 @@ const CHART_COLORS = {
 const MOOD_SCORE: Record<Mood, number> = { terrible: 1, bad: 2, okay: 3, good: 4, great: 5 };
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-function daysAgo(days: number): Date {
-  const date = new Date();
+function daysAgo(days: number, from: Date = new Date()): Date {
+  const date = new Date(from);
   date.setDate(date.getDate() - days);
   return date;
 }
@@ -52,9 +52,9 @@ const MOOD_PATTERN: Mood[] = ['good', 'great', 'okay', 'good', 'good', 'bad', 'o
  * behavior (bars read left-to-right ending on "today"); longer ranges label by day-of-month,
  * same as the old monthly builder.
  */
-function buildTimeSeries(days: number): DayTimeEntry[] {
+function buildTimeSeries(days: number, endDate: Date = new Date()): DayTimeEntry[] {
   return Array.from({ length: days }, (_, i) => {
-    const date = daysAgo(days - 1 - i);
+    const date = daysAgo(days - 1 - i, endDate);
     const weekdayFactor = WEEK_HOURS_PATTERN[mondayFirstIndex(date)];
     // Gentle wave on top of the weekday pattern so longer ranges aren't flat-repeating,
     // still deterministic (not Math.random) so it's stable across reloads/hot-refresh.
@@ -67,9 +67,9 @@ function buildTimeSeries(days: number): DayTimeEntry[] {
   });
 }
 
-function buildMoodTrend(days: number): MoodTrendPoint[] {
+function buildMoodTrend(days: number, endDate: Date = new Date()): MoodTrendPoint[] {
   return Array.from({ length: days }, (_, i) => {
-    const date = daysAgo(days - 1 - i);
+    const date = daysAgo(days - 1 - i, endDate);
     // Not every day has a journal entry — every 4th day (deterministically) has none,
     // so the line legitimately gaps rather than always being fully populated.
     const hasEntry = i % 4 !== 3;
@@ -107,8 +107,8 @@ const weeklySummary: WeeklySummaryItem[] = [
   { id: 'task-rate', label: 'Task Completion', value: '73%', icon: 'CheckSquare', tint: 'muted' },
 ];
 
-function buildHeatmap(days: number): HeatmapDay[] {
-  return buildTimeSeries(days).map(({ date, seconds }) => {
+function buildHeatmap(days: number, endDate: Date = new Date()): HeatmapDay[] {
+  return buildTimeSeries(days, endDate).map(({ date, seconds }) => {
     const hours = seconds / 3600;
     const level: HeatmapDay['level'] = hours >= 5 ? 4 : hours >= 3.5 ? 3 : hours >= 2 ? 2 : hours > 0 ? 1 : 0;
     return { date, level, seconds };
@@ -128,18 +128,22 @@ export const mockInsightsData: InsightsData = {
 };
 
 /**
- * Fix 4's range filter (TimeFilter.tsx) needs arbitrary day counts (Today=1 through
- * All Time), not just the two fixed 7/30-day windows above — this generates all of a
- * range's chart data from the same deterministic patterns, so every chart on the Insights
- * screen (time chart, mood trend, heatmap) recomputes consistently for whatever range is
- * selected instead of only Week/Month having real data.
+ * The range filter (TimeFilter.tsx) needs arbitrary day-count windows ending on an
+ * arbitrary date (Today through a specific past calendar month, e.g. "Jan 2026"), not just
+ * the two fixed 7/30-day-ending-today windows above — this generates all of a range's chart
+ * data from the same deterministic patterns, so every chart on the Insights screen (time
+ * chart, mood trend, heatmap) recomputes consistently for whatever window is selected.
+ * `endDate` defaults to today (every range except the month/year picker ends there).
  */
-export function buildInsightsForRange(days: number): { time: DayTimeEntry[]; mood: MoodTrendPoint[]; heatmap: HeatmapDay[] } {
+export function buildInsightsForRange(
+  days: number,
+  endDate: Date = new Date(),
+): { time: DayTimeEntry[]; mood: MoodTrendPoint[]; heatmap: HeatmapDay[] } {
   const clampedDays = Math.max(1, days);
   return {
-    time: buildTimeSeries(clampedDays),
-    mood: buildMoodTrend(clampedDays),
-    heatmap: buildHeatmap(clampedDays),
+    time: buildTimeSeries(clampedDays, endDate),
+    mood: buildMoodTrend(clampedDays, endDate),
+    heatmap: buildHeatmap(clampedDays, endDate),
   };
 }
 

@@ -25,7 +25,8 @@ async function bumpStreakIfDayComplete(userId, dateKey) {
     .from('quests')
     .select('is_completed')
     .eq('user_id', userId)
-    .eq('date', dateKey);
+    .eq('date', dateKey)
+    .eq('is_active', true);
 
   if (questsError || !dayQuests?.length || dayQuests.some((q) => !q.is_completed)) return null;
 
@@ -68,15 +69,39 @@ router.get('/', async (req, res) => {
   res.json({ quests: data });
 });
 
-// POST /api/quests — used by the daily-quest generator to seed today's quest set.
+// POST /api/quests — used both by the daily-quest generator (is_custom: false) to seed
+// today's random set, and by the user's own "+ Add Quest" flow (is_custom: true).
 router.post('/', async (req, res) => {
-  const { title, description, icon, category, xp, date } = req.body;
+  const {
+    title,
+    description,
+    icon,
+    category,
+    xp,
+    date,
+    is_recurring: isRecurring,
+    recurrence_type: recurrenceType,
+    is_active: isActive,
+    is_custom: isCustom,
+  } = req.body;
 
   if (!title) return res.status(400).json({ error: 'title is required' });
 
   const { data, error } = await supabaseAdmin
     .from('quests')
-    .insert({ user_id: req.user.id, title, description, icon, category, xp, date: date || todayKey() })
+    .insert({
+      user_id: req.user.id,
+      title,
+      description,
+      icon,
+      category,
+      xp,
+      date: date || todayKey(),
+      is_recurring: Boolean(isRecurring),
+      recurrence_type: isRecurring ? recurrenceType : null,
+      is_active: isActive === undefined ? true : Boolean(isActive),
+      is_custom: Boolean(isCustom),
+    })
     .select()
     .single();
 
@@ -84,12 +109,34 @@ router.post('/', async (req, res) => {
   res.status(201).json({ quest: data });
 });
 
+// PATCH /api/quests/:id — handles both a completion toggle (is_completed) and a full edit
+// (title/description/icon/category/xp/recurring/active), since both are just partial
+// updates to the same row. Only fields actually present in the body are touched.
 router.patch('/:id', async (req, res) => {
-  const isCompleted = Boolean(req.body.is_completed);
+  const update = {};
+  let togglingCompletion = false;
+
+  if ('title' in req.body) update.title = req.body.title;
+  if ('description' in req.body) update.description = req.body.description;
+  if ('icon' in req.body) update.icon = req.body.icon;
+  if ('category' in req.body) update.category = req.body.category;
+  if ('xp' in req.body) update.xp = req.body.xp;
+  if ('is_active' in req.body) update.is_active = Boolean(req.body.is_active);
+  if ('is_recurring' in req.body) {
+    update.is_recurring = Boolean(req.body.is_recurring);
+    update.recurrence_type = update.is_recurring ? (req.body.recurrence_type ?? null) : null;
+  } else if ('recurrence_type' in req.body) {
+    update.recurrence_type = req.body.recurrence_type;
+  }
+  if ('is_completed' in req.body) {
+    togglingCompletion = true;
+    update.is_completed = Boolean(req.body.is_completed);
+    update.completed_at = update.is_completed ? new Date().toISOString() : null;
+  }
 
   const { data: quest, error } = await supabaseAdmin
     .from('quests')
-    .update({ is_completed: isCompleted, completed_at: isCompleted ? new Date().toISOString() : null })
+    .update(update)
     .eq('id', req.params.id)
     .eq('user_id', req.user.id)
     .select()
@@ -98,9 +145,28 @@ router.patch('/:id', async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   if (!quest) return res.status(404).json({ error: 'Quest not found' });
 
-  const streak = isCompleted ? await bumpStreakIfDayComplete(req.user.id, quest.date) : null;
+  const streak = togglingCompletion && update.is_completed ? await bumpStreakIfDayComplete(req.user.id, quest.date) : null;
 
   res.json({ quest, streak });
+});
+
+// DELETE /api/quests/:id — custom (user-created) quests only; system-generated ones can be
+// paused (is_active: false) instead but not removed outright.
+router.delete('/:id', async (req, res) => {
+  const { data: quest, error: fetchError } = await supabaseAdmin
+    .from('quests')
+    .select('is_custom')
+    .eq('id', req.params.id)
+    .eq('user_id', req.user.id)
+    .single();
+
+  if (fetchError || !quest) return res.status(404).json({ error: 'Quest not found' });
+  if (!quest.is_custom) return res.status(403).json({ error: 'Only custom quests can be deleted — pause it instead' });
+
+  const { error } = await supabaseAdmin.from('quests').delete().eq('id', req.params.id).eq('user_id', req.user.id);
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(204).send();
 });
 
 module.exports = router;

@@ -43,14 +43,14 @@ export function HabitTracker() {
 
       <View className="gap-3">
         <View className="flex-row items-center">
-          <View className="w-28" />
-          <View className="flex-1 flex-row justify-between">
+          <View className="w-16 md:w-28" />
+          <View className="flex-1 flex-row gap-1">
             {DAY_LABELS.map((day, i) => (
               <Text
                 key={i}
                 variant="caption"
                 color={i === todayIndex ? 'accent' : 'muted'}
-                className="w-6 text-center normal-case tracking-normal"
+                className="flex-1 text-center normal-case tracking-normal"
               >
                 {day}
               </Text>
@@ -60,19 +60,21 @@ export function HabitTracker() {
 
         {habits.map((habit) => (
           <View key={habit.id} className="flex-row items-center">
-            <View className="w-28 flex-row items-center gap-2 pr-2">
+            <View className="w-16 flex-row items-center gap-1.5 pr-2 md:w-28 md:gap-2">
               <Icon name={habit.icon} size={16} color={themeColors.brand.tideTeal} />
-              <Text variant="caption" color="secondary" className="normal-case tracking-normal" numberOfLines={1}>
+              <Text variant="caption" color="secondary" className="flex-1 normal-case tracking-normal" numberOfLines={1}>
                 {habit.label}
               </Text>
             </View>
-            <View className="flex-1 flex-row justify-between">
+            <View className="flex-1 flex-row gap-1">
               {habit.completedDays.map((done, i) => (
                 <Pressable
                   key={i}
                   onPress={() => toggleDay(habit.id, i)}
-                  className="h-6 w-6 items-center justify-center rounded-md border"
+                  className="flex-1 items-center justify-center rounded-md border"
                   style={{
+                    aspectRatio: 1,
+                    maxWidth: 28,
                     borderColor: done ? themeColors.brand.tideTeal : themeColors.border.subtle,
                     backgroundColor: done ? hexToRgba(themeColors.brand.tideTeal, 0.15) : 'transparent',
                   }}

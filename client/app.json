@@ -35,7 +35,8 @@
           "cameraPermission": "Tide needs access to your camera so you can take a new avatar or cover photo."
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

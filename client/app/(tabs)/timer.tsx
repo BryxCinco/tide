@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActivityFormModal } from '@/components/activity';
@@ -13,7 +13,7 @@ import {
   TimerDisplay,
   TodayLogs,
 } from '@/components/timer';
-import { BackButton, Button, Input, Modal, ResponsiveContainer, Text } from '@/components/ui';
+import { BackButton, Button, ErrorState, Input, Modal, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
 import { useTimer } from '@/hooks/useTimer';
 import { useActivityStore } from '@/store/activityStore';
 import { DEFAULT_FOCUS_ACTIVITY } from '@/mocks/mockActivities';
@@ -39,6 +39,10 @@ export default function TimerScreen() {
     secondsRemaining,
     todaySessions,
     activityTotals,
+    isLoading,
+    error,
+    fetchTodaySessions,
+    clearError,
     setActivity,
     clearActivity,
     toggleTag,
@@ -53,6 +57,8 @@ export default function TimerScreen() {
   } = useTimer();
 
   const allActivities = useActivityStore((s) => s.activities);
+  const activitiesLoading = useActivityStore((s) => s.isLoading);
+  const fetchActivities = useActivityStore((s) => s.fetchActivities);
   // Focus Session is always offered as a pickable chip (not just an invisible fallback the
   // store reaches for) — prepended, not appended, so it reads as the default choice.
   const activities = useMemo(
@@ -60,6 +66,21 @@ export default function TimerScreen() {
     [allActivities],
   );
   const [customModalVisible, setCustomModalVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    fetchActivities();
+    fetchTodaySessions();
+    // Intentionally once on mount — re-fires only via pull-to-refresh below, not on every
+    // render these functions get a new identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([fetchActivities(), fetchTodaySessions()]);
+    setRefreshing(false);
+  };
 
   const isSessionActive = isRunning || isPaused;
 
@@ -122,7 +143,11 @@ export default function TimerScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-base">
-      <ScrollView className="flex-1" contentContainerClassName="pb-24 pt-4 md:pt-6 lg:pt-8">
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="pb-24 pt-4 md:pt-6 lg:pt-8"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         <ResponsiveContainer className="gap-8">
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center gap-3">
@@ -185,9 +210,26 @@ export default function TimerScreen() {
             onConfirmStop={stop}
           />
 
-          <TodayLogs sessions={todaySessions} />
-
-          <ActivityBreakdown activities={activities} totals={activityTotals} />
+          {error && todaySessions.length === 0 ? (
+            <ErrorState
+              message={error}
+              onRetry={() => {
+                clearError();
+                fetchTodaySessions();
+              }}
+            />
+          ) : (isLoading || activitiesLoading) && todaySessions.length === 0 ? (
+            <View className="gap-2">
+              {[0, 1].map((i) => (
+                <SkeletonRow key={i} />
+              ))}
+            </View>
+          ) : (
+            <>
+              <TodayLogs sessions={todaySessions} />
+              <ActivityBreakdown activities={activities} totals={activityTotals} />
+            </>
+          )}
         </ResponsiveContainer>
       </ScrollView>
 

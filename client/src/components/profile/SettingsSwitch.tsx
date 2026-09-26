@@ -49,7 +49,11 @@ export function SettingsSwitch({ value, onValueChange, disabled = false }: Setti
   }));
 
   return (
-    <Pressable onPress={() => onValueChange(!value)} disabled={disabled} hitSlop={8}>
+    <Pressable
+      onPress={() => onValueChange(!value)}
+      disabled={disabled}
+      hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+    >
       <Animated.View
         style={[
           { width: WIDTH, height: HEIGHT, borderRadius: HEIGHT / 2, padding: PADDING, justifyContent: 'center', opacity: disabled ? 0.5 : 1 },

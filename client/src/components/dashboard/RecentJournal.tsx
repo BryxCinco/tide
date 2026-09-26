@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
 
 import type { JournalPreview } from '../../types/dashboard';
-import { Badge, Text } from '../ui';
+import { Badge, EmptyState, Text } from '../ui';
 
 export interface RecentJournalProps {
   entries: JournalPreview[];
@@ -22,6 +22,16 @@ export function RecentJournal({ entries }: RecentJournalProps) {
           </Text>
         </Pressable>
       </View>
+
+      {entries.length === 0 && (
+        <EmptyState
+          icon="BookOpen"
+          title="No entries yet"
+          description="Write your first journal entry to see it here."
+          actionLabel="Write Journal"
+          onAction={() => router.push('/journal/new')}
+        />
+      )}
 
       <View className="flex-row flex-wrap gap-4">
         {entries.map((entry) => (

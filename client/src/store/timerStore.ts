@@ -1,7 +1,10 @@
 import { create } from 'zustand';
 
 import { DEFAULT_FOCUS_ACTIVITY } from '../mocks/mockActivities';
-import { mockTodaySessions } from '../mocks/mockTimer';
+import { getApiErrorMessage } from '../services/api';
+import { mapApiSession, sessionService } from '../services/session.service';
+import { useActivityStore } from './activityStore';
+import { showToast } from './toastStore';
 import type { Activity } from '../types/activity';
 import type { Session } from '../types/timer';
 import { formatClockTime } from '../utils/formatTime';
@@ -28,7 +31,14 @@ interface TimerState {
 
   todaySessions: Session[];
   activityTotals: Record<string, number>;
+  isLoading: boolean;
+  error: string | null;
 
+  /** GET /api/sessions scoped to today — replaces todaySessions/activityTotals with the
+   * server's copy, enriching each row with icon/color from activityStore (time_logs has no
+   * icon/color columns of its own; see session.service.ts's mapApiSession). */
+  fetchTodaySessions: () => Promise<void>;
+  clearError: () => void;
   setActivity: (activity: Activity) => void;
   /** Idle-only — deselects back to no activity picked. Mid-session there's always a
    * logged-against activity (setActivity re-tags it instead; see its own comment). */
@@ -42,8 +52,15 @@ interface TimerState {
   resume: () => void;
   /** Saves the current session (called after the confirmation modal, not on the raw Stop press). */
   stop: () => void;
+  /** Resets the live in-progress timer (elapsed seconds/activity/running state) — NOT
+   * todaySessions history. See resetAccountData for that. */
   reset: () => void;
   tick: () => void;
+  /** Wipes todaySessions/activityTotals — this store isn't zustand-persisted, but its
+   * in-memory state can still leak across accounts within the same tab session (logout
+   * then a different login, no page reload in between). Named distinctly from reset()
+   * above since that resets the *live* timer, a different concept entirely. */
+  resetAccountData: () => void;
 }
 
 function computeActivityTotals(sessions: Session[]): Record<string, number> {
@@ -68,8 +85,33 @@ export const useTimerStore = create<TimerState>()((set, get) => ({
   mode: 'stopwatch',
   countdownDurationSeconds: null,
 
-  todaySessions: mockTodaySessions,
-  activityTotals: computeActivityTotals(mockTodaySessions),
+  todaySessions: [],
+  activityTotals: {},
+  isLoading: false,
+  error: null,
+
+  fetchTodaySessions: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const now = new Date();
+      const from = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      const to = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
+      const rows = await sessionService.list({ from, to });
+
+      const activities = useActivityStore.getState().activities;
+      const todaySessions: Session[] = rows.map((row) => {
+        const partial = mapApiSession(row);
+        const activity = activities.find((a) => a.id === partial.activityId);
+        return { ...partial, icon: activity?.icon ?? 'Circle', color: activity?.color ?? '#14B8A6' };
+      });
+
+      set({ todaySessions, activityTotals: computeActivityTotals(todaySessions), isLoading: false });
+    } catch (err) {
+      set({ error: getApiErrorMessage(err), isLoading: false });
+    }
+  },
+
+  clearError: () => set({ error: null }),
 
   setActivity: (activity) => {
     // Allowed mid-session too (Fix 3: "change activity after starting") — the confirmation
@@ -153,9 +195,30 @@ export const useTimerStore = create<TimerState>()((set, get) => ({
       },
       ...initialSessionState,
     });
+
+    // Fire-and-forget persist (the spec's "saveSession"): the session is already shown
+    // above from local state, so a slow/failed request doesn't block or undo the UI the
+    // user just saw — it only surfaces as a toast, since the tracked time is real either way
+    // even if this particular sync attempt didn't land.
+    sessionService
+      .create({
+        activityId: session.activityId,
+        activityName: session.activityLabel,
+        durationSeconds: session.durationSeconds,
+        notes: session.notes,
+        tags: session.tags,
+        startedAt: startDate.toISOString(),
+        endedAt: endDate.toISOString(),
+      })
+      .catch((err) => {
+        showToast(`Session tracked locally, but didn't sync: ${getApiErrorMessage(err)}`, 'error');
+      });
   },
 
   reset: () => set({ ...initialSessionState }),
 
   tick: () => set((state) => (state.isRunning ? { seconds: state.seconds + 1 } : state)),
+
+  resetAccountData: () =>
+    set({ ...initialSessionState, todaySessions: [], activityTotals: {}, isLoading: false, error: null }),
 }));

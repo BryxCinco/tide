@@ -1,10 +1,10 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyJournal, JournalCard, JournalFilters, SearchBar } from '@/components/journal';
-import { BackButton, FAB, ResponsiveContainer, Text } from '@/components/ui';
+import { BackButton, ErrorState, FAB, ResponsiveContainer, SkeletonCard, Text } from '@/components/ui';
 import { useResponsive } from '@/hooks/useResponsive';
 import { getVisibleEntries, useJournalStore } from '@/store/journalStore';
 
@@ -15,6 +15,10 @@ export default function JournalScreen() {
   const filter = useJournalStore((s) => s.filter);
   const moodFilter = useJournalStore((s) => s.moodFilter);
   const searchQuery = useJournalStore((s) => s.searchQuery);
+  const isLoading = useJournalStore((s) => s.isLoading);
+  const error = useJournalStore((s) => s.error);
+  const fetchEntries = useJournalStore((s) => s.fetchEntries);
+  const clearError = useJournalStore((s) => s.clearError);
   const setFilter = useJournalStore((s) => s.setFilter);
   const setMoodFilter = useJournalStore((s) => s.setMoodFilter);
   const setSearchQuery = useJournalStore((s) => s.setSearchQuery);
@@ -26,6 +30,17 @@ export default function JournalScreen() {
   // Local, immediate value for the input; committed to the store (debounced) so the
   // filtered list doesn't re-run on every keystroke.
   const [searchDraft, setSearchDraft] = useState(searchQuery);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    fetchEntries();
+  }, [fetchEntries]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchEntries();
+    setRefreshing(false);
+  };
 
   useEffect(() => {
     const timeout = setTimeout(() => setSearchQuery(searchDraft), SEARCH_DEBOUNCE_MS);
@@ -47,7 +62,11 @@ export default function JournalScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-base">
-      <ScrollView className="flex-1" contentContainerClassName="pb-24 pt-4 md:pt-6 lg:pt-8">
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="pb-24 pt-4 md:pt-6 lg:pt-8"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         <ResponsiveContainer className="gap-5">
           <View className="flex-row items-center gap-3">
             <BackButton onPress={() => router.push('/')} />
@@ -65,7 +84,23 @@ export default function JournalScreen() {
             onMoodFilterChange={setMoodFilter}
           />
 
-          {visibleEntries.length === 0 ? (
+          {error && allEntries.length === 0 ? (
+            <ErrorState
+              message={error}
+              onRetry={() => {
+                clearError();
+                fetchEntries();
+              }}
+            />
+          ) : isLoading && allEntries.length === 0 ? (
+            <View className="flex-row flex-wrap gap-3">
+              {[0, 1, 2].map((i) => (
+                <View key={i} className={basisClass}>
+                  <SkeletonCard />
+                </View>
+              ))}
+            </View>
+          ) : visibleEntries.length === 0 ? (
             <EmptyJournal hasActiveFilters={hasActiveFilters} onNewEntry={openNewEntry} />
           ) : (
             <View className="flex-row flex-wrap gap-3">
