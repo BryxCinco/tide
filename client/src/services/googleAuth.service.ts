@@ -52,13 +52,18 @@ supabase.auth.onAuthStateChange((event, session) => {
   handleGoogleSignIn({
     accessToken: session.access_token,
     refreshToken: session.refresh_token ?? null,
-  }).finally(() => {
-    console.log('[OAuth Debug] completeGoogleSignIn settled, clearing supabase-js\'s own local session copy');
-    // authStore is now the single source of truth for the rest of the app (see its
-    // completeGoogleSignIn) — clear this client's own local copy so there's no second,
-    // unused session left sitting in storage that could silently drift from it.
-    supabase.auth.signOut({ scope: 'local' }).catch(() => {});
   });
+  // Deliberately NOT calling supabase.auth.signOut() here — an earlier version of this
+  // file did, on the theory that it was harmless "local" cleanup of this client's own
+  // session copy. It is not harmless: reading _signOut()'s actual implementation
+  // (@supabase/auth-js's GoTrueClient), EVERY scope — including 'local' — calls
+  // `this.admin.signOut(accessToken, scope)`, a real network call that revokes that
+  // access token server-side. 'local' only controls *which* sessions get revoked (this
+  // device vs. every device), not whether a revocation happens at all. That call was
+  // immediately invalidating the very token just handed to authStore, which is exactly
+  // why sign-in appeared to succeed for a moment and then fail with "Invalid or expired
+  // token" shortly after. Leaving supabase-js's own session in place costs nothing but a
+  // second, unused copy of the session sitting in storage under its own distinct key.
 });
 
 /**
