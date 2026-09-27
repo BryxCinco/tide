@@ -4,7 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { getApiErrorMessage } from '../services/api';
 import { taskService } from '../services/task.service';
 import type { Task, TaskPriority, TaskStatus } from '../types/task';
-import { isGuestMode } from '../utils/authFlags';
+import { hasAuthToken, isGuestMode } from '../utils/authFlags';
 import { storage } from '../utils/storage';
 import { showToast } from './toastStore';
 
@@ -68,6 +68,11 @@ export const useTaskStore = create<TaskState>()(
         // localStorage/SecureStore regardless of account type, so whatever's already
         // loaded there is already correct; there's nothing to fetch.
         if (isGuestMode()) return;
+        // No token yet (e.g. this fetch fired from a mount effect a tick ahead of sign-in
+        // actually completing) — skip rather than 401 for a reason that has nothing to do
+        // with the token itself being invalid. Whatever triggers a re-render once the token
+        // shows up (auth-gated screens only mount post-isAuthenticated) re-fires this.
+        if (!hasAuthToken()) return;
 
         set({ isLoading: true, error: null });
         try {

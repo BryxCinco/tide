@@ -11,8 +11,10 @@ export interface GoogleSessionTokens {
 }
 
 type GoogleSignInHandler = (tokens: GoogleSessionTokens) => Promise<void>;
+type GoogleTokenRefreshHandler = (accessToken: string) => void;
 
 let handleGoogleSignIn: GoogleSignInHandler = async () => {};
+let handleGoogleTokenRefresh: GoogleTokenRefreshHandler = () => {};
 
 /**
  * authStore registers itself here (mirrors api.ts's `onUnauthorized` listener pattern) so
@@ -24,22 +26,39 @@ export function onGoogleSignIn(handler: GoogleSignInHandler): void {
 }
 
 /**
- * Fires whenever *this* client's session changes, which happens two different ways
- * depending on platform:
- *  - Native: `exchangeCodeForSession()` below triggers it directly, in the same tick as
- *    `signInWithGoogle()`'s own await.
- *  - Web: `lib/supabase.ts`'s `detectSessionInUrl: true` triggers it automatically on a
- *    fresh page load, the moment Supabase has just redirected back here with `?code=...`
- *    in the URL — a completely different JS context than the one that started the flow,
- *    which is exactly why this has to be an event listener rather than something
- *    `signInWithGoogle()` can just return a value from on web.
- *
- * Registered at module scope (not inside a React effect) so it's subscribed before
- * supabase-js's own internal initialization — which is what runs detectSessionInUrl's
- * auto-exchange — has a chance to complete and be missed.
+ * Fires whenever supabase-js silently rotates the access token of an already-established
+ * Google session (its own internal autoRefreshToken timer — nothing this app's code
+ * triggers directly). authStore keeps its own separate copy of that access token (in its
+ * `token` field + AUTH_TOKEN_KEY storage, same as the email/password path) because the
+ * backend is authenticated with a plain Bearer token, not with this `supabase` client
+ * instance. Without this, that copy is only ever written once, at sign-in — if supabase-js
+ * rotates the underlying token afterward, our copy silently goes stale and every request
+ * after the rotation 401s with a token that "looks" fine (same session, just outdated).
+ */
+export function onGoogleTokenRefresh(handler: GoogleTokenRefreshHandler): void {
+  handleGoogleTokenRefresh = handler;
+}
+
+/**
+ * Only ever used for TOKEN_REFRESHED now — sign-in completion does NOT go through this
+ * listener (see signInWithGoogle's own comment for why). This client runs with
+ * `persistSession: true` (required for the PKCE code_verifier to survive the redirect out to
+ * Google and back — see lib/supabase.ts), and supabase-js automatically opens a
+ * `BroadcastChannel` to sync auth events across every tab/window on this same site whenever
+ * that's on. That's exactly the trap a SIGNED_IN listener falls into: a leftover tab from an
+ * earlier session refreshing or re-emitting ITS OWN (unrelated, possibly stale) session
+ * broadcasts a SIGNED_IN/TOKEN_REFRESHED that this tab's listener cannot tell apart from its
+ * own real sign-in completing. That's the actual mechanism behind `onAuthStateChange` firing
+ * SIGNED_IN more than once for a single redirect (confirmed via a real console trace) — not
+ * a bug in the exchange itself, but a cross-tab broadcast landing in the middle of it. Rather
+ * than try to filter broadcast-originated events out (the public API gives no way to), both
+ * signInWithGoogle's web and native branches now call handleGoogleSignIn directly from their
+ * own `exchangeCodeForSession()` result, which cannot be confused with any other tab's
+ * traffic. TOKEN_REFRESHED is left listened-to here because a same-tab, same-session refresh
+ * is exactly what it's meant to reflect, and authStore's copy of the token does need to stay
+ * in sync with it regardless of which tab's timer fired it.
  */
 supabase.auth.onAuthStateChange((event, session) => {
-  // TEMPORARY — remove once the redirect-loop bug is confirmed fixed.
   console.log('[OAuth Debug] onAuthStateChange fired:', {
     event,
     hasSession: Boolean(session),
@@ -47,12 +66,10 @@ supabase.auth.onAuthStateChange((event, session) => {
     hasRefreshToken: Boolean(session?.refresh_token),
   });
 
-  if (event !== 'SIGNED_IN' || !session) return;
-
-  handleGoogleSignIn({
-    accessToken: session.access_token,
-    refreshToken: session.refresh_token ?? null,
-  });
+  if (event === 'TOKEN_REFRESHED' && session) {
+    console.log('[OAuth Debug] Supabase rotated the access token — syncing authStore\'s copy.');
+    handleGoogleTokenRefresh(session.access_token);
+  }
   // Deliberately NOT calling supabase.auth.signOut() here — an earlier version of this
   // file did, on the theory that it was harmless "local" cleanup of this client's own
   // session copy. It is not harmless: reading _signOut()'s actual implementation
@@ -67,23 +84,57 @@ supabase.auth.onAuthStateChange((event, session) => {
 });
 
 /**
+ * Web's half of the OAuth redirect: exchanges `?code=...` for a session exactly once,
+ * manually, and completes sign-in directly from the result — see the onAuthStateChange
+ * comment above for why this can no longer go through that listener (cross-tab
+ * BroadcastChannel traffic). `lib/supabase.ts` runs with `detectSessionInUrl: false` now:
+ * its automatic version of this exact exchange was firing the underlying exchange request
+ * itself TWICE for one redirect, and Supabase treats a second exchange of the same
+ * authorization code as a replay attack, responding by revoking the session the first
+ * (legitimate) exchange had just issued — which is why sign-in used to appear to succeed
+ * and then fail moments later. Runs once at module load — the only point in time this page
+ * load will ever see this particular `?code=`.
+ */
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
+  const code = new URLSearchParams(window.location.search).get('code');
+  if (code) {
+    console.log('[OAuth Debug] (web) manual exchangeCodeForSession starting for code:', `${code.slice(0, 12)}...`);
+    supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
+      console.log(
+        '[OAuth Debug] (web) manual exchangeCodeForSession result:',
+        error ? `error: ${error.message}` : 'success',
+      );
+      if (error || !data.session) return; // Left for OAuthCallbackScreen's own 10s timeout to surface.
+      handleGoogleSignIn({
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token ?? null,
+      });
+    });
+  }
+}
+
+/**
  * Starts Google sign-in via Supabase + PKCE. Returns `true` if a flow that will eventually
  * produce a sign-in was actually started, `false` if the user cancelled before it could
- * (native only — see below). Never returns the session itself; completion always goes
- * through the `onGoogleSignIn` listener above, uniformly for both platforms.
+ * (native only — see below). Never returns the session itself on web (the tab navigates
+ * away before there's anything to return); on native, completion happens inline in this
+ * same function via `handleGoogleSignIn`, straight from `exchangeCodeForSession`'s own
+ * result — same reasoning as the module-scope web block above (see onAuthStateChange's
+ * comment): going through the shared listener risked picking up another tab/session's
+ * broadcast instead of this attempt's own result.
  *
  * Web and native need genuinely different mechanisms here, not just different `redirectTo`
  * values:
  *  - **Web**: a full top-level redirect (`window.location.assign`, done by supabase-js
  *    itself since `skipBrowserRedirect` is omitted). The tab navigates away entirely and
  *    this function's remaining code never runs — completion happens on the next page load,
- *    via detectSessionInUrl (see lib/supabase.ts) and the listener above. This deliberately
- *    replaces an earlier popup-based attempt (`WebBrowser.openAuthSessionAsync` +
- *    `postMessage` back to the opener): that mechanism depends on the popup retaining a
- *    `window.opener` reference and a `message` event actually arriving, both of which
- *    browsers' Cross-Origin-Opener-Policy defaults can silently break — which is exactly
- *    what produced a popup landing on `?code=...` with nothing ever telling the main tab
- *    about it. A full redirect has no popup, no postMessage, and nothing for COOP to break.
+ *    via the module-scope block above. This deliberately replaces an earlier popup-based
+ *    attempt (`WebBrowser.openAuthSessionAsync` + `postMessage` back to the opener): that
+ *    mechanism depends on the popup retaining a `window.opener` reference and a `message`
+ *    event actually arriving, both of which browsers' Cross-Origin-Opener-Policy defaults
+ *    can silently break — which is exactly what produced a popup landing on `?code=...`
+ *    with nothing ever telling the main tab about it. A full redirect has no popup, no
+ *    postMessage, and nothing for COOP to break.
  *  - **Native**: there's no page to navigate away from, so this opens a system browser
  *    session and waits for it — `openAuthSessionAsync` on native uses
  *    ASWebAuthenticationSession/Custom Tabs, which intercept the `tide://` redirect
@@ -136,14 +187,18 @@ export async function signInWithGoogle(): Promise<boolean> {
   }
 
   console.log('[OAuth Debug] (native) code received:', `${params.code.slice(0, 12)}...`);
-  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(params.code);
+  const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(params.code);
   console.log('[OAuth Debug] (native) exchangeCodeForSession result:', exchangeError ? `error: ${exchangeError.message}` : 'success');
   if (exchangeError) {
     throw new Error(exchangeError.message);
   }
+  if (!exchangeData.session) {
+    throw new Error('No session returned from Google sign-in.');
+  }
 
-  // No need to read the returned session here — exchangeCodeForSession's own internal
-  // _saveSession() firing the SIGNED_IN event above is what completes the sign-in, keeping
-  // native and web funneled through the exact same completion path.
+  await handleGoogleSignIn({
+    accessToken: exchangeData.session.access_token,
+    refreshToken: exchangeData.session.refresh_token ?? null,
+  });
   return true;
 }

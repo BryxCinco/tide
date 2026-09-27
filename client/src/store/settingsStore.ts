@@ -5,7 +5,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { getApiErrorMessage } from '../services/api';
 import { settingsService } from '../services/settings.service';
 import type { UserSettings } from '../types/settings';
-import { isGuestMode } from '../utils/authFlags';
+import { hasAuthToken, isGuestMode } from '../utils/authFlags';
 import { storage } from '../utils/storage';
 import { showToast } from './toastStore';
 import { useThemeStore } from './themeStore';
@@ -80,6 +80,9 @@ export const useSettingsStore = create<SettingsState>()(
         // localStorage/SecureStore regardless of account type, so whatever's already
         // loaded there (or DEFAULT_SETTINGS, for a brand-new guest) is already correct.
         if (isGuestMode()) return;
+        // No token yet — skip rather than 401 for a reason unrelated to the token itself.
+        // See taskStore.ts's fetchTasks for the full rationale.
+        if (!hasAuthToken()) return;
 
         set({ isLoading: true, error: null });
         try {

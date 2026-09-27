@@ -5,7 +5,7 @@ import { createSeedActivities } from '../mocks/mockActivities';
 import { activityService } from '../services/activity.service';
 import { getApiErrorMessage } from '../services/api';
 import type { Activity } from '../types/activity';
-import { isGuestMode } from '../utils/authFlags';
+import { hasAuthToken, isGuestMode } from '../utils/authFlags';
 import { storage } from '../utils/storage';
 import { showToast } from './toastStore';
 
@@ -57,6 +57,10 @@ export const useActivityStore = create<ActivityState>()(
         // store persists to localStorage/SecureStore regardless of account type) is already
         // exactly what a guest should see, so this is a no-op rather than a network call.
         if (isGuestMode()) return;
+        // No token yet (this fetch fired a tick ahead of sign-in actually completing) —
+        // skip rather than 401 for a reason unrelated to the token itself. See
+        // taskStore.ts's fetchTasks for the full rationale.
+        if (!hasAuthToken()) return;
 
         set({ isLoading: true, error: null });
         try {

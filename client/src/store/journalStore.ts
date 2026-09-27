@@ -4,7 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { getApiErrorMessage } from '../services/api';
 import { journalService } from '../services/journal.service';
 import type { JournalEntry, Mood } from '../types/journal';
-import { isGuestMode } from '../utils/authFlags';
+import { hasAuthToken, isGuestMode } from '../utils/authFlags';
 import { countWords } from '../utils/formatDate';
 import { storage } from '../utils/storage';
 import { showToast } from './toastStore';
@@ -49,6 +49,9 @@ export const useJournalStore = create<JournalState>()(
         // localStorage/SecureStore regardless of account type, so whatever's already
         // loaded there is already correct; there's nothing to fetch.
         if (isGuestMode()) return;
+        // No token yet — skip rather than 401 for a reason unrelated to the token itself.
+        // See taskStore.ts's fetchTasks for the full rationale.
+        if (!hasAuthToken()) return;
 
         set({ isLoading: true, error: null });
         try {

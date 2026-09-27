@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { DEFAULT_FOCUS_ACTIVITY } from '../mocks/mockActivities';
 import { getApiErrorMessage } from '../services/api';
 import { mapApiSession, sessionService } from '../services/session.service';
-import { isGuestMode } from '../utils/authFlags';
+import { hasAuthToken, isGuestMode } from '../utils/authFlags';
 import { useActivityStore } from './activityStore';
 import { showToast } from './toastStore';
 import type { Activity } from '../types/activity';
@@ -96,6 +96,9 @@ export const useTimerStore = create<TimerState>()((set, get) => ({
     // store's own doc comment), so there's genuinely nothing to fetch; whatever's already
     // in memory from this tab session is all there is.
     if (isGuestMode()) return;
+    // No token yet — skip rather than 401 for a reason unrelated to the token itself. See
+    // taskStore.ts's fetchTasks for the full rationale.
+    if (!hasAuthToken()) return;
 
     set({ isLoading: true, error: null });
     try {

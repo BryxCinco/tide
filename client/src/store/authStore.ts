@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 
-import { AUTH_TOKEN_KEY, AUTH_USER_KEY, getApiErrorMessage, onUnauthorized } from '../services/api';
+import { AUTH_TOKEN_KEY, AUTH_USER_KEY, getApiErrorMessage, onUnauthorized, registerTokenGetter } from '../services/api';
 import { authService, mapProfileToUser } from '../services/auth.service';
-import { onGoogleSignIn, signInWithGoogle, type GoogleSessionTokens } from '../services/googleAuth.service';
+import { onGoogleSignIn, onGoogleTokenRefresh, signInWithGoogle, type GoogleSessionTokens } from '../services/googleAuth.service';
 import { profileService, type UpdateProfilePayload } from '../services/profile.service';
 import type { User } from '../types/user';
-import { setGuestMode } from '../utils/authFlags';
+import { setGuestMode, setHasAuthToken } from '../utils/authFlags';
 import { guestStorage } from '../utils/guestStorage';
 import { storage } from '../utils/storage';
 import { useActivityStore } from './activityStore';
@@ -367,9 +367,26 @@ onUnauthorized(() => {
 // place that actually completes a Google sign-in, on both platforms.
 onGoogleSignIn((tokens) => useAuthStore.getState().completeGoogleSignIn(tokens));
 
-// Keeps utils/authFlags.ts's isGuestMode() in sync with this store's own isGuest — see that
-// file's comment for why every other store reads guest status through it instead of
-// importing authStore directly. Fires once immediately on subscribe with the current
-// value, then on every subsequent change.
+// Keeps our own copy of the Google session's access token current if supabase-js silently
+// rotates it later — see onGoogleTokenRefresh's own comment for why this exists. Deliberately
+// NOT resetDomainStores()/isAuthenticated/etc — this is a same-session token swap, not a
+// sign-in event, so nothing else about the session has changed.
+onGoogleTokenRefresh((accessToken) => {
+  console.log('[OAuth Debug] authStore: persisting refreshed token from Supabase.');
+  storage.setItem(TOKEN_KEY, accessToken);
+  useAuthStore.setState({ token: accessToken });
+});
+
+// api.ts's request interceptor reads the token from here first (in-memory, synchronous)
+// instead of always awaiting a storage read — see registerTokenGetter's own comment.
+registerTokenGetter(() => useAuthStore.getState().token);
+
+// Keeps utils/authFlags.ts's isGuestMode()/hasAuthToken() in sync with this store's own
+// isGuest/token — see that file's comment for why every other store reads them through it
+// instead of importing authStore directly. Each fires once immediately on subscribe with
+// the current value, then on every subsequent change.
 setGuestMode(useAuthStore.getState().isGuest);
 useAuthStore.subscribe((state) => setGuestMode(state.isGuest));
+
+setHasAuthToken(Boolean(useAuthStore.getState().token));
+useAuthStore.subscribe((state) => setHasAuthToken(Boolean(state.token)));

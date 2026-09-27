@@ -12,8 +12,22 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+type TokenGetter = () => string | null;
+let getInMemoryToken: TokenGetter = () => null;
+
+/** authStore registers itself here at module load (`() => useAuthStore.getState().token`).
+ * Reading the in-memory value first — falling back to the async storage read only when
+ * nothing's registered yet — means the very first request fired the instant
+ * isAuthenticated flips true (e.g. the dashboard's mount-time fetches, right after
+ * completeGoogleSignIn's `set()`) sees the token synchronously, with no dependency on a
+ * storage read landing in time. Kept as a listener instead of an import for the same reason
+ * as onUnauthorized below: authStore already imports api.ts. */
+export function registerTokenGetter(getter: TokenGetter): void {
+  getInMemoryToken = getter;
+}
+
 api.interceptors.request.use(async (config) => {
-  const token = await storage.getItem(AUTH_TOKEN_KEY);
+  const token = getInMemoryToken() ?? (await storage.getItem(AUTH_TOKEN_KEY));
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
