@@ -1,45 +1,97 @@
 import { makeRedirectUri } from 'expo-auth-session';
 import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import * as WebBrowser from 'expo-web-browser';
+import { Platform } from 'react-native';
 
 import { supabase } from '../lib/supabase';
-
-// Required by expo-web-browser on web: lets a popup opened by openAuthSessionAsync signal
-// completion back to the tab that opened it (window.opener.postMessage). No-op on native.
-WebBrowser.maybeCompleteAuthSession();
 
 export interface GoogleSessionTokens {
   accessToken: string;
   refreshToken: string | null;
 }
 
+type GoogleSignInHandler = (tokens: GoogleSessionTokens) => Promise<void>;
+
+let handleGoogleSignIn: GoogleSignInHandler = async () => {};
+
 /**
- * Google sign-in via Supabase's OAuth + PKCE, driven entirely client-side through
- * expo-auth-session/expo-web-browser rather than a webview the app has to manage by hand:
- *
- * 1. Ask Supabase for the Google consent-screen URL (`skipBrowserRedirect: true` so
- *    supabase-js hands back the URL instead of navigating the page itself — needed so the
- *    same code path works on native, where there's no "current page" to navigate).
- * 2. Open it in the system browser via `openAuthSessionAsync`, which transparently captures
- *    the redirect back to `redirectTo` (our own `tide://` scheme on native, matching what
- *    was registered as a Redirect URL in both the Supabase and Google Cloud consoles; the
- *    app's actual origin on web) and resolves with that URL once Google/Supabase redirect
- *    there — this *is* the deep-link handoff, no separate `Linking` listener needed.
- * 3. Pull the PKCE `code` out of that redirect URL and exchange it for a real Supabase
- *    session.
- *
- * Returns `null` (not a throw) if the user closes the browser/cancels — that's an expected,
- * silent outcome, not a failure worth surfacing as an error toast; the caller (authStore)
- * decides what "no result" means for its loading state.
+ * authStore registers itself here (mirrors api.ts's `onUnauthorized` listener pattern) so
+ * this file never has to import authStore back — authStore already imports
+ * `signInWithGoogle` from here, and a two-way import would be circular.
  */
-export async function signInWithGoogle(): Promise<GoogleSessionTokens | null> {
+export function onGoogleSignIn(handler: GoogleSignInHandler): void {
+  handleGoogleSignIn = handler;
+}
+
+/**
+ * Fires whenever *this* client's session changes, which happens two different ways
+ * depending on platform:
+ *  - Native: `exchangeCodeForSession()` below triggers it directly, in the same tick as
+ *    `signInWithGoogle()`'s own await.
+ *  - Web: `lib/supabase.ts`'s `detectSessionInUrl: true` triggers it automatically on a
+ *    fresh page load, the moment Supabase has just redirected back here with `?code=...`
+ *    in the URL — a completely different JS context than the one that started the flow,
+ *    which is exactly why this has to be an event listener rather than something
+ *    `signInWithGoogle()` can just return a value from on web.
+ *
+ * Registered at module scope (not inside a React effect) so it's subscribed before
+ * supabase-js's own internal initialization — which is what runs detectSessionInUrl's
+ * auto-exchange — has a chance to complete and be missed.
+ */
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event !== 'SIGNED_IN' || !session) return;
+
+  handleGoogleSignIn({
+    accessToken: session.access_token,
+    refreshToken: session.refresh_token ?? null,
+  }).finally(() => {
+    // authStore is now the single source of truth for the rest of the app (see its
+    // completeGoogleSignIn) — clear this client's own local copy so there's no second,
+    // unused session left sitting in storage that could silently drift from it.
+    supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+  });
+});
+
+/**
+ * Starts Google sign-in via Supabase + PKCE. Returns `true` if a flow that will eventually
+ * produce a sign-in was actually started, `false` if the user cancelled before it could
+ * (native only — see below). Never returns the session itself; completion always goes
+ * through the `onGoogleSignIn` listener above, uniformly for both platforms.
+ *
+ * Web and native need genuinely different mechanisms here, not just different `redirectTo`
+ * values:
+ *  - **Web**: a full top-level redirect (`window.location.assign`, done by supabase-js
+ *    itself since `skipBrowserRedirect` is omitted). The tab navigates away entirely and
+ *    this function's remaining code never runs — completion happens on the next page load,
+ *    via detectSessionInUrl (see lib/supabase.ts) and the listener above. This deliberately
+ *    replaces an earlier popup-based attempt (`WebBrowser.openAuthSessionAsync` +
+ *    `postMessage` back to the opener): that mechanism depends on the popup retaining a
+ *    `window.opener` reference and a `message` event actually arriving, both of which
+ *    browsers' Cross-Origin-Opener-Policy defaults can silently break — which is exactly
+ *    what produced a popup landing on `?code=...` with nothing ever telling the main tab
+ *    about it. A full redirect has no popup, no postMessage, and nothing for COOP to break.
+ *  - **Native**: there's no page to navigate away from, so this opens a system browser
+ *    session and waits for it — `openAuthSessionAsync` on native uses
+ *    ASWebAuthenticationSession/Custom Tabs, which intercept the `tide://` redirect
+ *    directly via the OS, not via a popup or postMessage. That mechanism isn't what broke,
+ *    so it's unchanged.
+ */
+export async function signInWithGoogle(): Promise<boolean> {
   const redirectTo = makeRedirectUri({ scheme: 'tide' });
+
+  if (Platform.OS === 'web') {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo },
+    });
+    if (error) throw new Error(error.message);
+    return true;
+  }
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo, skipBrowserRedirect: true },
   });
-
   if (error || !data?.url) {
     throw new Error(error?.message ?? 'Could not start Google sign-in.');
   }
@@ -47,7 +99,7 @@ export async function signInWithGoogle(): Promise<GoogleSessionTokens | null> {
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
   if (result.type === 'cancel' || result.type === 'dismiss') {
-    return null;
+    return false;
   }
   if (result.type !== 'success' || !result.url) {
     throw new Error("Google sign-in didn't complete. Please try again.");
@@ -64,13 +116,13 @@ export async function signInWithGoogle(): Promise<GoogleSessionTokens | null> {
     throw new Error('No authorization code returned from Google.');
   }
 
-  const { data: sessionData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(params.code);
-  if (exchangeError || !sessionData.session) {
-    throw new Error(exchangeError?.message ?? 'Could not complete Google sign-in.');
+  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(params.code);
+  if (exchangeError) {
+    throw new Error(exchangeError.message);
   }
 
-  return {
-    accessToken: sessionData.session.access_token,
-    refreshToken: sessionData.session.refresh_token ?? null,
-  };
+  // No need to read the returned session here — exchangeCodeForSession's own internal
+  // _saveSession() firing the SIGNED_IN event above is what completes the sign-in, keeping
+  // native and web funneled through the exact same completion path.
+  return true;
 }

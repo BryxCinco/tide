@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 import { AUTH_TOKEN_KEY, AUTH_USER_KEY, getApiErrorMessage, onUnauthorized } from '../services/api';
 import { authService, mapProfileToUser } from '../services/auth.service';
-import { signInWithGoogle } from '../services/googleAuth.service';
+import { onGoogleSignIn, signInWithGoogle, type GoogleSessionTokens } from '../services/googleAuth.service';
 import { profileService, type UpdateProfilePayload } from '../services/profile.service';
 import type { User } from '../types/user';
 import { guestStorage } from '../utils/guestStorage';
@@ -45,9 +45,16 @@ interface AuthState {
 
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
-  /** Google OAuth via Supabase (see services/googleAuth.service.ts). A no-op that leaves
-   * isAuthenticated false — not an error — if the user cancels the browser popup. */
+  /** Starts Google OAuth (see services/googleAuth.service.ts). On web this resolves almost
+   * immediately, before the tab navigates away — it does NOT mean the user is signed in
+   * yet. A no-op that resets isLoading without error if the user cancels on native. The
+   * actual sign-in always completes through completeGoogleSignIn below, however long that
+   * takes — driven by an event listener, not by this function's return. */
   loginWithGoogle: () => Promise<void>;
+  /** Registered with googleAuth.service.ts's onGoogleSignIn — fires once Supabase actually
+   * hands back a session, on both platforms (see that file's comment for why this can't
+   * just be inline in loginWithGoogle). Not meant to be called directly by UI code. */
+  completeGoogleSignIn: (tokens: GoogleSessionTokens) => Promise<void>;
   loginAsGuest: () => Promise<void>;
   linkGuestToAccount: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -143,14 +150,22 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   loginWithGoogle: async () => {
     set({ isLoading: true, error: null });
     try {
-      // resetDomainStores() is deliberately deferred until a session actually comes back —
-      // a cancelled browser popup shouldn't wipe whatever's currently loaded locally.
-      const tokens = await signInWithGoogle();
-      if (!tokens) {
+      const started = await signInWithGoogle();
+      if (!started) {
+        // Native cancel — nothing else will ever complete this, so reset here. On web,
+        // `started` is always true and the tab is already navigating away by this point;
+        // isLoading is deliberately left true (completeGoogleSignIn resets it once the
+        // sign-in genuinely finishes, on the other side of that navigation).
         set({ isLoading: false });
-        return;
       }
+    } catch (err) {
+      set({ error: getApiErrorMessage(err), isLoading: false });
+      throw err;
+    }
+  },
 
+  completeGoogleSignIn: async (tokens) => {
+    try {
       resetDomainStores();
 
       // Persisted before the /me call below so the request interceptor (which reads the
@@ -163,8 +178,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
       set({ user, token: tokens.accessToken, isAuthenticated: true, isGuest: false, isLoading: false });
     } catch (err) {
+      // Not re-thrown — there's no caller left waiting on a promise by the time this runs
+      // (it's invoked from an event listener, not from loginWithGoogle's own call stack).
+      // OAuthCallbackScreen (app root) watches `error` directly to show this.
       set({ error: getApiErrorMessage(err), isLoading: false });
-      throw err;
     }
   },
 
@@ -316,3 +333,7 @@ onUnauthorized(() => {
   resetDomainStores();
   useAuthStore.setState({ user: null, token: null, isAuthenticated: false, isGuest: false });
 });
+
+// See googleAuth.service.ts's onGoogleSignIn/onAuthStateChange comment — this is the one
+// place that actually completes a Google sign-in, on both platforms.
+onGoogleSignIn((tokens) => useAuthStore.getState().completeGoogleSignIn(tokens));

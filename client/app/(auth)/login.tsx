@@ -16,7 +16,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Divider, Input, Text } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { getApiErrorMessage } from '@/services/api';
-import { useAuthStore } from '@/store/authStore';
 import { showToast } from '@/store/toastStore';
 import { loginSchema, type LoginForm } from '@/utils/validation';
 
@@ -57,11 +56,12 @@ export default function LoginScreen() {
     clearError();
     try {
       await loginWithGoogle();
-      // isAuthenticated only flips true on a real session — a cancelled browser popup
-      // resolves normally with no session, so this correctly no-ops instead of navigating.
-      if (useAuthStore.getState().isAuthenticated) {
-        router.replace('/');
-      }
+      // No explicit navigation here on purpose — on web the tab is about to navigate away
+      // to Google regardless of anything below this line, and on native the sign-in
+      // actually completes asynchronously via an event listener (see authStore's
+      // completeGoogleSignIn), possibly after this promise already resolved. Either way,
+      // isAuthenticated flipping true is what the root navigator's Stack.Protected guard
+      // reacts to, automatically — a manual router.replace here would just race it.
     } catch (err) {
       showToast(getApiErrorMessage(err), 'error');
     }

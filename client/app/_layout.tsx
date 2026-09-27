@@ -21,6 +21,7 @@ import { Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { OAuthCallbackScreen } from '@/components/auth';
 import { ChatPanel } from '@/components/chat';
 import { SearchModal } from '@/components/search';
 import { Loader, OfflineBanner, Toast } from '@/components/ui';
@@ -33,6 +34,17 @@ import { darkVars, lightVars } from '@/utils/themeVars';
 
 SplashScreen.preventAutoHideAsync();
 
+/** True only on web, only when the URL still carries `?code=`/`?error=`/`?error_description=`
+ * from a Google OAuth redirect — this is what used to be a blank, stuck page (see
+ * OAuthCallbackScreen's own comment for the full mechanism). Computed once via a lazy
+ * useState initializer, not re-checked on every render — the URL gets cleaned up once the
+ * callback resolves, so re-reading it later would just see it's gone and doesn't need to. */
+function hasOAuthCallbackParams(): boolean {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  return params.has('code') || params.has('error') || params.has('error_description');
+}
+
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
@@ -43,6 +55,7 @@ export default function RootLayout() {
 
   const restoreSession = useAuthStore((s) => s.restoreSession);
   const [isRestoring, setIsRestoring] = useState(true);
+  const [isOAuthCallback, setIsOAuthCallback] = useState(hasOAuthCallbackParams);
   const theme = useThemeStore((s) => s.theme);
 
   // Deliberately not authStore's `isLoading` here — that flag also drives the
@@ -71,7 +84,13 @@ export default function RootLayout() {
             whichever CSS custom properties are applied here (see themeVars.ts). */}
         <View className="flex-1 bg-base" style={theme === 'dark' ? darkVars : lightVars}>
           <OfflineBanner />
-          {isRestoring ? <Loader fullScreen /> : <RootNavigator />}
+          {isOAuthCallback ? (
+            <OAuthCallbackScreen onResolved={() => setIsOAuthCallback(false)} />
+          ) : isRestoring ? (
+            <Loader fullScreen />
+          ) : (
+            <RootNavigator />
+          )}
           {/* Always mounted, not gated by auth — a toast fired right before/during a
               redirect (e.g. "Account deleted" just ahead of the /login replace) should
               still be visible to land. */}
