@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { getApiErrorMessage } from '../services/api';
 import { streakService } from '../services/streak.service';
 import type { Streak } from '../types/streak';
+import { isGuestMode } from '../utils/authFlags';
 
 interface StreakState {
   streak: Streak | null;
@@ -27,6 +28,11 @@ export const useStreakStore = create<StreakState>()((set) => ({
   error: null,
 
   fetchStreak: async () => {
+    // Guests have no backend account/JWT — streaks are entirely server-tracked (see
+    // quests.js's bumpStreakIfDayComplete), so a guest simply doesn't have one to fetch;
+    // leaving `streak: null` is correct here, not an error state.
+    if (isGuestMode()) return;
+
     set({ isLoading: true, error: null });
     try {
       const streak = await streakService.get();

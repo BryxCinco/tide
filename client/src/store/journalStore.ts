@@ -4,6 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { getApiErrorMessage } from '../services/api';
 import { journalService } from '../services/journal.service';
 import type { JournalEntry, Mood } from '../types/journal';
+import { isGuestMode } from '../utils/authFlags';
 import { countWords } from '../utils/formatDate';
 import { storage } from '../utils/storage';
 import { showToast } from './toastStore';
@@ -44,6 +45,11 @@ export const useJournalStore = create<JournalState>()(
       error: null,
 
       fetchEntries: async () => {
+        // Guests have no backend account/JWT — this store persists to
+        // localStorage/SecureStore regardless of account type, so whatever's already
+        // loaded there is already correct; there's nothing to fetch.
+        if (isGuestMode()) return;
+
         set({ isLoading: true, error: null });
         try {
           const entries = await journalService.list();
@@ -57,6 +63,23 @@ export const useJournalStore = create<JournalState>()(
       // id in React state (savedId) and reuses it for every subsequent autosave, so a
       // temporary local id swapped out later would silently break those follow-up saves.
       addEntry: async ({ title, content, mood, tags }) => {
+        if (isGuestMode()) {
+          const now = new Date().toISOString();
+          const entry: JournalEntry = {
+            id: `local_${Date.now()}`,
+            title,
+            content,
+            mood,
+            tags,
+            isFavorite: false,
+            wordCount: countWords(content),
+            createdAt: now,
+            updatedAt: now,
+          };
+          set((state) => ({ entries: [entry, ...state.entries] }));
+          return entry;
+        }
+
         const newEntry = await journalService.create({ title, content, mood, tags });
         set((state) => ({ entries: [newEntry, ...state.entries] }));
         return newEntry;
@@ -76,6 +99,7 @@ export const useJournalStore = create<JournalState>()(
               : e,
           ),
         }));
+        if (isGuestMode()) return;
         journalService.update(id, updates).catch((err) => {
           set({ entries: previous });
           showToast(getApiErrorMessage(err), 'error');
@@ -85,6 +109,7 @@ export const useJournalStore = create<JournalState>()(
       deleteEntry: (id) => {
         const previous = get().entries;
         set((state) => ({ entries: state.entries.filter((e) => e.id !== id) }));
+        if (isGuestMode()) return;
         journalService.remove(id).catch((err) => {
           set({ entries: previous });
           showToast(getApiErrorMessage(err), 'error');
@@ -98,6 +123,7 @@ export const useJournalStore = create<JournalState>()(
 
         const isFavorite = !entry.isFavorite;
         set((state) => ({ entries: state.entries.map((e) => (e.id === id ? { ...e, isFavorite } : e)) }));
+        if (isGuestMode()) return;
         journalService.update(id, { isFavorite }).catch((err) => {
           set({ entries: previous });
           showToast(getApiErrorMessage(err), 'error');

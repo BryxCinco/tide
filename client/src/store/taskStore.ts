@@ -4,6 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { getApiErrorMessage } from '../services/api';
 import { taskService } from '../services/task.service';
 import type { Task, TaskPriority, TaskStatus } from '../types/task';
+import { isGuestMode } from '../utils/authFlags';
 import { storage } from '../utils/storage';
 import { showToast } from './toastStore';
 
@@ -63,6 +64,11 @@ export const useTaskStore = create<TaskState>()(
       withdrawnCount: 0,
 
       fetchTasks: async () => {
+        // Guests have no backend account/JWT — this store persists to
+        // localStorage/SecureStore regardless of account type, so whatever's already
+        // loaded there is already correct; there's nothing to fetch.
+        if (isGuestMode()) return;
+
         set({ isLoading: true, error: null });
         try {
           const tasks = await taskService.list();
@@ -81,6 +87,8 @@ export const useTaskStore = create<TaskState>()(
         const task: Task = { id: tempId, createdAt: new Date().toISOString(), ...input };
         set((state) => ({ tasks: [task, ...state.tasks] }));
 
+        if (isGuestMode()) return task;
+
         taskService.create(input).then(
           (created) => set((state) => ({ tasks: state.tasks.map((t) => (t.id === tempId ? created : t)) })),
           (err) => {
@@ -97,6 +105,7 @@ export const useTaskStore = create<TaskState>()(
         set((state) => ({
           tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
         }));
+        if (isGuestMode()) return;
         taskService.update(id, updates).catch((err) => {
           set({ tasks: previous });
           showToast(getApiErrorMessage(err), 'error');
@@ -112,6 +121,7 @@ export const useTaskStore = create<TaskState>()(
           tasks: state.tasks.filter((t) => t.id !== id),
           withdrawnCount: wasWithdrawn ? state.withdrawnCount + 1 : state.withdrawnCount,
         }));
+        if (isGuestMode()) return;
         taskService.remove(id).catch((err) => {
           set((state) => ({ tasks: previous, withdrawnCount: wasWithdrawn ? state.withdrawnCount - 1 : state.withdrawnCount }));
           showToast(getApiErrorMessage(err), 'error');
@@ -130,6 +140,7 @@ export const useTaskStore = create<TaskState>()(
         set((state) => ({
           tasks: state.tasks.map((t) => (t.id === id ? { ...t, status: nextStatus, completedAt } : t)),
         }));
+        if (isGuestMode()) return;
         taskService.update(id, { status: nextStatus, completedAt: completedAt ?? null }).catch((err) => {
           set({ tasks: previous });
           showToast(getApiErrorMessage(err), 'error');

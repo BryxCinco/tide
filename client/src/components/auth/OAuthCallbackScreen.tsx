@@ -41,7 +41,13 @@ export function OAuthCallbackScreen({ onResolved }: OAuthCallbackScreenProps) {
   const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
+    console.log('[OAuth Debug] OAuthCallbackScreen mounted.');
+  }, []);
+
+  useEffect(() => {
+    console.log('[OAuth Debug] OAuthCallbackScreen sees isAuthenticated =', isAuthenticated);
     if (!isAuthenticated) return;
+    console.log('[OAuth Debug] Resolving OAuthCallbackScreen — isAuthenticated is true.');
     cleanUrl();
     onResolved();
     // onResolved is a fresh closure on every render (app/_layout.tsx's setState setter is
@@ -51,7 +57,10 @@ export function OAuthCallbackScreen({ onResolved }: OAuthCallbackScreenProps) {
   }, [isAuthenticated]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setTimedOut(true), TIMEOUT_MS);
+    const timer = setTimeout(() => {
+      console.log('[OAuth Debug] OAuthCallbackScreen timed out after', TIMEOUT_MS, 'ms with no session.');
+      setTimedOut(true);
+    }, TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, []);
 

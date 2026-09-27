@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { DEFAULT_FOCUS_ACTIVITY } from '../mocks/mockActivities';
 import { getApiErrorMessage } from '../services/api';
 import { mapApiSession, sessionService } from '../services/session.service';
+import { isGuestMode } from '../utils/authFlags';
 import { useActivityStore } from './activityStore';
 import { showToast } from './toastStore';
 import type { Activity } from '../types/activity';
@@ -91,6 +92,11 @@ export const useTimerStore = create<TimerState>()((set, get) => ({
   error: null,
 
   fetchTodaySessions: async () => {
+    // Guests have no backend account/JWT — todaySessions isn't persisted at all (see this
+    // store's own doc comment), so there's genuinely nothing to fetch; whatever's already
+    // in memory from this tab session is all there is.
+    if (isGuestMode()) return;
+
     set({ isLoading: true, error: null });
     try {
       const now = new Date();
@@ -195,6 +201,11 @@ export const useTimerStore = create<TimerState>()((set, get) => ({
       },
       ...initialSessionState,
     });
+
+    // Guests have no backend account/JWT — todaySessions above is the entire record for
+    // them (in-memory only, cleared on reload), so there's nothing to sync and no point
+    // attempting a request that would just 401.
+    if (isGuestMode()) return;
 
     // Fire-and-forget persist (the spec's "saveSession"): the session is already shown
     // above from local state, so a slow/failed request doesn't block or undo the UI the

@@ -5,6 +5,7 @@ import { authService, mapProfileToUser } from '../services/auth.service';
 import { onGoogleSignIn, signInWithGoogle, type GoogleSessionTokens } from '../services/googleAuth.service';
 import { profileService, type UpdateProfilePayload } from '../services/profile.service';
 import type { User } from '../types/user';
+import { setGuestMode } from '../utils/authFlags';
 import { guestStorage } from '../utils/guestStorage';
 import { storage } from '../utils/storage';
 import { useActivityStore } from './activityStore';
@@ -165,6 +166,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   completeGoogleSignIn: async (tokens) => {
+    console.log('[OAuth Debug] completeGoogleSignIn called with tokens:', {
+      accessTokenPrefix: `${tokens.accessToken.slice(0, 12)}...`,
+      hasRefreshToken: Boolean(tokens.refreshToken),
+    });
     try {
       resetDomainStores();
 
@@ -172,12 +177,16 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       // token from storage, not from this store) attaches the fresh token to it — same
       // ordering login() uses above.
       await storage.setItem(TOKEN_KEY, tokens.accessToken);
+      console.log('[OAuth Debug] token persisted to storage, calling /api/auth/me...');
       const { profile } = await authService.me();
+      console.log('[OAuth Debug] /api/auth/me succeeded:', profile);
       const user = mapProfileToUser(profile);
       await storage.setItem(USER_KEY, JSON.stringify(user));
 
       set({ user, token: tokens.accessToken, isAuthenticated: true, isGuest: false, isLoading: false });
+      console.log('[OAuth Debug] authStore state after completeGoogleSignIn:', useAuthStore.getState());
     } catch (err) {
+      console.log('[OAuth Debug] completeGoogleSignIn FAILED:', err);
       // Not re-thrown — there's no caller left waiting on a promise by the time this runs
       // (it's invoked from an event listener, not from loginWithGoogle's own call stack).
       // OAuthCallbackScreen (app root) watches `error` directly to show this.
@@ -263,6 +272,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   restoreSession: async () => {
     const token = await storage.getItem(TOKEN_KEY);
+    console.log('[OAuth Debug] restoreSession running. Found cached token?', Boolean(token));
     if (!token) return;
 
     const rawUser = await storage.getItem(USER_KEY);
@@ -337,3 +347,10 @@ onUnauthorized(() => {
 // See googleAuth.service.ts's onGoogleSignIn/onAuthStateChange comment — this is the one
 // place that actually completes a Google sign-in, on both platforms.
 onGoogleSignIn((tokens) => useAuthStore.getState().completeGoogleSignIn(tokens));
+
+// Keeps utils/authFlags.ts's isGuestMode() in sync with this store's own isGuest — see that
+// file's comment for why every other store reads guest status through it instead of
+// importing authStore directly. Fires once immediately on subscribe with the current
+// value, then on every subsequent change.
+setGuestMode(useAuthStore.getState().isGuest);
+useAuthStore.subscribe((state) => setGuestMode(state.isGuest));

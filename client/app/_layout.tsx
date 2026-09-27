@@ -62,9 +62,26 @@ export default function RootLayout() {
   // Sign In / Create Account button spinners, and reusing it for this gate
   // would unmount the login/register screen under a full-screen Loader every
   // time a login/register call is in flight.
+  //
+  // Skipped entirely while handling an OAuth callback: restoreSession() optimistically
+  // sets isAuthenticated=true the moment it finds ANY cached token, before verifying it —
+  // if a stale/expired one happens to be sitting in storage from a previous session, that
+  // false-positive isAuthenticated flip is indistinguishable, from OAuthCallbackScreen's
+  // point of view, from the real Google sign-in actually completing. That was the root
+  // cause of the redirect-loop bug: it resolved the callback screen (and wiped the `?code=`
+  // from the URL) off a stale cached session, which then failed its own background
+  // verification a few seconds later and bounced back to login — nothing to do with the
+  // Google flow at all, which was often still in progress. There's nothing to "restore"
+  // here anyway: completeGoogleSignIn (googleAuth.service.ts's listener) establishes a
+  // fresh, real session once the callback actually resolves.
   useEffect(() => {
+    if (isOAuthCallback) {
+      console.log('[OAuth Debug] Skipping restoreSession() while handling an OAuth callback.');
+      setIsRestoring(false);
+      return;
+    }
     restoreSession().finally(() => setIsRestoring(false));
-  }, [restoreSession]);
+  }, [isOAuthCallback, restoreSession]);
 
   useEffect(() => {
     if (fontsLoaded && !isRestoring) {

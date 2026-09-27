@@ -5,6 +5,7 @@ import { getApiErrorMessage } from '../services/api';
 import { questService, type UpdateQuestPayload } from '../services/quest.service';
 import { streakService } from '../services/streak.service';
 import type { Quest, QuestCategory, QuestRecurrenceType } from '../types/quest';
+import { isGuestMode } from '../utils/authFlags';
 import { toDateKey } from '../utils/formatDate';
 import { generateDailyQuests } from '../utils/questGenerator';
 import { storage } from '../utils/storage';
@@ -72,6 +73,17 @@ export const useQuestStore = create<QuestState>()(
 
       fetchTodayQuests: async () => {
         const todayKey = toDateKey(new Date());
+
+        // Guests have no backend account/JWT to persist quests against. If today's set was
+        // already generated (persisted locally like everything else in this store), leave
+        // it alone; otherwise generate one purely locally — no questService.create() calls,
+        // no streak (that's server-tracked only, see bumpStreakIfDayComplete on the backend).
+        if (isGuestMode()) {
+          if (get().date === todayKey && get().todayQuests.length > 0) return;
+          set({ todayQuests: generateDailyQuests(todayKey), date: todayKey, isLoading: false });
+          return;
+        }
+
         set({ isLoading: true, error: null });
         try {
           let quests = await questService.list(todayKey);
@@ -120,6 +132,10 @@ export const useQuestStore = create<QuestState>()(
           ),
         }));
 
+        // No backend account to persist completion or credit a streak against — the local
+        // toggle above is the whole story for a guest.
+        if (isGuestMode()) return;
+
         questService.complete(id, isCompleted).then(
           ({ streak }) => {
             // Only present when this completion finished off every quest for the day — see
@@ -137,6 +153,26 @@ export const useQuestStore = create<QuestState>()(
 
       addCustomQuest: async (input) => {
         const todayKey = get().date || toDateKey(new Date());
+
+        if (isGuestMode()) {
+          const quest: Quest = {
+            id: `local_${Date.now()}`,
+            title: input.title,
+            description: input.description,
+            icon: input.icon,
+            category: input.category,
+            xp: input.xp,
+            isCompleted: false,
+            date: todayKey,
+            isCustom: true,
+            isActive: true,
+            isRecurring: input.isRecurring,
+            recurrenceType: input.recurrenceType,
+          };
+          set((state) => ({ todayQuests: [...state.todayQuests, quest] }));
+          return quest;
+        }
+
         const quest = await questService.create({
           title: input.title,
           description: input.description,
@@ -172,6 +208,7 @@ export const useQuestStore = create<QuestState>()(
               : q,
           ),
         }));
+        if (isGuestMode()) return;
         questService.update(id, updates).catch((err) => {
           set({ todayQuests: previous });
           showToast(getApiErrorMessage(err), 'error');
@@ -184,6 +221,7 @@ export const useQuestStore = create<QuestState>()(
         if (!quest || !quest.isCustom) return;
 
         set((state) => ({ todayQuests: state.todayQuests.filter((q) => q.id !== id) }));
+        if (isGuestMode()) return;
         questService.remove(id).catch((err) => {
           set({ todayQuests: previous });
           showToast(getApiErrorMessage(err), 'error');

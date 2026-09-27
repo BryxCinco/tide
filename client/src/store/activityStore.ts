@@ -5,6 +5,7 @@ import { createSeedActivities } from '../mocks/mockActivities';
 import { activityService } from '../services/activity.service';
 import { getApiErrorMessage } from '../services/api';
 import type { Activity } from '../types/activity';
+import { isGuestMode } from '../utils/authFlags';
 import { storage } from '../utils/storage';
 import { showToast } from './toastStore';
 
@@ -51,6 +52,12 @@ export const useActivityStore = create<ActivityState>()(
       error: null,
 
       fetchActivities: async () => {
+        // Guests have no backend account/JWT — the request would just 401. The seeded
+        // predefined set from initial state (and anything since added locally, since this
+        // store persists to localStorage/SecureStore regardless of account type) is already
+        // exactly what a guest should see, so this is a no-op rather than a network call.
+        if (isGuestMode()) return;
+
         set({ isLoading: true, error: null });
         try {
           let activities = await activityService.list();
@@ -75,6 +82,21 @@ export const useActivityStore = create<ActivityState>()(
       },
 
       addActivity: async ({ name, icon, color }) => {
+        if (isGuestMode()) {
+          const activity: Activity = {
+            id: `local_${Date.now()}`,
+            name,
+            icon,
+            color,
+            category: 'custom',
+            isFavorite: false,
+            isArchived: false,
+            createdAt: new Date().toISOString(),
+          };
+          set((state) => ({ activities: [...state.activities, activity] }));
+          return activity;
+        }
+
         const activity = await activityService.create({ name, icon, color, category: 'custom' });
         set((state) => ({ activities: [...state.activities, activity] }));
         return activity;
@@ -85,6 +107,7 @@ export const useActivityStore = create<ActivityState>()(
         set((state) => ({
           activities: state.activities.map((activity) => (activity.id === id ? { ...activity, ...updates } : activity)),
         }));
+        if (isGuestMode()) return;
         activityService.update(id, updates).catch((err) => {
           set({ activities: previous });
           showToast(getApiErrorMessage(err), 'error');
@@ -97,6 +120,7 @@ export const useActivityStore = create<ActivityState>()(
 
         const previous = get().activities;
         set((state) => ({ activities: state.activities.filter((a) => a.id !== id) }));
+        if (isGuestMode()) return;
         activityService.remove(id).catch((err) => {
           set({ activities: previous });
           showToast(getApiErrorMessage(err), 'error');
@@ -112,6 +136,7 @@ export const useActivityStore = create<ActivityState>()(
         set((state) => ({
           activities: state.activities.map((a) => (a.id === id ? { ...a, isFavorite } : a)),
         }));
+        if (isGuestMode()) return;
         activityService.update(id, { isFavorite }).catch((err) => {
           set({ activities: previous });
           showToast(getApiErrorMessage(err), 'error');
@@ -123,6 +148,7 @@ export const useActivityStore = create<ActivityState>()(
         set((state) => ({
           activities: state.activities.map((a) => (a.id === id ? { ...a, isArchived: archived } : a)),
         }));
+        if (isGuestMode()) return;
         activityService.update(id, { isArchived: archived }).catch((err) => {
           set({ activities: previous });
           showToast(getApiErrorMessage(err), 'error');

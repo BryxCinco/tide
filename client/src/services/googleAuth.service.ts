@@ -39,12 +39,21 @@ export function onGoogleSignIn(handler: GoogleSignInHandler): void {
  * auto-exchange — has a chance to complete and be missed.
  */
 supabase.auth.onAuthStateChange((event, session) => {
+  // TEMPORARY — remove once the redirect-loop bug is confirmed fixed.
+  console.log('[OAuth Debug] onAuthStateChange fired:', {
+    event,
+    hasSession: Boolean(session),
+    accessTokenPrefix: session?.access_token ? `${session.access_token.slice(0, 12)}...` : null,
+    hasRefreshToken: Boolean(session?.refresh_token),
+  });
+
   if (event !== 'SIGNED_IN' || !session) return;
 
   handleGoogleSignIn({
     accessToken: session.access_token,
     refreshToken: session.refresh_token ?? null,
   }).finally(() => {
+    console.log('[OAuth Debug] completeGoogleSignIn settled, clearing supabase-js\'s own local session copy');
     // authStore is now the single source of truth for the rest of the app (see its
     // completeGoogleSignIn) — clear this client's own local copy so there's no second,
     // unused session left sitting in storage that could silently drift from it.
@@ -78,13 +87,18 @@ supabase.auth.onAuthStateChange((event, session) => {
  */
 export async function signInWithGoogle(): Promise<boolean> {
   const redirectTo = makeRedirectUri({ scheme: 'tide' });
+  console.log('[OAuth Debug] signInWithGoogle starting. redirectTo =', redirectTo, 'platform =', Platform.OS);
 
   if (Platform.OS === 'web') {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo },
     });
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.log('[OAuth Debug] signInWithOAuth (web) returned an error:', error.message);
+      throw new Error(error.message);
+    }
+    console.log('[OAuth Debug] signInWithOAuth (web) succeeded — tab should be navigating to Google now.');
     return true;
   }
 
@@ -116,7 +130,9 @@ export async function signInWithGoogle(): Promise<boolean> {
     throw new Error('No authorization code returned from Google.');
   }
 
+  console.log('[OAuth Debug] (native) code received:', `${params.code.slice(0, 12)}...`);
   const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(params.code);
+  console.log('[OAuth Debug] (native) exchangeCodeForSession result:', exchangeError ? `error: ${exchangeError.message}` : 'success');
   if (exchangeError) {
     throw new Error(exchangeError.message);
   }

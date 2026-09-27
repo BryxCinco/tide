@@ -5,6 +5,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { getApiErrorMessage } from '../services/api';
 import { settingsService } from '../services/settings.service';
 import type { UserSettings } from '../types/settings';
+import { isGuestMode } from '../utils/authFlags';
 import { storage } from '../utils/storage';
 import { showToast } from './toastStore';
 import { useThemeStore } from './themeStore';
@@ -43,6 +44,10 @@ function flushPendingSettings(): void {
   if (Object.keys(pendingUpdate).length === 0) return;
   const toSend = pendingUpdate;
   pendingUpdate = {};
+  // Guests have no backend account/JWT — this store persists to localStorage/SecureStore
+  // regardless of account type, so the local `set()` in updateSetting is already the whole
+  // story for a guest; there's nothing to sync.
+  if (isGuestMode()) return;
   settingsService.update(toSend).catch((err) => {
     showToast(getApiErrorMessage(err), 'error');
   });
@@ -71,6 +76,11 @@ export const useSettingsStore = create<SettingsState>()(
       error: null,
 
       fetchSettings: async () => {
+        // Guests have no backend account/JWT — this store persists to
+        // localStorage/SecureStore regardless of account type, so whatever's already
+        // loaded there (or DEFAULT_SETTINGS, for a brand-new guest) is already correct.
+        if (isGuestMode()) return;
+
         set({ isLoading: true, error: null });
         try {
           const settings = await settingsService.get();
@@ -97,6 +107,7 @@ export const useSettingsStore = create<SettingsState>()(
         useThemeStore.getState().setTheme('light');
         pendingUpdate = {};
         if (pendingTimeout) clearTimeout(pendingTimeout);
+        if (isGuestMode()) return;
         settingsService.update(DEFAULT_SETTINGS).catch((err) => {
           showToast(getApiErrorMessage(err), 'error');
         });
