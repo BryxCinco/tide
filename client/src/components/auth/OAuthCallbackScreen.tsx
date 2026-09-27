@@ -65,6 +65,7 @@ export function OAuthCallbackScreen({ onResolved }: OAuthCallbackScreenProps) {
   }, []);
 
   const handleBackToLogin = () => {
+    console.log('[OAuth Debug] User clicked "Back to Login" — navigating away from OAuthCallbackScreen.');
     clearError();
     cleanUrl();
     onResolved();

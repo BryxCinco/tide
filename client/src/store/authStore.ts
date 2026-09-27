@@ -149,9 +149,11 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   loginWithGoogle: async () => {
+    console.log('[OAuth Debug] authStore.loginWithGoogle() called.');
     set({ isLoading: true, error: null });
     try {
       const started = await signInWithGoogle();
+      console.log('[OAuth Debug] authStore.loginWithGoogle(): signInWithGoogle() returned', started);
       if (!started) {
         // Native cancel — nothing else will ever complete this, so reset here. On web,
         // `started` is always true and the tab is already navigating away by this point;
@@ -159,7 +161,9 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         // sign-in genuinely finishes, on the other side of that navigation).
         set({ isLoading: false });
       }
+      console.log('[OAuth Debug] authStore.loginWithGoogle() end.');
     } catch (err) {
+      console.log('[OAuth Debug] authStore.loginWithGoogle() FAILED:', err);
       set({ error: getApiErrorMessage(err), isLoading: false });
       throw err;
     }
@@ -183,8 +187,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       const user = mapProfileToUser(profile);
       await storage.setItem(USER_KEY, JSON.stringify(user));
 
+      console.log('[OAuth Debug] Setting isAuthenticated=true (completeGoogleSignIn succeeded).');
       set({ user, token: tokens.accessToken, isAuthenticated: true, isGuest: false, isLoading: false });
       console.log('[OAuth Debug] authStore state after completeGoogleSignIn:', useAuthStore.getState());
+      console.log('[OAuth Debug] completeGoogleSignIn end (success).');
     } catch (err) {
       console.log('[OAuth Debug] completeGoogleSignIn FAILED:', err);
       // Not re-thrown — there's no caller left waiting on a promise by the time this runs
@@ -248,6 +254,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   logout: async () => {
+    console.log('[OAuth Debug] authStore.logout() called — this will set isAuthenticated=false.', new Error().stack);
     const wasGuest = get().isGuest;
 
     if (!wasGuest) {
@@ -271,9 +278,13 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   restoreSession: async () => {
+    console.log('[OAuth Debug] restoreSession() called.', new Error().stack);
     const token = await storage.getItem(TOKEN_KEY);
-    console.log('[OAuth Debug] restoreSession running. Found cached token?', Boolean(token));
-    if (!token) return;
+    console.log('[OAuth Debug] restoreSession: found cached token?', Boolean(token));
+    if (!token) {
+      console.log('[OAuth Debug] restoreSession: no token, returning early (no state change).');
+      return;
+    }
 
     const rawUser = await storage.getItem(USER_KEY);
     let cachedUser: User | null = null;
@@ -282,9 +293,11 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     } catch {
       cachedUser = null;
     }
+    console.log('[OAuth Debug] restoreSession: cached user =', cachedUser);
 
     // Guests never touch the backend — the local cache is the only copy that exists.
     if (cachedUser?.isGuest) {
+      console.log('[OAuth Debug] restoreSession: cached user is a guest, setting isAuthenticated=true and returning.');
       set({ user: cachedUser, token, isAuthenticated: true, isGuest: true });
       return;
     }
@@ -292,15 +305,19 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     // Show the cached profile immediately (instant on relaunch instead of a loading
     // screen), then verify the token and refresh the profile in the background.
     if (cachedUser) {
+      console.log('[OAuth Debug] restoreSession: optimistically setting isAuthenticated=true from cached user (not yet verified).');
       set({ user: cachedUser, token, isAuthenticated: true, isGuest: false });
     }
 
     try {
+      console.log('[OAuth Debug] restoreSession: verifying token via /api/auth/me...');
       const { profile } = await authService.me();
+      console.log('[OAuth Debug] restoreSession: /api/auth/me succeeded, confirming isAuthenticated=true.');
       const user = mapProfileToUser(profile);
       await storage.setItem(USER_KEY, JSON.stringify(user));
       set({ user, token, isAuthenticated: true, isGuest: false });
-    } catch {
+    } catch (err) {
+      console.log('[OAuth Debug] restoreSession: /api/auth/me FAILED:', err);
       // An invalid/expired token (401) is already handled globally by the response
       // interceptor, which clears storage and calls onUnauthorized -> logout() below. Any
       // other failure (e.g. offline) just leaves the cached user shown above in place.
@@ -340,8 +357,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 // reacts to isAuthenticated flipping false and swaps to the (auth) screens on its own, so no
 // imperative redirect is needed here.
 onUnauthorized(() => {
+  console.log('[OAuth Debug] onUnauthorized fired — this will set isAuthenticated=false. Previous state:', useAuthStore.getState());
   resetDomainStores();
   useAuthStore.setState({ user: null, token: null, isAuthenticated: false, isGuest: false });
+  console.log('[OAuth Debug] isAuthenticated=false set by onUnauthorized.');
 });
 
 // See googleAuth.service.ts's onGoogleSignIn/onAuthStateChange comment — this is the one

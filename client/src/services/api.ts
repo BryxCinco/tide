@@ -34,8 +34,16 @@ api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     if (error.response?.status === 401) {
+      // TEMPORARY — remove once the OAuth redirect-loop bug is confirmed fixed.
+      console.log('[OAuth Debug] 401 response received:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        status: error.response.status,
+        data: error.response.data,
+      });
       await storage.removeItem(AUTH_TOKEN_KEY);
       await storage.removeItem(AUTH_USER_KEY);
+      console.log('[OAuth Debug] Cleared storage. Calling onUnauthorized listener — this will set isAuthenticated=false.');
       unauthorizedListener?.();
     } else if (!error.response) {
       // No response at all means the request never reached the server (offline, DNS, server

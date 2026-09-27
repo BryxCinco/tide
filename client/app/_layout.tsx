@@ -16,7 +16,7 @@ import {
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -42,7 +42,9 @@ SplashScreen.preventAutoHideAsync();
 function hasOAuthCallbackParams(): boolean {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
   const params = new URLSearchParams(window.location.search);
-  return params.has('code') || params.has('error') || params.has('error_description');
+  const result = params.has('code') || params.has('error') || params.has('error_description');
+  console.log('[OAuth Debug] app/_layout.tsx: hasOAuthCallbackParams() =', result, 'search =', window.location.search);
+  return result;
 }
 
 export default function RootLayout() {
@@ -57,6 +59,17 @@ export default function RootLayout() {
   const [isRestoring, setIsRestoring] = useState(true);
   const [isOAuthCallback, setIsOAuthCallback] = useState(hasOAuthCallbackParams);
   const theme = useThemeStore((s) => s.theme);
+
+  // Snapshot taken once, at mount — deliberately NOT the live `isOAuthCallback` state.
+  // OAuthCallbackScreen flips `isOAuthCallback` to `false` the moment completeGoogleSignIn
+  // finishes (see its onResolved effect below). If the effect after this depended on the
+  // live value, THAT flip would re-run it a second time with isOAuthCallback now false,
+  // calling restoreSession() again right after a real session was just established and
+  // verified — a completely redundant /api/auth/me call that raced with (and sometimes
+  // lost to) the one completeGoogleSignIn had just made, bouncing the user straight back to
+  // login a moment after a successful Google sign-in. This ref freezes the answer to "did
+  // this page load start as an OAuth callback" so that later flip can't retrigger anything.
+  const wasOAuthCallback = useRef(isOAuthCallback);
 
   // Deliberately not authStore's `isLoading` here — that flag also drives the
   // Sign In / Create Account button spinners, and reusing it for this gate
@@ -75,13 +88,21 @@ export default function RootLayout() {
   // here anyway: completeGoogleSignIn (googleAuth.service.ts's listener) establishes a
   // fresh, real session once the callback actually resolves.
   useEffect(() => {
-    if (isOAuthCallback) {
-      console.log('[OAuth Debug] Skipping restoreSession() while handling an OAuth callback.');
+    if (wasOAuthCallback.current) {
+      console.log('[OAuth Debug] app/_layout.tsx: Skipping restoreSession() — this load started as an OAuth callback.');
       setIsRestoring(false);
       return;
     }
-    restoreSession().finally(() => setIsRestoring(false));
-  }, [isOAuthCallback, restoreSession]);
+    console.log('[OAuth Debug] app/_layout.tsx: calling restoreSession() (not an OAuth callback).');
+    restoreSession().finally(() => {
+      console.log('[OAuth Debug] app/_layout.tsx: restoreSession() finished, setting isRestoring=false.');
+      setIsRestoring(false);
+    });
+    // Deliberately only [restoreSession] (a stable Zustand action reference) — this must
+    // run exactly once per page load, decided by wasOAuthCallback's frozen snapshot, not
+    // re-evaluated when isOAuthCallback later changes. See wasOAuthCallback's own comment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restoreSession]);
 
   useEffect(() => {
     if (fontsLoaded && !isRestoring) {
