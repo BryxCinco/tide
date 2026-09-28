@@ -1,6 +1,7 @@
 const express = require('express');
 const { supabaseAdmin } = require('../lib/supabaseClient');
 const { requireAuth } = require('../middleware/auth');
+const { upsertEmbedding, deleteEmbedding, buildTaskContent } = require('../lib/embeddingPipeline');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -28,6 +29,15 @@ router.post('/', async (req, res) => {
     .single();
 
   if (error) return res.status(500).json({ error: error.message });
+
+  upsertEmbedding({
+    userId: req.user.id,
+    sourceType: 'task',
+    sourceId: data.id,
+    content: buildTaskContent(data),
+    metadata: { title: data.title, status: data.status, priority: data.priority },
+  }).catch((err) => console.error('[tasks] embedding failed:', err.message));
+
   res.status(201).json({ task: data });
 });
 
@@ -54,6 +64,15 @@ router.patch('/:id', async (req, res) => {
 
   if (error) return res.status(500).json({ error: error.message });
   if (!data) return res.status(404).json({ error: 'Task not found' });
+
+  upsertEmbedding({
+    userId: req.user.id,
+    sourceType: 'task',
+    sourceId: data.id,
+    content: buildTaskContent(data),
+    metadata: { title: data.title, status: data.status, priority: data.priority },
+  }).catch((err) => console.error('[tasks] embedding failed:', err.message));
+
   res.json({ task: data });
 });
 
@@ -61,6 +80,11 @@ router.delete('/:id', async (req, res) => {
   const { error } = await supabaseAdmin.from('tasks').delete().eq('id', req.params.id).eq('user_id', req.user.id);
 
   if (error) return res.status(500).json({ error: error.message });
+
+  deleteEmbedding(req.user.id, 'task', req.params.id).catch((err) =>
+    console.error('[tasks] embedding delete failed:', err.message),
+  );
+
   res.status(204).send();
 });
 

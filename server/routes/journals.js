@@ -1,6 +1,7 @@
 const express = require('express');
 const { supabaseAdmin } = require('../lib/supabaseClient');
 const { requireAuth } = require('../middleware/auth');
+const { upsertEmbedding, deleteEmbedding, buildJournalContent } = require('../lib/embeddingPipeline');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -32,6 +33,17 @@ router.post('/', async (req, res) => {
     .single();
 
   if (error) return res.status(500).json({ error: error.message });
+
+  // Fire-and-forget — not awaited, so a slow/failed embedding call never delays or fails
+  // the response the user is waiting on for their own save.
+  upsertEmbedding({
+    userId: req.user.id,
+    sourceType: 'journal',
+    sourceId: data.id,
+    content: buildJournalContent(data),
+    metadata: { title: data.title, mood: data.mood },
+  }).catch((err) => console.error('[journals] embedding failed:', err.message));
+
   res.status(201).json({ entry: data });
 });
 
@@ -51,6 +63,15 @@ router.patch('/:id', async (req, res) => {
 
   if (error) return res.status(500).json({ error: error.message });
   if (!data) return res.status(404).json({ error: 'Journal entry not found' });
+
+  upsertEmbedding({
+    userId: req.user.id,
+    sourceType: 'journal',
+    sourceId: data.id,
+    content: buildJournalContent(data),
+    metadata: { title: data.title, mood: data.mood },
+  }).catch((err) => console.error('[journals] embedding failed:', err.message));
+
   res.json({ entry: data });
 });
 
@@ -58,6 +79,11 @@ router.delete('/:id', async (req, res) => {
   const { error } = await supabaseAdmin.from('journal_entries').delete().eq('id', req.params.id).eq('user_id', req.user.id);
 
   if (error) return res.status(500).json({ error: error.message });
+
+  deleteEmbedding(req.user.id, 'journal', req.params.id).catch((err) =>
+    console.error('[journals] embedding delete failed:', err.message),
+  );
+
   res.status(204).send();
 });
 

@@ -1,6 +1,7 @@
 const express = require('express');
 const { supabaseAdmin } = require('../lib/supabaseClient');
 const { requireAuth } = require('../middleware/auth');
+const { upsertEmbedding, deleteEmbedding, buildSessionContent } = require('../lib/embeddingPipeline');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -43,6 +44,15 @@ router.post('/', async (req, res) => {
     .single();
 
   if (error) return res.status(500).json({ error: error.message });
+
+  upsertEmbedding({
+    userId: req.user.id,
+    sourceType: 'session',
+    sourceId: data.id,
+    content: buildSessionContent(data),
+    metadata: { activity_name: data.activity_name, date: data.ended_at || data.started_at },
+  }).catch((err) => console.error('[sessions] embedding failed:', err.message));
+
   res.status(201).json({ session: data });
 });
 
@@ -50,6 +60,11 @@ router.delete('/:id', async (req, res) => {
   const { error } = await supabaseAdmin.from('time_logs').delete().eq('id', req.params.id).eq('user_id', req.user.id);
 
   if (error) return res.status(500).json({ error: error.message });
+
+  deleteEmbedding(req.user.id, 'session', req.params.id).catch((err) =>
+    console.error('[sessions] embedding delete failed:', err.message),
+  );
+
   res.status(204).send();
 });
 

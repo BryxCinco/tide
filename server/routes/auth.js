@@ -122,6 +122,19 @@ router.get('/me', requireAuth, async (req, res) => {
   res.json({ profile: created });
 });
 
+// POST /api/auth/backfill-embeddings
+// One-time endpoint to embed existing user data
+router.post('/backfill-embeddings', requireAuth, async (req, res) => {
+  try {
+    const { backfillUserEmbeddings } = require('../lib/embeddingPipeline');
+    const results = await backfillUserEmbeddings(req.user.id);
+    res.json({ success: true, results });
+  } catch (err) {
+    console.error('[backfill] failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // DELETE /api/auth/account — irreversibly deletes the current user: every per-user row
 // across all tables, their uploaded files, the profiles row, and finally the Supabase Auth
 // user itself. Guests never reach this (they have no backend account/token to send — see
