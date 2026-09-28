@@ -21,8 +21,7 @@ import {
 } from '@/components/dashboard';
 import { CalendarWidget, StreakWidget, TimeWidget, WeatherWidget, WeeklyProgressWidget } from '@/components/dashboard/widgets';
 import { TaskFormModal } from '@/components/tasks';
-import { Button, EmptyState, GuestBanner, ResponsiveContainer } from '@/components/ui';
-import { useAuth } from '@/hooks/useAuth';
+import { Button, EmptyState, ResponsiveContainer } from '@/components/ui';
 import { mockFocusActivities, mockFocusScore, mockHeroFocus, mockQuickActions } from '@/mocks/mockDashboard';
 import { getVisibleWidgets, useDashboardStore } from '@/store/dashboardStore';
 import { useJournalStore } from '@/store/journalStore';
@@ -34,7 +33,6 @@ import type { StatItem, WidgetId } from '@/types/dashboard';
 import { formatDuration } from '@/utils/formatTime';
 
 export default function DashboardScreen() {
-  const { isGuest } = useAuth();
   const [taskModalVisible, setTaskModalVisible] = useState(false);
   const [customizeVisible, setCustomizeVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -129,12 +127,6 @@ export default function DashboardScreen() {
         contentContainerClassName="pb-24"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {isGuest && (
-          <ResponsiveContainer className="pt-4 md:pt-6 lg:pt-8">
-            <GuestBanner onLinkPress={() => router.push('/(auth)/link-account')} />
-          </ResponsiveContainer>
-        )}
-
         <ProfileHeader />
 
         <ResponsiveContainer className="mt-6 gap-6">

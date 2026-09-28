@@ -60,6 +60,12 @@ export const authService = {
     await api.post('/api/auth/logout');
   },
 
+  /** Irreversible — deletes every row belonging to this account, its uploaded files, and
+   * the Supabase Auth user itself. See server/routes/auth.js's DELETE /account. */
+  async deleteAccount() {
+    await api.delete('/api/auth/account');
+  },
+
   async me() {
     const { data } = await api.get<{ profile: ApiProfile }>('/api/auth/me');
     return data;

@@ -85,4 +85,24 @@ async function deleteIfOwned(previousValue) {
   if (error) console.error('[storage] Could not delete previous file:', error.message);
 }
 
-module.exports = { AVATARS_BUCKET, ensureAvatarsBucket, uploadIfDataUri, deleteIfOwned };
+/**
+ * Removes every file a user has ever uploaded (avatar + cover, current and any orphaned
+ * replaced ones) — everything under their `${userId}/` prefix in the bucket. Used by account
+ * deletion, where leaving files behind would be a real (if small) storage leak: nothing else
+ * ever points at a deleted user's folder again to clean it up later. Best-effort, same as
+ * deleteIfOwned — a failure here is logged, not allowed to block the rest of account deletion.
+ */
+async function deleteAllUserFiles(userId) {
+  const { data: files, error: listError } = await supabaseAdmin.storage.from(AVATARS_BUCKET).list(userId);
+  if (listError) {
+    console.error('[storage] Could not list files for deletion:', listError.message);
+    return;
+  }
+  if (!files || files.length === 0) return;
+
+  const paths = files.map((f) => `${userId}/${f.name}`);
+  const { error: removeError } = await supabaseAdmin.storage.from(AVATARS_BUCKET).remove(paths);
+  if (removeError) console.error('[storage] Could not delete user files:', removeError.message);
+}
+
+module.exports = { AVATARS_BUCKET, ensureAvatarsBucket, uploadIfDataUri, deleteIfOwned, deleteAllUserFiles };

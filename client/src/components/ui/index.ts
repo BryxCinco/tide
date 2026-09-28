@@ -9,7 +9,6 @@ export * from './Divider';
 export * from './EmptyState';
 export * from './ErrorState';
 export * from './FAB';
-export * from './GuestBanner';
 export * from './Icon';
 export * from './Input';
 export * from './Loader';

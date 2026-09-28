@@ -1,8 +1,15 @@
 const express = require('express');
 const { supabaseAuth, supabaseAdmin } = require('../lib/supabaseClient');
 const { requireAuth } = require('../middleware/auth');
+const { deleteAllUserFiles } = require('../lib/storage');
 
 const router = express.Router();
+
+// Every table that holds per-user rows, keyed by user_id — kept as one list so account
+// deletion (below) can't silently miss one if a table gets added later without remembering
+// to update this. `profiles` isn't here — it's keyed by `id`, not `user_id`, and is deleted
+// separately after these.
+const USER_SCOPED_TABLES = ['tasks', 'journal_entries', 'time_logs', 'activities', 'quests', 'streaks', 'user_settings'];
 
 // POST /api/auth/signup — creates the auth.users row; the DB trigger (handle_new_user)
 // auto-creates matching profiles/user_settings/streaks rows from raw_user_meta_data.name.
@@ -113,6 +120,38 @@ router.get('/me', requireAuth, async (req, res) => {
   }
 
   res.json({ profile: created });
+});
+
+// DELETE /api/auth/account — irreversibly deletes the current user: every per-user row
+// across all tables, their uploaded files, the profiles row, and finally the Supabase Auth
+// user itself. Guests never reach this (they have no backend account/token to send — see
+// client/src/utils/deleteAccount.ts, which only calls this for real accounts).
+//
+// Order matters: dependent data first, profiles second, the auth user LAST. If anything
+// fails partway, the worst case is orphaned-but-harmless rows under a still-existing
+// account (recoverable — nothing was told it's "gone" yet) rather than a user who can no
+// longer log in to see that their data didn't actually finish clearing.
+router.delete('/account', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    await deleteAllUserFiles(userId);
+
+    for (const table of USER_SCOPED_TABLES) {
+      const { error } = await supabaseAdmin.from(table).delete().eq('user_id', userId);
+      if (error) return res.status(500).json({ error: `Failed to delete ${table}: ${error.message}` });
+    }
+
+    const { error: profileError } = await supabaseAdmin.from('profiles').delete().eq('id', userId);
+    if (profileError) return res.status(500).json({ error: `Failed to delete profile: ${profileError.message}` });
+
+    const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    if (authDeleteError) return res.status(500).json({ error: authDeleteError.message });
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Could not delete account.' });
+  }
 });
 
 module.exports = router;

@@ -8,10 +8,14 @@ import { Button, Icon, Input, Modal, Text } from '../ui';
 export interface DeleteAccountModalProps {
   visible: boolean;
   onClose: () => void;
-  /** Actually deleting an account needs a backend, which doesn't exist yet — the confirm
-   * button stays wired up (this isn't a dead-end placeholder), but what it does today is
-   * caller-defined, e.g. logging the guest/account out locally. */
+  /** For a real account, this actually deletes it server-side (see
+   * utils/deleteAccount.ts) — awaited by the caller, which keeps `isDeleting` true and this
+   * modal open until it settles. */
   onConfirm: () => void;
+  /** True while onConfirm's own delete request is in flight — disables both buttons (no
+   * closing out of an irreversible action mid-request) and relabels Delete so it doesn't
+   * just sit there looking unresponsive. */
+  isDeleting?: boolean;
 }
 
 const CONFIRM_WORD = 'DELETE';
@@ -19,7 +23,7 @@ const CONFIRM_WORD = 'DELETE';
 /** Irreversible-action modal: typing the exact confirm word is what enables the Delete
  * button, not just a checkbox — same "make it deliberately a little effortful" pattern as
  * most account-deletion flows, so a stray tap can't trigger it. */
-export function DeleteAccountModal({ visible, onClose, onConfirm }: DeleteAccountModalProps) {
+export function DeleteAccountModal({ visible, onClose, onConfirm, isDeleting = false }: DeleteAccountModalProps) {
   const { t } = useTranslation();
   const [confirmText, setConfirmText] = useState('');
 
@@ -46,11 +50,18 @@ export function DeleteAccountModal({ visible, onClose, onConfirm }: DeleteAccoun
           onChangeText={setConfirmText}
           autoCapitalize="characters"
           autoCorrect={false}
+          editable={!isDeleting}
         />
 
         <View className="flex-row gap-3">
-          <Button title={t('common.cancel')} variant="secondary" fullWidth onPress={onClose} />
-          <Button title={t('profile.deleteAccount')} variant="danger" fullWidth disabled={!canDelete} onPress={onConfirm} />
+          <Button title={t('common.cancel')} variant="secondary" fullWidth onPress={onClose} disabled={isDeleting} />
+          <Button
+            title={isDeleting ? 'Deleting…' : t('profile.deleteAccount')}
+            variant="danger"
+            fullWidth
+            disabled={!canDelete || isDeleting}
+            onPress={onConfirm}
+          />
         </View>
       </View>
     </Modal>

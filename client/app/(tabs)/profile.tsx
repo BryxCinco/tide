@@ -23,6 +23,7 @@ import { Button, ErrorState, Icon, ResponsiveContainer, Text, ThemeToggle } from
 import { useAuth } from '@/hooks/useAuth';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { LANGUAGES, useTranslation } from '@/i18n';
+import { getApiErrorMessage } from '@/services/api';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useStreakStore } from '@/store/streakStore';
 import { useThemeStore } from '@/store/themeStore';
@@ -30,7 +31,7 @@ import { showToast } from '@/store/toastStore';
 import { cn } from '@/utils/cn';
 import { clearCache } from '@/utils/clearCache';
 import { confirmAsync } from '@/utils/confirm';
-import { deleteAccountLocally } from '@/utils/deleteAccount';
+import { deleteAccount } from '@/utils/deleteAccount';
 import { exportUserData } from '@/utils/exportData';
 import type { WeekStart } from '@/types/settings';
 
@@ -61,7 +62,8 @@ function TimeFormatSegmented({ value, onChange }: { value: '12h' | '24h'; onChan
 }
 
 export default function ProfileScreen() {
-  const { logout } = useAuth();
+  const { logout, isGuest } = useAuth();
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const themeColors = useThemeColors();
   const { t } = useTranslation();
   const settings = useSettingsStore((s) => s.settings);
@@ -104,13 +106,24 @@ export default function ProfileScreen() {
   };
 
   const handleDeleteAccount = async () => {
-    await deleteAccountLocally();
-    setDeleteVisible(false);
-    router.replace('/(auth)/login');
-    // Toast is always mounted at the app root (see app/_layout.tsx), not gated by auth, so
-    // this still lands on the login screen even though the profile screen it fired from
-    // has just unmounted.
-    showToast('Account deleted');
+    setIsDeletingAccount(true);
+    try {
+      await deleteAccount(isGuest);
+      setDeleteVisible(false);
+      router.replace('/(auth)/login');
+      // Toast is always mounted at the app root (see app/_layout.tsx), not gated by auth, so
+      // this still lands on the login screen even though the profile screen it fired from
+      // has just unmounted.
+      showToast('Account deleted');
+    } catch (err) {
+      // Deliberately NOT closing the modal or navigating away here — the backend delete
+      // failed, so the account and its data are still intact server-side. Closing the
+      // modal or logging out here would make it look like the deletion went through when
+      // it didn't.
+      showToast(getApiErrorMessage(err, 'Could not delete your account. Please try again.'), 'error');
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   const handleClearCache = async () => {
@@ -247,7 +260,12 @@ export default function ProfileScreen() {
       <AvatarPickerModal visible={avatarPickerVisible} onClose={() => setAvatarPickerVisible(false)} />
       <ChangePasswordModal visible={changePasswordVisible} onClose={() => setChangePasswordVisible(false)} />
       <LogoutModal visible={logoutVisible} onClose={() => setLogoutVisible(false)} onConfirm={handleLogout} />
-      <DeleteAccountModal visible={deleteVisible} onClose={() => setDeleteVisible(false)} onConfirm={handleDeleteAccount} />
+      <DeleteAccountModal
+        visible={deleteVisible}
+        onClose={() => setDeleteVisible(false)}
+        onConfirm={handleDeleteAccount}
+        isDeleting={isDeletingAccount}
+      />
       <FeedbackModal visible={feedbackVisible} onClose={() => setFeedbackVisible(false)} />
 
       <LanguageModal visible={languagePickerVisible} onClose={() => setLanguagePickerVisible(false)} />

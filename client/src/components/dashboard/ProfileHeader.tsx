@@ -13,7 +13,7 @@ import { CoverPicker } from './CoverPicker';
 /** Notion-style header: full-width cover, an avatar overlapping its bottom edge, then
  * name/bio/edit — the centerpiece of the redesigned Dashboard. */
 export function ProfileHeader() {
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const [pickerVisible, setPickerVisible] = useState(false);
   const [avatarHovered, setAvatarHovered] = useState(false);
   const { isDesktop, isTablet } = useResponsive();
@@ -71,20 +71,47 @@ export function ProfileHeader() {
         </Pressable>
 
         <View className="mt-2 gap-0.5 pb-2">
-          <Text variant="h2" color="primary">
-            {user?.name ?? 'Guest'}
-          </Text>
+          <View className="flex-row items-center gap-2">
+            <Text variant="h2" color="primary">
+              {user?.name ?? 'Guest'}
+            </Text>
+            {/* Replaces the old full-width "You're using TIDE as a guest..." banner that
+                used to sit above the whole dashboard — it reset back to visible on every
+                navigation/reload (its dismissal was never persisted) instead of actually
+                going away, which read as broken rather than dismissible. This carries the
+                same "you're a guest, here's how to keep this" message, but as a small,
+                permanent badge next to the name instead of a recurring interruption. */}
+            {isGuest && (
+              <View className="rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5">
+                <Text variant="caption" className="text-tide-teal normal-case tracking-normal">
+                  Guest
+                </Text>
+              </View>
+            )}
+          </View>
           <Text variant="caption" color="muted" className="normal-case tracking-normal">
             {user?.bio ?? user?.email ?? 'Browsing as guest'}
           </Text>
-          <Button
-            title="Edit Profile"
-            variant="ghost"
-            size="sm"
-            icon="Pencil"
-            onPress={() => router.push('/(tabs)/profile')}
-            className="mt-1"
-          />
+          <View className="flex-row flex-wrap items-center">
+            <Button
+              title="Edit Profile"
+              variant="ghost"
+              size="sm"
+              icon="Pencil"
+              onPress={() => router.push('/(tabs)/profile')}
+              className="mt-1"
+            />
+            {isGuest && (
+              <Button
+                title="Save Progress"
+                variant="ghost"
+                size="sm"
+                icon="Save"
+                onPress={() => router.push('/(auth)/link-account')}
+                className="mt-1"
+              />
+            )}
+          </View>
         </View>
       </ResponsiveContainer>
 
