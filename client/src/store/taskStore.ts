@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { getApiErrorMessage } from '../services/api';
-import { taskService } from '../services/task.service';
+import { taskService, type UpdateTaskPayload } from '../services/task.service';
 import type { Task, TaskPriority, TaskStatus } from '../types/task';
 import { hasAuthToken, isGuestMode } from '../utils/authFlags';
 import { storage } from '../utils/storage';
@@ -35,10 +35,15 @@ interface TaskState {
     status: TaskStatus;
     priority: TaskPriority;
     dueDate?: string;
+    dueDateStart?: string;
+    dueDateEnd?: string;
     linkedActivityId?: string;
     tags: string[];
   }) => Task;
-  updateTask: (id: string, updates: Partial<Omit<Task, 'id' | 'createdAt'>>) => void;
+  // UpdateTaskPayload (not a plain Partial<Task>) so callers can pass `null` for
+  // dueDateStart/dueDateEnd/completedAt to explicitly clear them server-side — see
+  // task.service.ts's comment on why `undefined` alone can't do that.
+  updateTask: (id: string, updates: UpdateTaskPayload) => void;
   deleteTask: (id: string) => void;
   /** Binary done/not-done toggle for the checkbox — the 3-way status (incl. "in-progress")
    * is only settable deliberately, via updateTask from the edit modal's status selector. */
@@ -107,8 +112,18 @@ export const useTaskStore = create<TaskState>()(
 
       updateTask: (id, updates) => {
         const previous = get().tasks;
+        // `updates` may carry explicit `null` (to clear completedAt/dueDateStart/
+        // dueDateEnd server-side — see UpdateTaskPayload's comment), but Task's own fields
+        // are `string | undefined`, never `null` — normalize before merging into local state.
+        const { completedAt, dueDateStart, dueDateEnd, ...rest } = updates;
+        const localPatch = {
+          ...rest,
+          ...(completedAt !== undefined ? { completedAt: completedAt ?? undefined } : {}),
+          ...(dueDateStart !== undefined ? { dueDateStart: dueDateStart ?? undefined } : {}),
+          ...(dueDateEnd !== undefined ? { dueDateEnd: dueDateEnd ?? undefined } : {}),
+        };
         set((state) => ({
-          tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+          tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...localPatch } : t)),
         }));
         if (isGuestMode()) return;
         taskService.update(id, updates).catch((err) => {

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DailyQuestCard } from '@/components/dashboard';
 import { AppLayout } from '@/components/layout';
-import { TaskCard, TaskFilters, TaskFormModal } from '@/components/tasks';
+import { TaskCard, TaskFilters, TaskFormModal, TaskInfoModal } from '@/components/tasks';
 import { BackButton, Button, EmptyState, ErrorState, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
 import { useActivityStore } from '@/store/activityStore';
 import { getVisibleTasks, useTaskStore } from '@/store/taskStore';
@@ -27,6 +27,8 @@ export default function TasksScreen() {
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined);
+  const [infoTask, setInfoTask] = useState<Task | undefined>(undefined);
+  const [infoVisible, setInfoVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
@@ -49,6 +51,11 @@ export default function TasksScreen() {
   const openEdit = (task: Task) => {
     setEditingTask(task);
     setModalVisible(true);
+  };
+
+  const openInfo = (task: Task) => {
+    setInfoTask(task);
+    setInfoVisible(true);
   };
 
   return (
@@ -102,6 +109,7 @@ export default function TasksScreen() {
                       task={task}
                       activityName={activities.find((a) => a.id === task.linkedActivityId)?.name}
                       onToggle={() => toggleTaskStatus(task.id)}
+                      onView={() => openInfo(task)}
                       onEdit={() => openEdit(task)}
                       onDelete={() => deleteTask(task.id)}
                     />
@@ -113,6 +121,19 @@ export default function TasksScreen() {
         </ScrollView>
 
         <TaskFormModal visible={modalVisible} onClose={() => setModalVisible(false)} task={editingTask} />
+
+        <TaskInfoModal
+          visible={infoVisible}
+          onClose={() => setInfoVisible(false)}
+          task={infoTask}
+          activityName={activities.find((a) => a.id === infoTask?.linkedActivityId)?.name}
+          onToggle={toggleTaskStatus}
+          onDelete={deleteTask}
+          onEdit={(task) => {
+            setInfoVisible(false);
+            openEdit(task);
+          }}
+        />
       </SafeAreaView>
     </AppLayout>
   );

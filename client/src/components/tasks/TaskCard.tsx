@@ -3,6 +3,7 @@ import { Pressable } from '../ui/SoundPressable';
 
 import type { Task, TaskPriority } from '../../types/task';
 import { cn } from '../../utils/cn';
+import { formatDateKeyCompact } from '../../utils/formatDate';
 import { colors } from '../../utils/theme';
 import { Badge, Icon, Text, VisibleDeleteButton, type BadgeVariant } from '../ui';
 
@@ -18,13 +19,23 @@ export interface TaskCardProps {
   /** Resolved name of the linked activity, if any — looked up by the caller. */
   activityName?: string;
   onToggle: () => void;
+  /** Tapping the card's main body opens the view-only info modal — Edit stays an explicit,
+   * separate action (the pencil icon below), never triggered by this. Same split as
+   * ActivityRow.tsx's onInfo/onEdit. */
+  onView: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-export function TaskCard({ task, activityName, onToggle, onEdit, onDelete }: TaskCardProps) {
+export function TaskCard({ task, activityName, onToggle, onView, onEdit, onDelete }: TaskCardProps) {
   const isDone = task.status === 'done';
   const priority = PRIORITY_BADGE[task.priority];
+  const dateLabel =
+    task.dueDateStart && task.dueDateEnd
+      ? `${formatDateKeyCompact(task.dueDateStart)} - ${formatDateKeyCompact(task.dueDateEnd)}`
+      : task.dueDate
+        ? `Due ${formatDateKeyCompact(task.dueDate)}`
+        : null;
 
   return (
     <View className="flex-row items-start gap-3 rounded-xl border border-subtle bg-base p-3">
@@ -39,18 +50,18 @@ export function TaskCard({ task, activityName, onToggle, onEdit, onDelete }: Tas
         {isDone && <Icon name="Check" size={12} color={colors.text.inverse} />}
       </Pressable>
 
-      <Pressable onPress={onEdit} className="flex-1 gap-1.5">
+      <Pressable onPress={onView} className="flex-1 gap-1.5">
         <Text variant="body" color={isDone ? 'muted' : 'primary'} className={cn('font-medium', isDone && 'line-through')}>
           {task.title}
         </Text>
 
         <View className="flex-row flex-wrap items-center gap-1.5">
           <Badge label={priority.label} variant={priority.variant} size="sm" />
-          {task.dueDate && (
+          {dateLabel && (
             <View className="flex-row items-center gap-1">
               <Icon name="Calendar" size={12} />
               <Text variant="caption" color="muted" className="normal-case tracking-normal">
-                {task.dueDate}
+                {dateLabel}
               </Text>
             </View>
           )}

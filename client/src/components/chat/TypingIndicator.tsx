@@ -6,8 +6,11 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 
 const DOT_COUNT = 3;
 const BOUNCE_HEIGHT = 4;
-const CYCLE_DURATION = 600;
-const STAGGER = 150;
+// Each dot bounces up-and-back over 1.4s total (withRepeat's `true` reverse means this
+// duration is one direction, so the full up+down cycle is 2x = 1.4s — matching the "loop:
+// 1.4s total" spec), staggered 0.2s apart so they read as a wave, not a synchronized bounce.
+const CYCLE_DURATION = 700;
+const STAGGER = 200;
 
 function Dot({ delay, color }: { delay: number; color: string }) {
   const progress = useSharedValue(0);
@@ -32,7 +35,7 @@ function Dot({ delay, color }: { delay: number; color: string }) {
 }
 
 /** Classic 3-dot "thinking" indicator, shown in an assistant-style bubble while
- * chatStore's isTyping is true (see chatStore.ts's simulated MOCK_AI_THINKING_DELAY). */
+ * chatStore's isTyping is true (app/chat.tsx's full-page AI Coach — Fix 6). */
 export function TypingIndicator() {
   const themeColors = useThemeColors();
 

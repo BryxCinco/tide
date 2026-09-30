@@ -11,20 +11,39 @@ export interface AIAvatarProps {
   /** Subtle breathing glow — on by default, but the typing indicator's own inline avatar
    * turns it off so two independently-animated pulses don't compete visually. */
   pulse?: boolean;
+  /** One-shot 360° spin on mount — Fix 6's "rotation on new message". ChatConversation only
+   * passes true for a bubble whose message was created live during this session (not one
+   * restored from persisted history on load), so old messages don't all spin at once when
+   * the screen first opens. */
+  spinOnMount?: boolean;
 }
 
 /** Teal-gradient circular avatar for the AI Coach — Sparkles icon, optional soft pulse
- * glow (a shadow, not a scale change, so it doesn't jostle text sitting next to it). */
-export function AIAvatar({ size = 32, pulse = true }: AIAvatarProps) {
+ * glow (a shadow, not a scale change, so it doesn't jostle text sitting next to it), and an
+ * optional one-shot spin-in when it mounts as a genuinely new message. */
+export function AIAvatar({ size = 32, pulse = true, spinOnMount }: AIAvatarProps) {
   const glow = useSharedValue(0);
+  const rotation = useSharedValue(spinOnMount ? 0 : 360);
 
   useEffect(() => {
     if (!pulse) return;
     glow.value = withRepeat(withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.ease) }), -1, true);
   }, [pulse, glow]);
 
+  useEffect(() => {
+    if (!spinOnMount) return;
+    rotation.value = withTiming(360, { duration: 500, easing: Easing.out(Easing.cubic) });
+    // Runs once on mount only — this is a spin-IN flourish for a bubble that was just
+    // created, not something that should re-fire on prop changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const glowStyle = useAnimatedStyle(() => ({
     shadowOpacity: 0.25 + glow.value * 0.25,
+  }));
+
+  const spinStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
   }));
 
   return (
@@ -38,6 +57,7 @@ export function AIAvatar({ size = 32, pulse = true }: AIAvatarProps) {
           elevation: 4,
         },
         pulse && glowStyle,
+        spinStyle,
       ]}
     >
       <LinearGradient

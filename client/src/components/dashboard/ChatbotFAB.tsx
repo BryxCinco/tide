@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
@@ -5,21 +6,17 @@ import { Pressable } from '../ui/SoundPressable';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { useUiStore } from '../../store/uiStore';
 import { gradients } from '../../utils/gradients';
 import { colors, shadows } from '../../utils/theme';
 import { Icon } from '../ui';
 
 /**
- * Floating action button for the AI Coach — always opens ChatPanel.tsx (the Spotlight-
- * style overlay, uiStore's isChatOpen, mounted in app/_layout.tsx) at every screen width.
- * There used to be an isPhone branch that routed to app/chat.tsx instead on narrow
- * screens — that was the actual bug behind "the redesign didn't show up": it silently
- * fell back to the old, unstyled screen below desktop width.
+ * Floating action button for the AI Coach — navigates to the full-page /chat screen (Fix
+ * 5 retired the old ChatPanel.tsx modal/overlay in favor of a dedicated page) at every
+ * screen width.
  */
 export function ChatbotFAB() {
   const themeColors = useThemeColors();
-  const openChat = useUiStore((s) => s.openChat);
   const size = Platform.OS === 'web' ? 64 : 56;
 
   const float = useSharedValue(0);
@@ -49,7 +46,7 @@ export function ChatbotFAB() {
       ]}
     >
       <Pressable
-        onPress={openChat}
+        onPress={() => router.push('/chat')}
         style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden' }}
       >
         <LinearGradient

@@ -1,11 +1,45 @@
 const { supabaseAdmin } = require('./supabaseClient');
 const {
   upsertEmbedding,
+  deleteEmbedding,
   buildTaskContent,
   buildJournalContent,
   buildSessionContent,
 } = require('./embeddingPipeline');
-const { retrieveStats } = require('./ragService');
+const { retrieveStats, retrieveRelevantContext } = require('./ragService');
+
+// WMO weather codes, as returned by Open-Meteo's `current_weather.weathercode` — this is
+// their fixed vocabulary (https://open-meteo.com/en/docs), not something TIDE defines.
+const WEATHER_CODES = {
+  0: 'Clear sky',
+  1: 'Mainly clear',
+  2: 'Partly cloudy',
+  3: 'Overcast',
+  45: 'Fog',
+  48: 'Depositing rime fog',
+  51: 'Light drizzle',
+  53: 'Moderate drizzle',
+  55: 'Dense drizzle',
+  56: 'Light freezing drizzle',
+  57: 'Dense freezing drizzle',
+  61: 'Slight rain',
+  63: 'Moderate rain',
+  65: 'Heavy rain',
+  66: 'Light freezing rain',
+  67: 'Heavy freezing rain',
+  71: 'Slight snow fall',
+  73: 'Moderate snow fall',
+  75: 'Heavy snow fall',
+  77: 'Snow grains',
+  80: 'Slight rain showers',
+  81: 'Moderate rain showers',
+  82: 'Violent rain showers',
+  85: 'Slight snow showers',
+  86: 'Heavy snow showers',
+  95: 'Thunderstorm',
+  96: 'Thunderstorm with slight hail',
+  99: 'Thunderstorm with heavy hail',
+};
 
 // Groq (OpenAI-compatible) tool/function-calling schema — see
 // https://console.groq.com/docs/tool-use. Each entry's `function.parameters` is a JSON
@@ -15,7 +49,8 @@ const tools = [
     type: 'function',
     function: {
       name: 'createTask',
-      description: 'Create a new task for the user to track and complete later.',
+      description:
+        'Create a new task for the user to track and complete later. Supports either a single due date or a date range (e.g. "Oct 21-27").',
       parameters: {
         type: 'object',
         properties: {
@@ -28,7 +63,16 @@ const tools = [
           },
           dueDate: {
             type: 'string',
-            description: 'Optional ISO 8601 date (e.g. 2026-10-05) the task is due.',
+            description: 'Single due date as an ISO 8601 date (e.g. 2026-10-05). Omit this if using a date range instead.',
+          },
+          dueDateStart: {
+            type: 'string',
+            description:
+              'Start of a due date RANGE, ISO 8601 (e.g. 2026-10-21). Use this + dueDateEnd instead of dueDate when the user gives a range like "Oct 21-27" or "next week".',
+          },
+          dueDateEnd: {
+            type: 'string',
+            description: 'End of a due date RANGE, ISO 8601 (e.g. 2026-10-27). Always paired with dueDateStart.',
           },
           activityType: {
             type: 'string',
@@ -82,6 +126,66 @@ const tools = [
   {
     type: 'function',
     function: {
+      name: 'updateTask',
+      description: "Change a task's title, priority, status, description, or due date(s), found by matching its current title.",
+      parameters: {
+        type: 'object',
+        properties: {
+          taskTitle: { type: 'string', description: 'The task title (or close approximation) to find and update.' },
+          updates: {
+            type: 'object',
+            description: 'Only the fields being changed — omit anything left as-is.',
+            properties: {
+              title: { type: 'string', description: 'New title.' },
+              priority: { type: 'string', enum: ['low', 'medium', 'high', 'critical'] },
+              status: { type: 'string', enum: ['todo', 'in-progress', 'done'] },
+              description: { type: 'string' },
+              dueDateStart: { type: 'string', description: 'ISO 8601 date. Pair with dueDateEnd for a range.' },
+              dueDateEnd: { type: 'string', description: 'ISO 8601 date.' },
+            },
+          },
+        },
+        required: ['taskTitle', 'updates'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'deleteTask',
+      description:
+        "Permanently delete a task, found by matching its title. DESTRUCTIVE — the first call (without confirm) never deletes anything; it only returns a confirmation question to relay to the user verbatim. Only pass confirm:true after the user has clearly said yes to that exact question.",
+      parameters: {
+        type: 'object',
+        properties: {
+          taskTitle: { type: 'string', description: 'The task title (or close approximation) to find and delete.' },
+          confirm: {
+            type: 'boolean',
+            description: 'Must be true to actually delete. Leave false/omitted on the first attempt.',
+          },
+        },
+        required: ['taskTitle'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'rescheduleTask',
+      description: 'Move an existing task to a new single due date, found by matching its title.',
+      parameters: {
+        type: 'object',
+        properties: {
+          taskTitle: { type: 'string', description: 'The task title (or close approximation) to find and reschedule.' },
+          newDueDate: { type: 'string', description: 'The new due date, ISO 8601 (e.g. 2026-10-12).' },
+        },
+        required: ['taskTitle', 'newDueDate'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'logMood',
       description: "Record how the user is feeling right now as a mood check-in.",
       parameters: {
@@ -98,6 +202,20 @@ const tools = [
           },
         },
         required: ['mood'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'getMoodHistory',
+      description: "Get the user's logged moods over a recent time window.",
+      parameters: {
+        type: 'object',
+        properties: {
+          days: { type: 'number', description: 'How many days back to look. Defaults to 30.' },
+        },
+        required: [],
       },
     },
   },
@@ -135,11 +253,84 @@ const tools = [
       parameters: { type: 'object', properties: {}, required: [] },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'getActivityStats',
+      description:
+        "Get time-tracking stats for one activity (total time, session count, average session length, last session date), or — when no activity is named — the user's top 5 activities by total time.",
+      parameters: {
+        type: 'object',
+        properties: {
+          activityName: { type: 'string', description: 'Name of the activity to get stats for. Omit for a top-5 overview.' },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'getStreakInfo',
+      description: "Get the user's current streak, longest streak ever, and the date they were last active.",
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'addJournalEntry',
+      description: 'Write a new journal entry for the user.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Short title for the entry.' },
+          content: { type: 'string', description: 'The entry text.' },
+          mood: {
+            type: 'string',
+            enum: ['terrible', 'bad', 'okay', 'good', 'great'],
+            description: 'Optional mood to attach to this entry.',
+          },
+          tags: { type: 'array', items: { type: 'string' }, description: 'Optional tags for this entry.' },
+        },
+        required: ['title', 'content'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'searchJournals',
+      description: 'Semantically search the user\'s past journal entries for ones relevant to a topic or question.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'What to search for, e.g. "times I felt stressed about work".' },
+          limit: { type: 'number', description: 'Max entries to return. Defaults to 5.' },
+        },
+        required: ['query'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'getWeather',
+      description: "Get the current weather for a city. Defaults to Manila if the user doesn't name a location.",
+      parameters: {
+        type: 'object',
+        properties: {
+          location: { type: 'string', description: 'City name, e.g. "Tokyo" or "Cebu City". Defaults to Manila.' },
+        },
+        required: [],
+      },
+    },
+  },
 ];
 
-// Loose fuzzy matcher for completeTask — no fuzzy-matching library is installed, and pulling
-// one in for a single call site wasn't worth it. Exact match scores highest, then
-// substring containment either direction, then falls back to word-overlap (Jaccard) so
+// Loose fuzzy matcher for the *ByTitle tools — no fuzzy-matching library is installed, and
+// pulling one in for a handful of call sites wasn't worth it. Exact match scores highest,
+// then substring containment either direction, then falls back to word-overlap (Jaccard) so
 // "call mom" still matches a task titled "Call mom about the trip".
 function normalize(text) {
   return (text || '')
@@ -162,9 +353,53 @@ function fuzzyScore(a, b) {
   return union.size ? intersection.length / union.size : 0;
 }
 
+/** Shared by completeTask/updateTask/deleteTask/rescheduleTask — all four find their target
+ * the same way (fuzzy title match, scoped to this user), so this factors out the query +
+ * scoring instead of repeating it four times. `onlyOpen` restricts to not-yet-done tasks,
+ * used by completeTask (a done task can't be completed again); the other three search every
+ * status, since editing/deleting/rescheduling a completed task is still meaningful. */
+async function findTaskByTitle(userId, title, { onlyOpen = false } = {}) {
+  let query = supabaseAdmin.from('tasks').select('*').eq('user_id', userId);
+  if (onlyOpen) query = query.neq('status', 'done');
+
+  const { data: tasks, error } = await query;
+  if (error) throw new Error(error.message);
+
+  let best = null;
+  let bestScore = 0;
+  for (const task of tasks || []) {
+    const score = fuzzyScore(task.title, title);
+    if (score > bestScore) {
+      bestScore = score;
+      best = task;
+    }
+  }
+
+  return bestScore >= 0.3 ? best : null;
+}
+
+function embedTaskInBackground(userId, task) {
+  upsertEmbedding({
+    userId,
+    sourceType: 'task',
+    sourceId: task.id,
+    content: buildTaskContent(task),
+    metadata: { title: task.title, status: task.status, priority: task.priority },
+  }).catch((err) => console.error('[tools] task embedding failed:', err.message));
+}
+
 const toolHandlers = {};
 
-toolHandlers.createTask = async ({ userId, title, description, priority, dueDate, activityType }) => {
+toolHandlers.createTask = async ({ userId, title, description, priority, dueDate, dueDateStart, dueDateEnd, activityType }) => {
+  // The tool schema marks `title` required, but that's a hint to the model, not an
+  // API-enforced guarantee — unlike the REST route (routes/tasks.js), this handler talks
+  // to Supabase directly, bypassing that route's own `if (!title)` check entirely. Without
+  // this, an empty/missing title would either insert a blank-titled task or surface a raw
+  // Postgres NOT NULL error instead of something the model can react to sensibly.
+  if (!title || !title.trim()) {
+    return { error: 'title is required', message: "I need a title to create that task — what should I call it?" };
+  }
+
   const { data, error } = await supabaseAdmin
     .from('tasks')
     .insert({
@@ -173,7 +408,12 @@ toolHandlers.createTask = async ({ userId, title, description, priority, dueDate
       description,
       status: 'todo',
       priority: priority || 'medium',
-      due_date: dueDate,
+      // A range's start doubles as `due_date` so existing date-based sort/filter (which only
+      // knows about that single column) still places range tasks correctly — see
+      // migrations/006_task_date_range.sql's comment.
+      due_date: dueDateStart || dueDate,
+      due_date_start: dueDateStart,
+      due_date_end: dueDateEnd,
       activity_type: activityType,
     })
     .select()
@@ -181,57 +421,29 @@ toolHandlers.createTask = async ({ userId, title, description, priority, dueDate
 
   if (error) throw new Error(error.message);
 
-  upsertEmbedding({
-    userId,
-    sourceType: 'task',
-    sourceId: data.id,
-    content: buildTaskContent(data),
-    metadata: { title: data.title, status: data.status, priority: data.priority },
-  }).catch((err) => console.error('[tools] createTask embedding failed:', err.message));
+  embedTaskInBackground(userId, data);
 
-  return { task: data, message: `Created task: "${data.title}"` };
+  const dateNote = dueDateStart && dueDateEnd ? ` (due ${dueDateStart} to ${dueDateEnd})` : dueDate ? ` (due ${dueDate})` : '';
+  return { task: data, message: `Created task: "${data.title}"${dateNote}` };
 };
 
 toolHandlers.completeTask = async ({ userId, taskTitle }) => {
-  const { data: openTasks, error } = await supabaseAdmin
-    .from('tasks')
-    .select('*')
-    .eq('user_id', userId)
-    .neq('status', 'done');
-
-  if (error) throw new Error(error.message);
-
-  let best = null;
-  let bestScore = 0;
-  for (const task of openTasks || []) {
-    const score = fuzzyScore(task.title, taskTitle);
-    if (score > bestScore) {
-      bestScore = score;
-      best = task;
-    }
-  }
-
-  if (!best || bestScore < 0.3) {
+  const match = await findTaskByTitle(userId, taskTitle, { onlyOpen: true });
+  if (!match) {
     return { matched: false, message: `I couldn't find an open task matching "${taskTitle}".` };
   }
 
-  const { data, error: updateError } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('tasks')
     .update({ status: 'done', completed_at: new Date().toISOString() })
-    .eq('id', best.id)
+    .eq('id', match.id)
     .eq('user_id', userId)
     .select()
     .single();
 
-  if (updateError) throw new Error(updateError.message);
+  if (error) throw new Error(error.message);
 
-  upsertEmbedding({
-    userId,
-    sourceType: 'task',
-    sourceId: data.id,
-    content: buildTaskContent(data),
-    metadata: { title: data.title, status: data.status, priority: data.priority },
-  }).catch((err) => console.error('[tools] completeTask embedding failed:', err.message));
+  embedTaskInBackground(userId, data);
 
   return { task: data, matched: true, message: `Marked "${data.title}" as done.` };
 };
@@ -252,7 +464,93 @@ toolHandlers.listTasks = async ({ userId, status, limit }) => {
   return { tasks: data, count: data.length, message: `Found ${data.length} task(s).` };
 };
 
+toolHandlers.updateTask = async ({ userId, taskTitle, updates = {} }) => {
+  const match = await findTaskByTitle(userId, taskTitle);
+  if (!match) {
+    return { matched: false, message: `I couldn't find a task matching "${taskTitle}".` };
+  }
+
+  const patch = {};
+  if (updates.title !== undefined) patch.title = updates.title;
+  if (updates.priority !== undefined) patch.priority = updates.priority;
+  if (updates.description !== undefined) patch.description = updates.description;
+  if (updates.dueDateStart !== undefined) patch.due_date_start = updates.dueDateStart;
+  if (updates.dueDateEnd !== undefined) patch.due_date_end = updates.dueDateEnd;
+  if (updates.dueDateStart !== undefined) patch.due_date = updates.dueDateStart;
+  if (updates.status !== undefined) {
+    patch.status = updates.status;
+    patch.completed_at = updates.status === 'done' ? new Date().toISOString() : null;
+  }
+
+  const { data, error } = await supabaseAdmin.from('tasks').update(patch).eq('id', match.id).eq('user_id', userId).select().single();
+  if (error) throw new Error(error.message);
+
+  embedTaskInBackground(userId, data);
+
+  return { task: data, message: `Updated "${data.title}".` };
+};
+
+// DESTRUCTIVE — see the tool schema's own description. The first call (confirm falsy) never
+// touches the database; it only looks the task up and hands back a confirmation question for
+// the model to relay verbatim. NOTE on why this is a `confirm` boolean rather than the
+// "confirmation_token" the spec described: tool-call/tool-result messages only exist inside
+// one HTTP request's message array (see generateWithTools's `rounds` loop in llmService.js) —
+// chatStore.ts only ever persists the final assistant `content` string as chat history, never
+// the intermediate tool call/result. A token minted on the first call would never be visible
+// to the model on the user's *next* message (a separate request), so it could never echo it
+// back. `confirm: true` sidesteps that entirely: the model just re-calls the same tool once
+// the user's own next message plainly says yes (per the system prompt's instruction on this).
+toolHandlers.deleteTask = async ({ userId, taskTitle, confirm }) => {
+  const match = await findTaskByTitle(userId, taskTitle);
+  if (!match) {
+    return { matched: false, message: `I couldn't find a task matching "${taskTitle}".` };
+  }
+
+  if (!confirm) {
+    return {
+      needsConfirmation: true,
+      task: { id: match.id, title: match.title },
+      message: `Are you sure you want to delete "${match.title}"? This cannot be undone.`,
+    };
+  }
+
+  const { error } = await supabaseAdmin.from('tasks').delete().eq('id', match.id).eq('user_id', userId);
+  if (error) throw new Error(error.message);
+
+  deleteEmbedding(userId, 'task', match.id).catch((err) => console.error('[tools] deleteTask embedding delete failed:', err.message));
+
+  return { deleted: true, task: { id: match.id, title: match.title }, message: `Deleted "${match.title}".` };
+};
+
+toolHandlers.rescheduleTask = async ({ userId, taskTitle, newDueDate }) => {
+  const match = await findTaskByTitle(userId, taskTitle);
+  if (!match) {
+    return { matched: false, message: `I couldn't find a task matching "${taskTitle}".` };
+  }
+
+  // Rescheduling to a single new date supersedes any existing range.
+  const { data, error } = await supabaseAdmin
+    .from('tasks')
+    .update({ due_date: newDueDate, due_date_start: null, due_date_end: null })
+    .eq('id', match.id)
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  embedTaskInBackground(userId, data);
+
+  return { task: data, message: `Rescheduled "${data.title}" to ${newDueDate}.` };
+};
+
+const VALID_MOODS = ['terrible', 'bad', 'okay', 'good', 'great'];
+
 toolHandlers.logMood = async ({ userId, mood, note }) => {
+  if (!VALID_MOODS.includes(mood)) {
+    return { error: 'invalid mood', message: `Mood has to be one of: ${VALID_MOODS.join(', ')}. Which one fits?` };
+  }
+
   const title = 'Mood Check-in';
   const content = note && note.trim() ? note.trim() : `Feeling ${mood} today.`;
 
@@ -282,12 +580,41 @@ toolHandlers.logMood = async ({ userId, mood, note }) => {
   return { entry: data, message: `Logged your mood as "${mood}".` };
 };
 
+toolHandlers.getMoodHistory = async ({ userId, days }) => {
+  const windowDays = days || 30;
+  const sinceIso = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data, error } = await supabaseAdmin
+    .from('journal_entries')
+    .select('mood, created_at, title')
+    .eq('user_id', userId)
+    .not('mood', 'is', null)
+    .gte('created_at', sinceIso)
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error(error.message);
+
+  const entries = (data || []).map((row) => ({ mood: row.mood, date: row.created_at, title: row.title }));
+
+  return {
+    entries,
+    count: entries.length,
+    message: entries.length
+      ? `Found ${entries.length} mood entr${entries.length === 1 ? 'y' : 'ies'} in the last ${windowDays} days.`
+      : `No mood entries logged in the last ${windowDays} days.`,
+  };
+};
+
 // There's no live "running timer" state tracked server-side in this codebase (the frontend's
 // timer is client-only Zustand state; POST /api/sessions only ever records a session after
 // it ends). This handler can't start or sync a live client timer — it records the intent as
 // a time_logs row instead: an open-ended row (duration_seconds: 0, ended_at: null) if no
 // duration was given, or a pre-filled row spanning now..now+duration if one was.
 toolHandlers.startTimer = async ({ userId, activityName, durationMinutes }) => {
+  if (!activityName || !activityName.trim()) {
+    return { error: 'activityName is required', message: 'What activity should I start timing?' };
+  }
+
   const startedAt = new Date();
   const hasDuration = typeof durationMinutes === 'number' && durationMinutes > 0;
   const endedAt = hasDuration ? new Date(startedAt.getTime() + durationMinutes * 60000) : null;
@@ -369,6 +696,176 @@ toolHandlers.getWeeklySummary = async ({ userId }) => {
   return {
     stats,
     message: `This week: ${stats.focusTimeLast7DaysMinutes}m focus time, ${stats.completedTasks} task(s) completed, current streak ${stats.currentStreak} day(s).`,
+  };
+};
+
+toolHandlers.getActivityStats = async ({ userId, activityName }) => {
+  const { data, error } = await supabaseAdmin
+    .from('time_logs')
+    .select('activity_name, duration_seconds, ended_at')
+    .eq('user_id', userId);
+
+  if (error) throw new Error(error.message);
+  const rows = data || [];
+
+  if (activityName) {
+    const matching = rows.filter((row) => (row.activity_name || '').toLowerCase() === activityName.toLowerCase());
+    if (matching.length === 0) {
+      return { found: false, message: `No sessions found for "${activityName}".` };
+    }
+
+    const totalSeconds = matching.reduce((sum, row) => sum + (row.duration_seconds || 0), 0);
+    const sessionCount = matching.length;
+    const lastSessionDate = matching.reduce(
+      (latest, row) => (row.ended_at && (!latest || row.ended_at > latest) ? row.ended_at : latest),
+      null,
+    );
+
+    const totalMinutes = Math.round(totalSeconds / 60);
+    return {
+      found: true,
+      activityName,
+      totalMinutes,
+      sessionCount,
+      averageMinutes: Math.round(totalSeconds / sessionCount / 60),
+      lastSessionDate,
+      message: `"${activityName}": ${totalMinutes}m total across ${sessionCount} session(s).`,
+    };
+  }
+
+  const byActivity = {};
+  for (const row of rows) {
+    const name = row.activity_name || 'Unknown';
+    byActivity[name] = (byActivity[name] || 0) + (row.duration_seconds || 0);
+  }
+
+  const topActivities = Object.entries(byActivity)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([name, seconds]) => ({ activityName: name, totalMinutes: Math.round(seconds / 60) }));
+
+  return {
+    topActivities,
+    message: topActivities.length
+      ? `Top activities: ${topActivities.map((a) => `${a.activityName} (${a.totalMinutes}m)`).join(', ')}.`
+      : 'No tracked activity time yet.',
+  };
+};
+
+toolHandlers.getStreakInfo = async ({ userId }) => {
+  const { data, error } = await supabaseAdmin
+    .from('streaks')
+    .select('current_streak, longest_streak, last_activity_date')
+    .eq('user_id', userId)
+    .single();
+
+  // PGRST116 ("no rows") just means this account has no streaks row yet.
+  if (error && error.code !== 'PGRST116') throw new Error(error.message);
+
+  const streak = data || { current_streak: 0, longest_streak: 0, last_activity_date: null };
+
+  return {
+    currentStreak: streak.current_streak,
+    longestStreak: streak.longest_streak,
+    lastActivityDate: streak.last_activity_date,
+    message: `Current streak: ${streak.current_streak} day(s). Longest ever: ${streak.longest_streak} day(s).`,
+  };
+};
+
+toolHandlers.addJournalEntry = async ({ userId, title, content, mood, tags }) => {
+  if (!title || !title.trim() || !content || !content.trim()) {
+    return { error: 'title and content are required', message: 'I need both a title and some content to save a journal entry — what would you like it to say?' };
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('journal_entries')
+    .insert({
+      user_id: userId,
+      title,
+      content,
+      mood,
+      tags: tags && tags.length ? tags : null,
+      word_count: content.trim().split(/\s+/).length,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  upsertEmbedding({
+    userId,
+    sourceType: 'journal',
+    sourceId: data.id,
+    content: buildJournalContent(data),
+    metadata: { title: data.title, mood: data.mood },
+  }).catch((err) => console.error('[tools] addJournalEntry embedding failed:', err.message));
+
+  return { entry: data, message: `Added journal entry: "${data.title}"` };
+};
+
+toolHandlers.searchJournals = async ({ userId, query, limit }) => {
+  const wantCount = limit || 5;
+  // Over-fetches across all source types (match_embeddings has no source_type filter) and
+  // takes the top journal-only matches locally — simpler than a second RPC variant just for
+  // this one filtered case.
+  const results = await retrieveRelevantContext(userId, query, { limit: wantCount * 4, threshold: 0.15 });
+  const journalResults = results.filter((r) => r.source_type === 'journal').slice(0, wantCount);
+
+  return {
+    entries: journalResults.map((r) => ({ id: r.source_id, content: r.content, metadata: r.metadata, similarity: r.similarity })),
+    count: journalResults.length,
+    message: journalResults.length
+      ? `Found ${journalResults.length} journal entr${journalResults.length === 1 ? 'y' : 'ies'} matching "${query}".`
+      : `No journal entries found matching "${query}".`,
+  };
+};
+
+// No API key needed (Open-Meteo is free/open) — two calls: geocode the place name to
+// lat/lon, then ask the forecast endpoint for that point's current conditions. Both use
+// Node's built-in global `fetch` (Node 18+).
+toolHandlers.getWeather = async ({ location }) => {
+  const place = location && location.trim() ? location.trim() : 'Manila';
+
+  const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(place)}&count=1`);
+  if (!geoRes.ok) throw new Error(`Geocoding request failed (${geoRes.status})`);
+  const geoData = await geoRes.json();
+  const match = geoData.results?.[0];
+
+  if (!match) {
+    return { found: false, message: `I couldn't find a location called "${place}".` };
+  }
+
+  const weatherRes = await fetch(
+    `https://api.open-meteo.com/v1/forecast?latitude=${match.latitude}&longitude=${match.longitude}&current_weather=true&hourly=relative_humidity_2m&timezone=auto`,
+  );
+  if (!weatherRes.ok) throw new Error(`Weather request failed (${weatherRes.status})`);
+  const weatherData = await weatherRes.json();
+  const current = weatherData.current_weather;
+
+  if (!current) {
+    return { found: false, message: `Couldn't get current weather for ${place} right now.` };
+  }
+
+  // relative_humidity_2m comes back as an hourly series, not part of current_weather itself —
+  // find the hourly entry whose timestamp matches current_weather.time.
+  let humidity = null;
+  const hourlyTimes = weatherData.hourly?.time;
+  const hourlyHumidity = weatherData.hourly?.relative_humidity_2m;
+  if (hourlyTimes && hourlyHumidity) {
+    const idx = hourlyTimes.indexOf(current.time);
+    if (idx !== -1) humidity = hourlyHumidity[idx];
+  }
+
+  const condition = WEATHER_CODES[current.weathercode] || 'Unknown conditions';
+  const locationLabel = [match.name, match.admin1, match.country].filter(Boolean).join(', ');
+
+  return {
+    location: locationLabel,
+    temperature: current.temperature,
+    condition,
+    humidity,
+    windSpeed: current.windspeed,
+    message: `${locationLabel}: ${current.temperature}°C, ${condition}${humidity != null ? `, ${humidity}% humidity` : ''}.`,
   };
 };
 

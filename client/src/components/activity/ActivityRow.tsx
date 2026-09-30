@@ -9,6 +9,9 @@ import { Badge, Icon, Text, VisibleDeleteButton, type IconName } from '../ui';
 
 export interface ActivityRowProps {
   activity: Activity;
+  /** Tapping the row's main body (icon + name) opens the view-only info modal — Edit stays
+   * an explicit, separate action (the pencil icon below), never triggered by this. */
+  onInfo: () => void;
   onEdit: () => void;
   onToggleFavorite: () => void;
   onMoveUp: () => void;
@@ -27,6 +30,7 @@ export interface ActivityRowProps {
 
 export function ActivityRow({
   activity,
+  onInfo,
   onEdit,
   onToggleFavorite,
   onMoveUp,
@@ -39,20 +43,22 @@ export function ActivityRow({
   const isCustom = activity.category === 'custom';
   return (
     <View className="flex-row items-center gap-3 rounded-xl border border-subtle bg-base p-3">
-      <View
-        className="h-10 w-10 items-center justify-center rounded-full"
-        style={{ backgroundColor: hexToRgba(activity.color, 0.1) }}
-      >
-        <Icon name={activity.icon as IconName} size={18} color={activity.color} />
-      </View>
+      <Pressable onPress={onInfo} className="flex-1 flex-row items-center gap-3">
+        <View
+          className="h-10 w-10 items-center justify-center rounded-full"
+          style={{ backgroundColor: hexToRgba(activity.color, 0.1) }}
+        >
+          <Icon name={activity.icon as IconName} size={18} color={activity.color} />
+        </View>
 
-      <View className="flex-1 flex-row flex-wrap items-center gap-2">
-        <Text variant="body" color="primary" className="font-medium">
-          {activity.name}
-        </Text>
-        {activity.category === 'custom' && <Badge label="Custom" variant="default" size="sm" />}
-        {activity.isArchived && <Badge label="Archived" variant="warning" size="sm" />}
-      </View>
+        <View className="flex-1 flex-row flex-wrap items-center gap-2">
+          <Text variant="body" color="primary" className="font-medium">
+            {activity.name}
+          </Text>
+          {activity.category === 'custom' && <Badge label="Custom" variant="default" size="sm" />}
+          {activity.isArchived && <Badge label="Archived" variant="warning" size="sm" />}
+        </View>
+      </Pressable>
 
       <View className="flex-row items-center">
         <Pressable

@@ -6,13 +6,24 @@ const { generateResponse, generateResponseStream, generateWithTools } = require(
 const router = express.Router();
 router.use(requireAuth);
 
+// A pasted essay would otherwise eat most of the model's context window on one message and
+// (on this account's Groq tier) risks tipping a request over the tokens-per-minute limit by
+// itself — see llmService.js's MODEL comment for how tight that budget already runs with the
+// full 15-tool schema. ~2000 chars is generous for an actual chat message (a few paragraphs)
+// while keeping worst-case prompt size predictable.
+const MAX_MESSAGE_LENGTH = 2000;
+
 // POST /api/chat — non-streaming response
 router.post('/', async (req, res) => {
   try {
-    const { message, history = [] } = req.body;
+    const { history = [], timezone } = req.body;
+    let { message } = req.body;
 
     if (!message || !message.trim()) {
       return res.status(400).json({ error: 'message is required' });
+    }
+    if (message.length > MAX_MESSAGE_LENGTH) {
+      message = message.slice(0, MAX_MESSAGE_LENGTH);
     }
 
     console.log(`[chat] user ${req.user.id.slice(0, 8)}: "${message.slice(0, 50)}..."`);
@@ -38,6 +49,7 @@ router.post('/', async (req, res) => {
       context: contextStr,
       stats,
       history,
+      timezone,
     });
     const duration = Date.now() - startTime;
 
@@ -64,10 +76,14 @@ router.post('/', async (req, res) => {
 // POST /api/chat/stream — streaming response via SSE
 router.post('/stream', async (req, res) => {
   try {
-    const { message, history = [] } = req.body;
+    const { history = [], timezone } = req.body;
+    let { message } = req.body;
 
     if (!message || !message.trim()) {
       return res.status(400).json({ error: 'message is required' });
+    }
+    if (message.length > MAX_MESSAGE_LENGTH) {
+      message = message.slice(0, MAX_MESSAGE_LENGTH);
     }
 
     // Set SSE headers
@@ -94,6 +110,7 @@ router.post('/stream', async (req, res) => {
         context: contextStr,
         stats,
         history,
+        timezone,
       })) {
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`);
       }

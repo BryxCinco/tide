@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ActivityFormModal, ActivityRow } from '@/components/activity';
+import { ActivityFormModal, ActivityInfoModal, ActivityRow } from '@/components/activity';
 import { AppLayout } from '@/components/layout';
 import { BackButton, Button, EmptyState, ErrorState, Input, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
 import { useActivityStore } from '@/store/activityStore';
@@ -11,6 +11,7 @@ import type { Activity } from '@/types/activity';
 interface GroupProps {
   title: string;
   items: Activity[];
+  onInfo: (activity: Activity) => void;
   onEdit: (activity: Activity) => void;
   onToggleFavorite: (id: string) => void;
   onReorder: (id: string, swapWithId: string) => void;
@@ -18,7 +19,7 @@ interface GroupProps {
   onToggleHide: (id: string, archived: boolean) => void;
 }
 
-function ActivityGroup({ title, items, onEdit, onToggleFavorite, onReorder, onDelete, onToggleHide }: GroupProps) {
+function ActivityGroup({ title, items, onInfo, onEdit, onToggleFavorite, onReorder, onDelete, onToggleHide }: GroupProps) {
   if (items.length === 0) return null;
 
   return (
@@ -31,6 +32,7 @@ function ActivityGroup({ title, items, onEdit, onToggleFavorite, onReorder, onDe
           <ActivityRow
             key={activity.id}
             activity={activity}
+            onInfo={() => onInfo(activity)}
             onEdit={() => onEdit(activity)}
             onToggleFavorite={() => onToggleFavorite(activity.id)}
             onMoveUp={() => index > 0 && onReorder(activity.id, items[index - 1].id)}
@@ -60,6 +62,8 @@ export default function ActivitiesScreen() {
   const [search, setSearch] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | undefined>(undefined);
+  const [infoActivity, setInfoActivity] = useState<Activity | undefined>(undefined);
+  const [infoVisible, setInfoVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
@@ -90,6 +94,11 @@ export default function ActivitiesScreen() {
   const openEdit = (activity: Activity) => {
     setEditingActivity(activity);
     setModalVisible(true);
+  };
+
+  const openInfo = (activity: Activity) => {
+    setInfoActivity(activity);
+    setInfoVisible(true);
   };
 
   return (
@@ -138,6 +147,7 @@ export default function ActivitiesScreen() {
                 <ActivityGroup
                   title="Favorites"
                   items={favorites}
+                  onInfo={openInfo}
                   onEdit={openEdit}
                   onToggleFavorite={toggleFavorite}
                   onReorder={reorderActivity}
@@ -147,6 +157,7 @@ export default function ActivitiesScreen() {
                 <ActivityGroup
                   title="Custom"
                   items={custom}
+                  onInfo={openInfo}
                   onEdit={openEdit}
                   onToggleFavorite={toggleFavorite}
                   onReorder={reorderActivity}
@@ -156,6 +167,7 @@ export default function ActivitiesScreen() {
                 <ActivityGroup
                   title="Pre-defined"
                   items={predefined}
+                  onInfo={openInfo}
                   onEdit={openEdit}
                   onToggleFavorite={toggleFavorite}
                   onReorder={reorderActivity}
@@ -165,6 +177,7 @@ export default function ActivitiesScreen() {
                 <ActivityGroup
                   title="Archived"
                   items={archived}
+                  onInfo={openInfo}
                   onEdit={openEdit}
                   onToggleFavorite={toggleFavorite}
                   onReorder={reorderActivity}
@@ -180,6 +193,16 @@ export default function ActivitiesScreen() {
           visible={modalVisible}
           onClose={() => setModalVisible(false)}
           activity={editingActivity}
+        />
+
+        <ActivityInfoModal
+          visible={infoVisible}
+          onClose={() => setInfoVisible(false)}
+          activity={infoActivity}
+          onEdit={(activity) => {
+            setInfoVisible(false);
+            openEdit(activity);
+          }}
         />
       </SafeAreaView>
     </AppLayout>

@@ -22,13 +22,11 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { OAuthCallbackScreen } from '@/components/auth';
-import { ChatPanel } from '@/components/chat';
 import { SearchModal } from '@/components/search';
 import { Loader, OfflineBanner, Toast } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
-import { useUiStore } from '@/store/uiStore';
 import { colors, darkColors } from '@/utils/theme';
 import { darkVars, lightVars } from '@/utils/themeVars';
 
@@ -145,7 +143,6 @@ function RootNavigator() {
   const theme = useThemeStore((s) => s.theme);
   const backgroundColor = theme === 'dark' ? darkColors.background.base : colors.background.base;
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const isChatOpen = useUiStore((s) => s.isChatOpen);
 
   // Cmd+K (Mac) / Ctrl+K (Windows/Linux) — web only, there's no keyboard shortcut
   // equivalent on native. Mounted here (not RootLayout) so it only ever fires once the
@@ -196,10 +193,6 @@ function RootNavigator() {
       </Stack>
 
       {isAuthenticated && <SearchModal visible={isSearchOpen} onClose={() => setIsSearchOpen(false)} />}
-      {/* Mounted only while open (not always-mounted + a `visible` prop) — matches
-          MobileDrawer's convention: no animated exit, just an instant unmount, with the
-          entrance slide-in handled inside ChatPanel itself. */}
-      {isAuthenticated && isChatOpen && <ChatPanel />}
     </>
   );
 }

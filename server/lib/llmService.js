@@ -46,21 +46,74 @@ Example responses:
 - "I don't have any sessions logged for this week yet. Want to start one?"
 
 Never use emojis. Never use markdown formatting (no **, no ##, no *).
-Just plain conversational text.`;
+Just plain conversational text.
+
+About TIDE (answer with this directly, no tool needed, when asked "what is TIDE"):
+"TIDE is a personal productivity app that helps you track your time, interests, diary
+entries, and daily tasks. It has an AI Coach (me!) that can help you plan, reflect, and
+stay on track."
+
+Your capabilities (answer with this directly, no tool needed, when asked "what can you do"):
+"I can: track your focus time, create and manage tasks, log your mood, summarize your
+week, analyze your productivity patterns, check the weather, and more."`;
+
+// Default when the client doesn't send its own IANA zone (see chat.js) and for getWeather's
+// own default location — this app's primary userbase, not a hardcoded assumption meant to
+// apply universally.
+const DEFAULT_TIMEZONE = 'Asia/Manila';
+
+/** "The current date and time is: ..., The user's timezone is: ..." — rebuilt fresh per
+ * request (never baked into the static SYSTEM_PROMPT) so "what time is it"/"what's the date
+ * today" are answered directly from this fact, no tool call needed, and are actually correct
+ * for whenever the request happens to land. */
+function buildDatetimeMessage(timezone) {
+  const tz = timezone || DEFAULT_TIMEZONE;
+  const currentDateTime = new Date().toLocaleString('en-US', {
+    timeZone: tz,
+    dateStyle: 'full',
+    timeStyle: 'short',
+  });
+  return {
+    role: 'system',
+    content: `The current date and time is: ${currentDateTime}. The user's timezone is: ${tz}.`,
+  };
+}
 
 // Appended only for generateWithTools — plain generateResponse/generateResponseStream never
 // have tools available, so this instruction would be dead weight there.
-const TOOLS_SAFETY_NOTE = `You have access to tools that can create tasks, complete tasks,
-log mood, start a timer, and read the user's stats. If the user asks you to DELETE or REMOVE
-something (a task, a journal entry, a session), DO NOT do it — no delete tool exists yet.
-Instead say you can't delete it yet and ask them to confirm what they want, or do it from
-the app directly. Only call a tool when the user's intent is clear and unambiguous; if a
-detail is genuinely ambiguous (for example, which of several similarly-named tasks to
-complete), ask a short clarifying question instead of guessing.`;
+const TOOLS_SAFETY_NOTE = `You have access to these tools — call one whenever it matches
+what the user is asking for, instead of just describing what you would do:
 
-async function generateResponse({ userQuery, context, stats, history = [] }) {
+Tasks: createTask, listTasks, updateTask, completeTask, rescheduleTask, deleteTask
+Mood & journal: logMood, getMoodHistory, addJournalEntry, searchJournals
+Time & stats: startTimer, getTodayStats, getWeeklySummary, getActivityStats, getStreakInfo
+Other: getWeather (ask which location if the user doesn't say one and hasn't got a usual
+city from context — otherwise it defaults to Manila)
+
+You already know the current date and time (see below) and don't need a tool for "what
+time is it" or "what's the date today" — just answer directly from that fact.
+
+Date ranges: if the user gives a task a range like "Oct 21-27" or "next week", call
+createTask/updateTask with dueDateStart + dueDateEnd (both ISO dates) instead of dueDate.
+Use dueDate only for a single specific day.
+
+DELETE CONFIRMATION — deleteTask is destructive and has a required two-step flow:
+1. First call deleteTask with confirm omitted/false. It will NOT delete anything — it just
+   returns a message asking the user to confirm. Relay that exact message to the user and
+   stop there; do not call the tool again in the same reply.
+2. Only on the user's NEXT message, if they clearly say yes/confirm/do it/go ahead (and are
+   replying to that same confirmation question), call deleteTask again for the same task
+   with confirm:true. If they decline or change the subject, do not call it again.
+Never pass confirm:true on a first attempt, and never delete anything via updateTask or any
+other tool as a workaround.
+
+Only call a tool when the user's intent is clear and unambiguous; if a detail is genuinely
+ambiguous (for example, which of several similarly-named tasks they mean), ask a short
+clarifying question instead of guessing.`;
+
+async function generateResponse({ userQuery, context, stats, history = [], timezone }) {
   // Build messages array
-  const messages = [{ role: 'system', content: SYSTEM_PROMPT }];
+  const messages = [{ role: 'system', content: SYSTEM_PROMPT }, buildDatetimeMessage(timezone)];
 
   // Add context as a system message if available
   if (context && context.trim()) {
@@ -96,8 +149,8 @@ async function generateResponse({ userQuery, context, stats, history = [] }) {
   };
 }
 
-async function* generateResponseStream({ userQuery, context, stats, history = [] }) {
-  const messages = [{ role: 'system', content: SYSTEM_PROMPT }];
+async function* generateResponseStream({ userQuery, context, stats, history = [], timezone }) {
+  const messages = [{ role: 'system', content: SYSTEM_PROMPT }, buildDatetimeMessage(timezone)];
 
   if (context && context.trim()) {
     messages.push({
@@ -133,10 +186,11 @@ async function* generateResponseStream({ userQuery, context, stats, history = []
 // Groq's function-calling tools. `userId` isn't part of the LLM conversation at all; it's
 // threaded through purely so each executed tool call knows whose data to touch, since
 // toolHandlers.* all take { userId, ...args }.
-async function generateWithTools({ userId, userQuery, context, stats, history = [] }) {
+async function generateWithTools({ userId, userQuery, context, stats, history = [], timezone }) {
   const messages = [
     { role: 'system', content: SYSTEM_PROMPT },
     { role: 'system', content: TOOLS_SAFETY_NOTE },
+    buildDatetimeMessage(timezone),
   ];
 
   if (context && context.trim()) {
@@ -222,4 +276,5 @@ module.exports = {
   generateWithTools,
   MODEL,
   SYSTEM_PROMPT,
+  DEFAULT_TIMEZONE,
 };

@@ -10,7 +10,7 @@ import { useTaskStore } from '../../store/taskStore';
 import type { Task, TaskPriority, TaskStatus } from '../../types/task';
 import { cn } from '../../utils/cn';
 import { confirmAsync } from '../../utils/confirm';
-import { formatDateKeyShort } from '../../utils/formatDate';
+import { formatDateKeyShort, toDateKey } from '../../utils/formatDate';
 import { shadows } from '../../utils/theme';
 import { Button, CalendarPicker, Icon, Input, Modal, Text, type IconName } from '../ui';
 
@@ -33,6 +33,16 @@ const PRIORITY_OPTIONS: { value: TaskPriority; label: string }[] = [
   { value: 'high', label: 'High' },
   { value: 'critical', label: 'Critical' },
 ];
+
+type DateMode = 'single' | 'range';
+
+const DATE_MODE_OPTIONS: { value: DateMode; label: string }[] = [
+  { value: 'single', label: 'Single Date' },
+  { value: 'range', label: 'Date Range' },
+];
+
+/** Which date field the nested CalendarPicker modal is currently editing. */
+type CalendarTarget = 'single' | 'start' | 'end' | null;
 
 function PillOption<T extends string>({
   value,
@@ -84,13 +94,18 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
   const [status, setStatus] = useState<TaskStatus>('todo');
   const [priority, setPriority] = useState<TaskPriority>('medium');
   const [dueDate, setDueDate] = useState('');
+  const [dateMode, setDateMode] = useState<DateMode>('single');
+  const [rangeStart, setRangeStart] = useState('');
+  const [rangeEnd, setRangeEnd] = useState('');
   const [linkedActivityId, setLinkedActivityId] = useState<string | undefined>(undefined);
   const [tags, setTags] = useState<string[]>([]);
   const [tagDraft, setTagDraft] = useState('');
   const [isTagFocused, setIsTagFocused] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activityError, setActivityError] = useState<string | null>(null);
-  const [calendarVisible, setCalendarVisible] = useState(false);
+  const [dateError, setDateError] = useState<string | null>(null);
+  const [calendarTarget, setCalendarTarget] = useState<CalendarTarget>(null);
+  const todayKey = useMemo(() => toDateKey(new Date()), []);
 
   const isEditing = Boolean(task);
 
@@ -100,13 +115,24 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
     setDescription(task?.description ?? '');
     setStatus(task?.status ?? 'todo');
     setPriority(task?.priority ?? 'medium');
-    setDueDate(task?.dueDate ?? '');
+    if (task?.dueDateStart && task?.dueDateEnd) {
+      setDateMode('range');
+      setRangeStart(task.dueDateStart);
+      setRangeEnd(task.dueDateEnd);
+      setDueDate('');
+    } else {
+      setDateMode('single');
+      setDueDate(task?.dueDate ?? '');
+      setRangeStart('');
+      setRangeEnd('');
+    }
     setLinkedActivityId(task?.linkedActivityId);
     setTags(task?.tags ?? []);
     setTagDraft('');
     setError(null);
     setActivityError(null);
-    setCalendarVisible(false);
+    setDateError(null);
+    setCalendarTarget(null);
   }, [visible, task]);
 
   const addTagFromDraft = () => {
@@ -129,22 +155,42 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
       setError('Give this task a title.');
       hasError = true;
     }
+    if (dateMode === 'range') {
+      if (!rangeStart || !rangeEnd) {
+        setDateError('Pick both a start and end date.');
+        hasError = true;
+      } else if (rangeEnd < rangeStart) {
+        setDateError('End date must be on or after the start date.');
+        hasError = true;
+      }
+    }
     if (hasError) return;
 
-    const payload = {
+    const base = {
       title: trimmedTitle,
       description: description.trim() || undefined,
       status,
       priority,
-      dueDate: dueDate.trim() || undefined,
       linkedActivityId,
       tags,
     };
 
     if (task) {
-      updateTask(task.id, payload);
+      // Editing: switching modes must actively clear whichever date fields the OTHER mode
+      // owns — a plain `undefined` wouldn't do that server-side (see UpdateTaskPayload's
+      // comment on why this needs an explicit `null`).
+      updateTask(
+        task.id,
+        dateMode === 'range'
+          ? { ...base, dueDate: rangeStart, dueDateStart: rangeStart, dueDateEnd: rangeEnd }
+          : { ...base, dueDate: dueDate.trim() || undefined, dueDateStart: null, dueDateEnd: null },
+      );
     } else {
-      addTask(payload);
+      addTask(
+        dateMode === 'range'
+          ? { ...base, dueDate: rangeStart, dueDateStart: rangeStart, dueDateEnd: rangeEnd }
+          : { ...base, dueDate: dueDate.trim() || undefined },
+      );
     }
     onClose();
   };
@@ -241,20 +287,59 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
             <Text variant="label" color="muted">
               Due date
             </Text>
-            <Pressable
-              onPress={() => setCalendarVisible(true)}
-              className="h-11 flex-row items-center gap-2.5 rounded-xl border border-subtle bg-base px-3.5 hover:border-default"
-            >
-              <Icon name="Calendar" size={16} color={dueDate ? themeColors.brand.tideTeal : themeColors.text.disabled} />
-              <Text variant="body" color={dueDate ? 'primary' : 'muted'} className="flex-1 normal-case tracking-normal">
-                {dueDate ? formatDateKeyShort(dueDate) : 'Select a date'}
-              </Text>
-              {dueDate && (
-                <Pressable onPress={() => setDueDate('')} hitSlop={8} className="h-6 w-6 items-center justify-center rounded-full hover:bg-elevated">
-                  <Icon name="X" size={14} color={themeColors.text.muted} />
+            <View className="flex-row flex-wrap gap-2">
+              {DATE_MODE_OPTIONS.map((option) => (
+                <PillOption
+                  key={option.value}
+                  value={option.value}
+                  label={option.label}
+                  selected={dateMode === option.value}
+                  onPress={(mode) => {
+                    setDateMode(mode);
+                    if (dateError) setDateError(null);
+                  }}
+                />
+              ))}
+            </View>
+
+            {dateMode === 'single' ? (
+              <Pressable
+                onPress={() => setCalendarTarget('single')}
+                className="h-11 flex-row items-center gap-2.5 rounded-xl border border-subtle bg-base px-3.5 hover:border-default"
+              >
+                <Icon name="Calendar" size={16} color={dueDate ? themeColors.brand.tideTeal : themeColors.text.disabled} />
+                <Text variant="body" color={dueDate ? 'primary' : 'muted'} className="flex-1 normal-case tracking-normal">
+                  {dueDate ? formatDateKeyShort(dueDate) : 'Select a date'}
+                </Text>
+                {dueDate && (
+                  <Pressable onPress={() => setDueDate('')} hitSlop={8} className="h-6 w-6 items-center justify-center rounded-full hover:bg-elevated">
+                    <Icon name="X" size={14} color={themeColors.text.muted} />
+                  </Pressable>
+                )}
+              </Pressable>
+            ) : (
+              <View className="flex-row gap-2">
+                <Pressable
+                  onPress={() => setCalendarTarget('start')}
+                  className="h-11 flex-1 flex-row items-center gap-2 rounded-xl border border-subtle bg-base px-3 hover:border-default"
+                >
+                  <Icon name="Calendar" size={16} color={rangeStart ? themeColors.brand.tideTeal : themeColors.text.disabled} />
+                  <Text variant="body" color={rangeStart ? 'primary' : 'muted'} className="flex-1 normal-case tracking-normal">
+                    {rangeStart ? formatDateKeyShort(rangeStart) : 'Start date'}
+                  </Text>
                 </Pressable>
-              )}
-            </Pressable>
+                <Pressable
+                  onPress={() => setCalendarTarget('end')}
+                  className="h-11 flex-1 flex-row items-center gap-2 rounded-xl border border-subtle bg-base px-3 hover:border-default"
+                >
+                  <Icon name="Calendar" size={16} color={rangeEnd ? themeColors.brand.tideTeal : themeColors.text.disabled} />
+                  <Text variant="body" color={rangeEnd ? 'primary' : 'muted'} className="flex-1 normal-case tracking-normal">
+                    {rangeEnd ? formatDateKeyShort(rangeEnd) : 'End date'}
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+            {dateError && <RNText className="text-caption text-error">{dateError}</RNText>}
           </View>
 
           <View className="gap-2">
@@ -306,24 +391,46 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
       </ScrollView>
 
       {/* Nested modal — RNModal portals independently, so stacking this on top of the
-          already-open task form modal is safe (last-mounted renders on top). */}
-      <Modal visible={calendarVisible} onClose={() => setCalendarVisible(false)} title="Due Date" icon="Calendar" size="sm">
+          already-open task form modal is safe (last-mounted renders on top). Serves all
+          three date fields (single / range start / range end) — `calendarTarget` picks
+          which one is being edited, so there's one shared calendar instead of three. Past
+          dates are disabled (minDate=today) EXCEPT the field's own already-set value, so
+          editing a task that already has a past date keeps that exact date pickable without
+          reopening every other past date too — see CalendarPicker.tsx's isDisabled. */}
+      <Modal
+        visible={calendarTarget !== null}
+        onClose={() => setCalendarTarget(null)}
+        title={calendarTarget === 'start' ? 'Start Date' : calendarTarget === 'end' ? 'End Date' : 'Due Date'}
+        icon="Calendar"
+        size="sm"
+      >
         <View className="items-center gap-4">
           <CalendarPicker
-            value={dueDate || undefined}
+            value={(calendarTarget === 'start' ? rangeStart : calendarTarget === 'end' ? rangeEnd : dueDate) || undefined}
+            minDate={calendarTarget === 'end' ? rangeStart || todayKey : todayKey}
             onChange={(key) => {
-              setDueDate(key);
-              setCalendarVisible(false);
+              if (calendarTarget === 'start') {
+                setRangeStart(key);
+                // Keep the range valid — a start moved past the current end pulls the end
+                // forward with it rather than leaving an invalid start > end pair.
+                if (rangeEnd && key > rangeEnd) setRangeEnd(key);
+              } else if (calendarTarget === 'end') {
+                setRangeEnd(key);
+              } else {
+                setDueDate(key);
+              }
+              if (dateError) setDateError(null);
+              setCalendarTarget(null);
             }}
           />
-          {dueDate && (
+          {calendarTarget === 'single' && dueDate && (
             <Button
               title="Clear date"
               variant="ghost"
               size="sm"
               onPress={() => {
                 setDueDate('');
-                setCalendarVisible(false);
+                setCalendarTarget(null);
               }}
             />
           )}

@@ -26,6 +26,14 @@ export function formatDateKeyShort(key: string): string {
   return fromDateKey(key).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+/** "Oct 21" — no year, for TaskCard's compact single-line display ("Due Oct 21" or, for a
+ * range, "Oct 21 - Oct 27"). The card already crops to one line, so the year would just be
+ * noise there — unlike the Due Date field above, which is the one place a task's date is
+ * unambiguous enough to skip repeating the year on every card in a list. */
+export function formatDateKeyCompact(key: string): string {
+  return fromDateKey(key).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 /** "Today" / "Yesterday" / "Sep 21" (adds the year only when it isn't the current one). */
 export function formatEntryDate(iso: string): string {
   const date = new Date(iso);

@@ -84,7 +84,12 @@ export function CalendarPicker({ value, onChange, minDate, maxDate }: CalendarPi
     setMonthAnchor((prev) => new Date(prev.getFullYear(), prev.getMonth() + offset, 1));
   };
 
-  const isDisabled = (dateKey: string) => Boolean((minDate && dateKey < minDate) || (maxDate && dateKey > maxDate));
+  // The already-selected value is never disabled, even if it falls outside [minDate,
+  // maxDate] — this is what lets a task keep its existing past due date selectable while
+  // editing (TaskFormModal always passes minDate=today), without every other past date
+  // opening back up too.
+  const isDisabled = (dateKey: string) =>
+    dateKey !== value && Boolean((minDate && dateKey < minDate) || (maxDate && dateKey > maxDate));
 
   return (
     <View style={{ width: 296 }}>

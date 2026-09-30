@@ -29,7 +29,11 @@ function buildTaskContent(task) {
   if (task.title) parts.push(`Task: ${task.title}`);
   if (task.status) parts.push(`Status: ${task.status}`);
   if (task.priority) parts.push(`Priority: ${task.priority}`);
-  if (task.due_date) parts.push(`Due: ${new Date(task.due_date).toDateString()}`);
+  if (task.due_date_start && task.due_date_end) {
+    parts.push(`Due: ${new Date(task.due_date_start).toDateString()} to ${new Date(task.due_date_end).toDateString()}`);
+  } else if (task.due_date) {
+    parts.push(`Due: ${new Date(task.due_date).toDateString()}`);
+  }
   if (task.description) parts.push(`Description: ${task.description}`);
   return parts.join('\n');
 }
