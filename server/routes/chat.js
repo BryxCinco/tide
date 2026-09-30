@@ -1,7 +1,7 @@
 const express = require('express');
 const { requireAuth } = require('../middleware/auth');
 const { retrieveRelevantContext, retrieveStats, buildContextString } = require('../lib/ragService');
-const { generateResponse, generateResponseStream } = require('../lib/llmService');
+const { generateResponse, generateResponseStream, generateWithTools } = require('../lib/llmService');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -29,9 +29,11 @@ router.post('/', async (req, res) => {
     // are written against.
     const contextStr = buildContextString(context);
 
-    // Generate response
+    // Generate response — Phase 11.5: agentic, can call tools (create/complete tasks, log
+    // mood, start a timer, read stats) instead of only ever answering in text.
     const startTime = Date.now();
-    const response = await generateResponse({
+    const response = await generateWithTools({
+      userId: req.user.id,
       userQuery: message,
       context: contextStr,
       stats,
@@ -39,12 +41,15 @@ router.post('/', async (req, res) => {
     });
     const duration = Date.now() - startTime;
 
-    console.log(`[chat] response in ${duration}ms, tokens: ${response.usage?.total_tokens}`);
+    console.log(
+      `[chat] response in ${duration}ms, tokens: ${response.usage?.total_tokens}, tools: ${response.toolsUsed.join(', ') || 'none'}`,
+    );
 
     res.json({
       message: response.content,
       usage: response.usage,
       contextUsed: context.length,
+      toolsUsed: response.toolsUsed,
       durationMs: duration,
     });
   } catch (err) {

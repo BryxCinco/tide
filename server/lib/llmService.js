@@ -1,4 +1,5 @@
 const Groq = require('groq-sdk');
+const { tools, toolHandlers } = require('./tools');
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
@@ -46,6 +47,16 @@ Example responses:
 
 Never use emojis. Never use markdown formatting (no **, no ##, no *).
 Just plain conversational text.`;
+
+// Appended only for generateWithTools — plain generateResponse/generateResponseStream never
+// have tools available, so this instruction would be dead weight there.
+const TOOLS_SAFETY_NOTE = `You have access to tools that can create tasks, complete tasks,
+log mood, start a timer, and read the user's stats. If the user asks you to DELETE or REMOVE
+something (a task, a journal entry, a session), DO NOT do it — no delete tool exists yet.
+Instead say you can't delete it yet and ask them to confirm what they want, or do it from
+the app directly. Only call a tool when the user's intent is clear and unambiguous; if a
+detail is genuinely ambiguous (for example, which of several similarly-named tasks to
+complete), ask a short clarifying question instead of guessing.`;
 
 async function generateResponse({ userQuery, context, stats, history = [] }) {
   // Build messages array
@@ -118,9 +129,97 @@ async function* generateResponseStream({ userQuery, context, stats, history = []
   }
 }
 
+// Agentic variant (Phase 11.5) — same context/history assembly as generateResponse, plus
+// Groq's function-calling tools. `userId` isn't part of the LLM conversation at all; it's
+// threaded through purely so each executed tool call knows whose data to touch, since
+// toolHandlers.* all take { userId, ...args }.
+async function generateWithTools({ userId, userQuery, context, stats, history = [] }) {
+  const messages = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: TOOLS_SAFETY_NOTE },
+  ];
+
+  if (context && context.trim()) {
+    messages.push({
+      role: 'system',
+      content: `Here is the user's relevant context:\n\n${context}\n\nStats:\n${JSON.stringify(stats, null, 2)}`,
+    });
+  }
+
+  const recentHistory = history.slice(-10);
+  for (const msg of recentHistory) {
+    messages.push({ role: msg.role, content: msg.content });
+  }
+
+  messages.push({ role: 'user', content: userQuery });
+
+  const toolsUsed = [];
+  let rounds = 0;
+
+  // Capped at 3 rounds of tool calls — a well-behaved conversation resolves in 1 (call a
+  // tool, get a result, answer), so 3 is headroom for a multi-step request, not a budget
+  // meant to be exhausted; if it is, something's looping and the fallback message below fires.
+  while (rounds < 3) {
+    const response = await groq.chat.completions.create({
+      model: MODEL,
+      messages,
+      tools,
+      tool_choice: 'auto',
+      temperature: 0.7,
+      max_tokens: 500,
+    });
+
+    const message = response.choices[0]?.message;
+    if (!message) {
+      return { content: '', usage: response.usage, toolsUsed };
+    }
+
+    messages.push(message);
+
+    if (!message.tool_calls || message.tool_calls.length === 0) {
+      return { content: message.content || '', usage: response.usage, toolsUsed };
+    }
+
+    for (const toolCall of message.tool_calls) {
+      const fnName = toolCall.function.name;
+      toolsUsed.push(fnName);
+
+      let args;
+      try {
+        args = JSON.parse(toolCall.function.arguments);
+      } catch (err) {
+        args = {};
+      }
+
+      const handler = toolHandlers[fnName];
+      let result;
+      if (!handler) {
+        result = { error: `Unknown tool: ${fnName}` };
+      } else {
+        try {
+          result = await handler({ userId, ...args });
+        } catch (err) {
+          result = { error: err.message };
+        }
+      }
+
+      messages.push({
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        content: JSON.stringify(result),
+      });
+    }
+
+    rounds += 1;
+  }
+
+  return { content: "Something went wrong. Please try again.", usage: null, toolsUsed };
+}
+
 module.exports = {
   generateResponse,
   generateResponseStream,
+  generateWithTools,
   MODEL,
   SYSTEM_PROMPT,
 };

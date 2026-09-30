@@ -9,7 +9,19 @@ const router = express.Router();
 // deletion (below) can't silently miss one if a table gets added later without remembering
 // to update this. `profiles` isn't here — it's keyed by `id`, not `user_id`, and is deleted
 // separately after these.
-const USER_SCOPED_TABLES = ['tasks', 'journal_entries', 'time_logs', 'activities', 'quests', 'streaks', 'user_settings'];
+const USER_SCOPED_TABLES = [
+  'tasks',
+  'journal_entries',
+  'time_logs',
+  'activities',
+  'quests',
+  'streaks',
+  'user_settings',
+  // Added post-Phase 11.2 — embeddings.user_id references auth.users, so leaving old rows
+  // behind here was blocking supabaseAdmin.auth.admin.deleteUser() with a foreign-key
+  // "Database error deleting user" (found via a throwaway test-account delete during 11.5).
+  'embeddings',
+];
 
 // POST /api/auth/signup — creates the auth.users row; the DB trigger (handle_new_user)
 // auto-creates matching profiles/user_settings/streaks rows from raw_user_meta_data.name.
@@ -159,7 +171,10 @@ router.delete('/account', requireAuth, async (req, res) => {
     if (profileError) return res.status(500).json({ error: `Failed to delete profile: ${profileError.message}` });
 
     const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
-    if (authDeleteError) return res.status(500).json({ error: authDeleteError.message });
+    if (authDeleteError) {
+      console.error(`[auth] deleteUser failed for ${userId}:`, authDeleteError.message);
+      return res.status(500).json({ error: authDeleteError.message });
+    }
 
     res.json({ success: true });
   } catch (err) {
