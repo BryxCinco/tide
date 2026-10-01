@@ -93,10 +93,6 @@ city from context — otherwise it defaults to Manila)
 You already know the current date and time (see below) and don't need a tool for "what
 time is it" or "what's the date today" — just answer directly from that fact.
 
-Date ranges: if the user gives a task a range like "Oct 21-27" or "next week", call
-createTask/updateTask with dueDateStart + dueDateEnd (both ISO dates) instead of dueDate.
-Use dueDate only for a single specific day.
-
 DELETE CONFIRMATION — deleteTask is destructive and has a required two-step flow:
 1. First call deleteTask with confirm omitted/false. It will NOT delete anything — it just
    returns a message asking the user to confirm. Relay that exact message to the user and

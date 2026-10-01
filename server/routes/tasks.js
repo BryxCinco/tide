@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { title, description, status, priority, activity_type, due_date, due_date_start, due_date_end, tags } = req.body;
+  const { title, description, status, priority, activity_type, due_date, tags } = req.body;
 
   if (!title) return res.status(400).json({ error: 'title is required' });
 
@@ -32,8 +32,6 @@ router.post('/', async (req, res) => {
       priority,
       activity_type,
       due_date,
-      due_date_start,
-      due_date_end,
       tags,
     })
     .select()
@@ -53,9 +51,9 @@ router.post('/', async (req, res) => {
 });
 
 router.patch('/:id', async (req, res) => {
-  const { title, description, status, priority, activity_type, due_date, due_date_start, due_date_end, tags } = req.body;
+  const { title, description, status, priority, activity_type, due_date, tags } = req.body;
 
-  const update = { title, description, status, priority, activity_type, due_date, due_date_start, due_date_end, tags };
+  const update = { title, description, status, priority, activity_type, due_date, tags };
   // completed_at follows status unless the caller passes it explicitly.
   if (req.body.completed_at !== undefined) {
     update.completed_at = req.body.completed_at;

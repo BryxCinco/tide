@@ -30,12 +30,7 @@ export interface TaskCardProps {
 export function TaskCard({ task, activityName, onToggle, onView, onEdit, onDelete }: TaskCardProps) {
   const isDone = task.status === 'done';
   const priority = PRIORITY_BADGE[task.priority];
-  const dateLabel =
-    task.dueDateStart && task.dueDateEnd
-      ? `${formatDateKeyCompact(task.dueDateStart)} - ${formatDateKeyCompact(task.dueDateEnd)}`
-      : task.dueDate
-        ? `Due ${formatDateKeyCompact(task.dueDate)}`
-        : null;
+  const dateLabel = task.dueDate ? `Due ${formatDateKeyCompact(task.dueDate)}` : null;
 
   return (
     <View className="flex-row items-start gap-3 rounded-xl border border-subtle bg-base p-3">

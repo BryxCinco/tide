@@ -10,8 +10,6 @@ export interface ApiTask {
   priority: string;
   activity_type: string | null;
   due_date: string | null;
-  due_date_start: string | null;
-  due_date_end: string | null;
   completed_at: string | null;
   is_withdrawn: boolean;
   tags: string[] | null;
@@ -24,23 +22,14 @@ export interface CreateTaskPayload {
   status: TaskStatus;
   priority: TaskPriority;
   dueDate?: string;
-  dueDateStart?: string;
-  dueDateEnd?: string;
   linkedActivityId?: string;
   tags: string[];
 }
 
-export type UpdateTaskPayload = Partial<Omit<Task, 'id' | 'createdAt' | 'completedAt' | 'dueDateStart' | 'dueDateEnd'>> & {
+export type UpdateTaskPayload = Partial<Omit<Task, 'id' | 'createdAt' | 'completedAt'>> & {
   /** `null` explicitly clears completed_at server-side (e.g. un-completing a task) — plain
    * `undefined` leaves it alone so the server's own status-based auto-set logic applies. */
   completedAt?: string | null;
-  /** Same `null`-clears/`undefined`-leaves-alone distinction as completedAt — needed when
-   * TaskFormModal switches a task from "Date Range" back to "Single Date" and has to
-   * actually clear the two range columns server-side, not just stop sending them (a plain
-   * `undefined` field is dropped by JSON.stringify, so the old range would silently survive
-   * the PATCH untouched). */
-  dueDateStart?: string | null;
-  dueDateEnd?: string | null;
 };
 
 /**
@@ -63,8 +52,6 @@ function mapApiTask(row: ApiTask): Task {
     // only ever stores/displays the plain "YYYY-MM-DD" key (see TaskCard's raw
     // `{task.dueDate}` render), so just take the date portion.
     dueDate: row.due_date ? row.due_date.slice(0, 10) : undefined,
-    dueDateStart: row.due_date_start ? row.due_date_start.slice(0, 10) : undefined,
-    dueDateEnd: row.due_date_end ? row.due_date_end.slice(0, 10) : undefined,
     linkedActivityId: row.activity_type ?? undefined,
     tags: row.tags ?? [],
     createdAt: row.created_at,
@@ -86,8 +73,6 @@ export const taskService = {
       priority: payload.priority,
       activity_type: payload.linkedActivityId,
       due_date: payload.dueDate,
-      due_date_start: payload.dueDateStart,
-      due_date_end: payload.dueDateEnd,
       tags: payload.tags,
     });
     return mapApiTask(data.task);
@@ -101,8 +86,6 @@ export const taskService = {
       priority: payload.priority,
       activity_type: payload.linkedActivityId,
       due_date: payload.dueDate,
-      due_date_start: payload.dueDateStart,
-      due_date_end: payload.dueDateEnd,
       tags: payload.tags,
       completed_at: payload.completedAt,
     });

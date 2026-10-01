@@ -49,8 +49,7 @@ const tools = [
     type: 'function',
     function: {
       name: 'createTask',
-      description:
-        'Create a new task for the user to track and complete later. Supports either a single due date or a date range (e.g. "Oct 21-27").',
+      description: 'Create a new task for the user to track and complete later.',
       parameters: {
         type: 'object',
         properties: {
@@ -63,16 +62,7 @@ const tools = [
           },
           dueDate: {
             type: 'string',
-            description: 'Single due date as an ISO 8601 date (e.g. 2026-10-05). Omit this if using a date range instead.',
-          },
-          dueDateStart: {
-            type: 'string',
-            description:
-              'Start of a due date RANGE, ISO 8601 (e.g. 2026-10-21). Use this + dueDateEnd instead of dueDate when the user gives a range like "Oct 21-27" or "next week".',
-          },
-          dueDateEnd: {
-            type: 'string',
-            description: 'End of a due date RANGE, ISO 8601 (e.g. 2026-10-27). Always paired with dueDateStart.',
+            description: 'Due date as an ISO 8601 date (e.g. 2026-10-05).',
           },
           activityType: {
             type: 'string',
@@ -140,8 +130,7 @@ const tools = [
               priority: { type: 'string', enum: ['low', 'medium', 'high', 'critical'] },
               status: { type: 'string', enum: ['todo', 'in-progress', 'done'] },
               description: { type: 'string' },
-              dueDateStart: { type: 'string', description: 'ISO 8601 date. Pair with dueDateEnd for a range.' },
-              dueDateEnd: { type: 'string', description: 'ISO 8601 date.' },
+              dueDate: { type: 'string', description: 'ISO 8601 date.' },
             },
           },
         },
@@ -390,7 +379,7 @@ function embedTaskInBackground(userId, task) {
 
 const toolHandlers = {};
 
-toolHandlers.createTask = async ({ userId, title, description, priority, dueDate, dueDateStart, dueDateEnd, activityType }) => {
+toolHandlers.createTask = async ({ userId, title, description, priority, dueDate, activityType }) => {
   // The tool schema marks `title` required, but that's a hint to the model, not an
   // API-enforced guarantee — unlike the REST route (routes/tasks.js), this handler talks
   // to Supabase directly, bypassing that route's own `if (!title)` check entirely. Without
@@ -408,12 +397,7 @@ toolHandlers.createTask = async ({ userId, title, description, priority, dueDate
       description,
       status: 'todo',
       priority: priority || 'medium',
-      // A range's start doubles as `due_date` so existing date-based sort/filter (which only
-      // knows about that single column) still places range tasks correctly — see
-      // migrations/006_task_date_range.sql's comment.
-      due_date: dueDateStart || dueDate,
-      due_date_start: dueDateStart,
-      due_date_end: dueDateEnd,
+      due_date: dueDate,
       activity_type: activityType,
     })
     .select()
@@ -423,7 +407,7 @@ toolHandlers.createTask = async ({ userId, title, description, priority, dueDate
 
   embedTaskInBackground(userId, data);
 
-  const dateNote = dueDateStart && dueDateEnd ? ` (due ${dueDateStart} to ${dueDateEnd})` : dueDate ? ` (due ${dueDate})` : '';
+  const dateNote = dueDate ? ` (due ${dueDate})` : '';
   return { task: data, message: `Created task: "${data.title}"${dateNote}` };
 };
 
@@ -474,9 +458,7 @@ toolHandlers.updateTask = async ({ userId, taskTitle, updates = {} }) => {
   if (updates.title !== undefined) patch.title = updates.title;
   if (updates.priority !== undefined) patch.priority = updates.priority;
   if (updates.description !== undefined) patch.description = updates.description;
-  if (updates.dueDateStart !== undefined) patch.due_date_start = updates.dueDateStart;
-  if (updates.dueDateEnd !== undefined) patch.due_date_end = updates.dueDateEnd;
-  if (updates.dueDateStart !== undefined) patch.due_date = updates.dueDateStart;
+  if (updates.dueDate !== undefined) patch.due_date = updates.dueDate;
   if (updates.status !== undefined) {
     patch.status = updates.status;
     patch.completed_at = updates.status === 'done' ? new Date().toISOString() : null;
@@ -528,10 +510,9 @@ toolHandlers.rescheduleTask = async ({ userId, taskTitle, newDueDate }) => {
     return { matched: false, message: `I couldn't find a task matching "${taskTitle}".` };
   }
 
-  // Rescheduling to a single new date supersedes any existing range.
   const { data, error } = await supabaseAdmin
     .from('tasks')
-    .update({ due_date: newDueDate, due_date_start: null, due_date_end: null })
+    .update({ due_date: newDueDate })
     .eq('id', match.id)
     .eq('user_id', userId)
     .select()

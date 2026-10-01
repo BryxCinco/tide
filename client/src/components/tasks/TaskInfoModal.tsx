@@ -58,12 +58,7 @@ export function TaskInfoModal({ visible, onClose, task, activityName, onToggle, 
 
   const isDone = task.status === 'done';
   const priority = PRIORITY_BADGE[task.priority];
-  const dateLabel =
-    task.dueDateStart && task.dueDateEnd
-      ? `${formatDateKeyShort(task.dueDateStart)} - ${formatDateKeyShort(task.dueDateEnd)}`
-      : task.dueDate
-        ? formatDateKeyShort(task.dueDate)
-        : null;
+  const dateLabel = task.dueDate ? formatDateKeyShort(task.dueDate) : null;
 
   const handleDelete = async () => {
     const confirmed = await confirmAsync('Delete task?', `"${task.title}" will be removed. This can't be undone.`);
@@ -96,7 +91,7 @@ export function TaskInfoModal({ visible, onClose, task, activityName, onToggle, 
         </View>
 
         <View className="gap-3 rounded-xl border border-subtle bg-base p-4">
-          {dateLabel && <InfoRow icon="Calendar" label={task.dueDateStart ? 'Date range' : 'Due date'} value={dateLabel} />}
+          {dateLabel && <InfoRow icon="Calendar" label="Due date" value={dateLabel} />}
           <InfoRow icon="CalendarPlus" label="Created" value={formatEntryDate(task.createdAt)} />
           {task.completedAt && <InfoRow icon="CheckCircle2" label="Completed" value={formatEntryDate(task.completedAt)} />}
         </View>
