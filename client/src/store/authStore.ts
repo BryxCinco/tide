@@ -19,6 +19,7 @@ import { useActivityStore } from './activityStore';
 import { useJournalStore } from './journalStore';
 import { useLevelStore } from './levelStore';
 import { useQuestStore } from './questStore';
+import { useSettingsStore } from './settingsStore';
 import { useTaskStore } from './taskStore';
 import { useTimerStore } from './timerStore';
 
@@ -49,6 +50,7 @@ function resetDomainStores(): void {
   useQuestStore.getState().reset();
   useTimerStore.getState().resetAccountData();
   useLevelStore.getState().reset();
+  useSettingsStore.getState().resetSettings();
 }
 
 interface AuthState {
@@ -144,6 +146,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       await storage.setItem(USER_KEY, JSON.stringify(user));
 
       set({ user, token: session.access_token, isAuthenticated: true, isGuest: false, isLoading: false });
+      // Fire-and-forget — resetDomainStores() just wiped settingsStore back to defaults;
+      // this loads this account's real theme/language/sound so they don't sit on defaults
+      // until the user happens to open Profile.
+      useSettingsStore.getState().fetchSettings();
     } catch (err) {
       set({ error: getApiErrorMessage(err), isLoading: false });
       throw err;
@@ -168,6 +174,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       await storage.setItem(USER_KEY, JSON.stringify(user));
 
       set({ user, token: session.access_token, isAuthenticated: true, isGuest: false, isLoading: false });
+      useSettingsStore.getState().fetchSettings();
     } catch (err) {
       set({ error: getApiErrorMessage(err), isLoading: false });
       throw err;
@@ -215,6 +222,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
       console.log('[OAuth Debug] Setting isAuthenticated=true (completeGoogleSignIn succeeded).');
       set({ user, token: tokens.accessToken, isAuthenticated: true, isGuest: false, isLoading: false });
+      useSettingsStore.getState().fetchSettings();
       console.log('[OAuth Debug] authStore state after completeGoogleSignIn:', useAuthStore.getState());
       console.log('[OAuth Debug] completeGoogleSignIn end (success).');
 
@@ -423,6 +431,17 @@ onGoogleSignIn((tokens) => useAuthStore.getState().completeGoogleSignIn(tokens))
 // NOT resetDomainStores()/isAuthenticated/etc — this is a same-session token swap, not a
 // sign-in event, so nothing else about the session has changed.
 onGoogleTokenRefresh((accessToken) => {
+  // Supabase's own background auto-refresh timer keeps running for the lifetime of the tab/
+  // process regardless of what this app's authStore thinks — logout() never calls
+  // supabase.auth.signOut() (see googleAuth.service.ts's comment on why not), so a refresh
+  // firing after an explicit logout would otherwise silently write a fresh, valid token back
+  // into app storage and re-authenticate the user on their next reload, despite having logged
+  // out. Guarding on isAuthenticated (rather than touching the fragile signOut() path) is
+  // enough to stop that without reintroducing whatever signOut() previously broke.
+  if (!useAuthStore.getState().isAuthenticated) {
+    console.log('[OAuth Debug] authStore: ignoring token refresh — not authenticated (logged out).');
+    return;
+  }
   console.log('[OAuth Debug] authStore: persisting refreshed token from Supabase.');
   storage.setItem(TOKEN_KEY, accessToken);
   useAuthStore.setState({ token: accessToken });
