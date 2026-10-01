@@ -12,7 +12,7 @@ export type TextVariant =
   | 'caption'
   | 'label';
 
-export type TextColor = 'primary' | 'secondary' | 'muted' | 'accent' | 'inverse';
+export type TextColor = 'primary' | 'secondary' | 'muted' | 'accent' | 'inverse' | 'error';
 
 export interface TextProps extends RNTextProps {
   /** Typography scale to apply. Defaults to `body`. */
@@ -41,6 +41,7 @@ const colorClasses: Record<TextColor, string> = {
   accent: 'text-tide-teal',
   /** For text placed on solid teal/dark backgrounds, e.g. the Card `gradient` variant. */
   inverse: 'text-inverse',
+  error: 'text-error',
 };
 
 /** Pre-styled typography primitive covering every Tide Light text variant. */

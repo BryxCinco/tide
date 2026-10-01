@@ -14,6 +14,7 @@ const tintClasses: Record<AccentTone, { bg: string; icon?: string }> = {
   blue: { bg: 'bg-ocean-blue/10', icon: colors.brand.oceanBlue },
   purple: { bg: 'bg-deep-purple/10', icon: colors.brand.deepPurple },
   muted: { bg: 'bg-hover' },
+  red: { bg: 'bg-error/10', icon: colors.status.error },
 };
 
 /** Plain rAF counter (not Reanimated) — animating Text *content* doesn't need worklets, and this avoids Reanimated's text-prop edge cases entirely. */

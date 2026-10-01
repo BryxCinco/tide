@@ -15,6 +15,7 @@ const tintClasses: Record<AccentTone, { bg: string; icon?: string }> = {
   blue: { bg: 'bg-ocean-blue/10', icon: colors.brand.oceanBlue },
   purple: { bg: 'bg-deep-purple/10', icon: colors.brand.deepPurple },
   muted: { bg: 'bg-hover' },
+  red: { bg: 'bg-error/10', icon: colors.status.error },
 };
 
 export interface RecentActivityProps {

@@ -7,7 +7,7 @@ import { AppLayout } from '@/components/layout';
 import { TaskCard, TaskFilters, TaskFormModal, TaskInfoModal } from '@/components/tasks';
 import { BackButton, Button, EmptyState, ErrorState, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
 import { useActivityStore } from '@/store/activityStore';
-import { getVisibleTasks, useTaskStore } from '@/store/taskStore';
+import { getVisibleTasks, isTaskOverdue, useTaskStore } from '@/store/taskStore';
 import type { Task } from '@/types/task';
 
 export default function TasksScreen() {
@@ -42,6 +42,7 @@ export default function TasksScreen() {
   };
 
   const visibleTasks = getVisibleTasks(tasks, filter, sort);
+  const overdueCount = tasks.filter(isTaskOverdue).length;
 
   const openCreate = () => {
     setEditingTask(undefined);
@@ -69,9 +70,16 @@ export default function TasksScreen() {
           <ResponsiveContainer className="gap-6">
             <View className="flex-row items-center gap-3">
               <BackButton />
-              <Text variant="h2" color="primary" className="flex-1">
-                Tasks
-              </Text>
+              <View className="flex-1 flex-row items-center gap-2">
+                <Text variant="h2" color="primary">
+                  Tasks
+                </Text>
+                {overdueCount > 0 && (
+                  <Text variant="caption" color="error" className="normal-case tracking-normal">
+                    {overdueCount} overdue
+                  </Text>
+                )}
+              </View>
               <Button title="New" variant="primary" size="sm" icon="Plus" onPress={openCreate} />
             </View>
 

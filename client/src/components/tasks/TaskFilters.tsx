@@ -8,6 +8,7 @@ import { Text } from '../ui';
 const FILTERS: { value: TaskFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'today', label: 'Today' },
+  { value: 'overdue', label: 'Overdue' },
   { value: 'done', label: 'Done' },
 ];
 

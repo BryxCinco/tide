@@ -27,7 +27,7 @@ import { getVisibleWidgets, useDashboardStore } from '@/store/dashboardStore';
 import { useJournalStore } from '@/store/journalStore';
 import { useQuestStore } from '@/store/questStore';
 import { useStreakStore } from '@/store/streakStore';
-import { useTaskStore } from '@/store/taskStore';
+import { isTaskOverdue, useTaskStore } from '@/store/taskStore';
 import { useTimerStore } from '@/store/timerStore';
 import type { StatItem, WidgetId } from '@/types/dashboard';
 import { formatDuration } from '@/utils/formatTime';
@@ -67,6 +67,7 @@ export default function DashboardScreen() {
 
   const todayTotalSeconds = Object.values(activityTotals).reduce((sum, value) => sum + value, 0);
   const openTasksCount = tasks.filter((t) => t.status !== 'done').length;
+  const missedTasksCount = tasks.filter(isTaskOverdue).length;
   const isFreshStart = todaySessions.length === 0 && tasks.length === 0 && journalCount === 0;
 
   // Fresh-start-friendly: real zeros instead of the old fabricated "2h 14m / 4 today /
@@ -78,6 +79,7 @@ export default function DashboardScreen() {
     { id: 'sessions', label: 'Sessions', value: `${todaySessions.length} today`, icon: 'Target', tint: 'blue' },
     { id: 'tasks', label: 'Open Tasks', value: `${openTasksCount}`, icon: 'ListChecks', tint: 'purple' },
     { id: 'streak', label: 'Streak', value: `${streak} day${streak === 1 ? '' : 's'}`, icon: 'Flame', tint: 'muted' },
+    { id: 'missed-tasks', label: 'Missed Tasks', value: `${missedTasksCount}`, icon: 'AlertTriangle', tint: missedTasksCount > 0 ? 'red' : 'muted' },
   ];
 
   const heroSubtitle = todaySessions.length > 0 ? `${formatDuration(todayTotalSeconds)} tracked today` : mockHeroFocus.subtitle;

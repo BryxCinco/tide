@@ -1,6 +1,6 @@
 import type { IconName } from '@/components/ui';
 
-export type AccentTone = 'teal' | 'blue' | 'purple' | 'muted';
+export type AccentTone = 'teal' | 'blue' | 'purple' | 'muted' | 'red';
 
 export interface HeroFocus {
   label: string;

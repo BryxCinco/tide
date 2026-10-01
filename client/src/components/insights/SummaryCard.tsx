@@ -17,6 +17,7 @@ const tintColors: Record<AccentTone, string | undefined> = {
   // 'muted' has no explicit color — Icon's own default already resolves to the
   // theme-reactive muted tone, so omitting it here keeps it correct in dark mode too.
   muted: undefined,
+  red: colors.status.error,
 };
 
 /** Horizontal chip row (not StatsRow's boxy cards) — the bento 'lg' full-width card's

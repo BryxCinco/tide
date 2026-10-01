@@ -116,8 +116,21 @@ const tools = [
   {
     type: 'function',
     function: {
+      name: 'listMissedTasks',
+      description:
+        'List the user\'s overdue tasks — not done, with a due date in the past. Use this for "what did I miss?" / "what\'s overdue?" questions.',
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'updateTask',
-      description: "Change a task's title, priority, status, description, or due date(s), found by matching its current title.",
+      description: "Change a task's title, priority, status, description, or due date, found by matching its current title.",
       parameters: {
         type: 'object',
         properties: {
@@ -446,6 +459,21 @@ toolHandlers.listTasks = async ({ userId, status, limit }) => {
   if (error) throw new Error(error.message);
 
   return { tasks: data, count: data.length, message: `Found ${data.length} task(s).` };
+};
+
+toolHandlers.listMissedTasks = async ({ userId }) => {
+  const { data, error } = await supabaseAdmin
+    .from('tasks')
+    .select('*')
+    .eq('user_id', userId)
+    .neq('status', 'done')
+    .lt('due_date', new Date().toISOString())
+    .order('due_date', { ascending: true });
+
+  if (error) throw new Error(error.message);
+
+  const message = data.length === 0 ? "You haven't missed anything — nice." : `You've missed ${data.length} task(s).`;
+  return { tasks: data, count: data.length, message };
 };
 
 toolHandlers.updateTask = async ({ userId, taskTitle, updates = {} }) => {

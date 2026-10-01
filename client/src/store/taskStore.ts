@@ -5,10 +5,11 @@ import { getApiErrorMessage } from '../services/api';
 import { taskService, type UpdateTaskPayload } from '../services/task.service';
 import type { Task, TaskPriority, TaskStatus } from '../types/task';
 import { hasAuthToken, isGuestMode } from '../utils/authFlags';
+import { toDateKey } from '../utils/formatDate';
 import { storage } from '../utils/storage';
 import { showToast } from './toastStore';
 
-export type TaskFilter = 'all' | 'today' | 'done';
+export type TaskFilter = 'all' | 'today' | 'done' | 'overdue';
 export type TaskSort = 'priority' | 'dueDate' | 'created';
 
 interface TaskState {
@@ -180,6 +181,21 @@ export const useTaskStore = create<TaskState>()(
 
 const PRIORITY_WEIGHT: Record<TaskPriority, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
+/** Past-due and not yet done — drives TaskCard's red "Overdue" badge/border, the Overdue
+ * filter, and the header/dashboard counts. Compares local date keys, not timestamps, so a
+ * task due "today" is never overdue purely from time-of-day. */
+export function isTaskOverdue(task: Task): boolean {
+  if (task.status === 'done' || !task.dueDate) return false;
+  return task.dueDate < toDateKey(new Date());
+}
+
+/** Due today and not yet done — the amber "Due today" badge. Mutually exclusive with
+ * isTaskOverdue by construction (today is never < today). */
+export function isTaskDueToday(task: Task): boolean {
+  if (task.status === 'done' || !task.dueDate) return false;
+  return task.dueDate === toDateKey(new Date());
+}
+
 function isToday(dateIso: string): boolean {
   const d = new Date(dateIso);
   const now = new Date();
@@ -195,6 +211,7 @@ function isToday(dateIso: string): boolean {
 export function getVisibleTasks(tasks: Task[], filter: TaskFilter, sort: TaskSort): Task[] {
   const filtered = tasks.filter((task) => {
     if (filter === 'done') return task.status === 'done';
+    if (filter === 'overdue') return isTaskOverdue(task);
     if (filter === 'today') return isToday(task.createdAt) || (task.dueDate ? isToday(task.dueDate) : false);
     return true;
   });

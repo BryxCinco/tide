@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
 
+import { isTaskDueToday, isTaskOverdue } from '../../store/taskStore';
 import type { Task, TaskPriority } from '../../types/task';
 import { cn } from '../../utils/cn';
 import { formatDateKeyCompact } from '../../utils/formatDate';
@@ -31,9 +32,16 @@ export function TaskCard({ task, activityName, onToggle, onView, onEdit, onDelet
   const isDone = task.status === 'done';
   const priority = PRIORITY_BADGE[task.priority];
   const dateLabel = task.dueDate ? `Due ${formatDateKeyCompact(task.dueDate)}` : null;
+  const overdue = isTaskOverdue(task);
+  const dueToday = !overdue && isTaskDueToday(task);
 
   return (
-    <View className="flex-row items-start gap-3 rounded-xl border border-subtle bg-base p-3">
+    <View
+      className={cn(
+        'flex-row items-start gap-3 rounded-xl border bg-base p-3',
+        overdue ? 'border-error/30 bg-error/5' : 'border-subtle',
+      )}
+    >
       <Pressable
         onPress={onToggle}
         hitSlop={6}
@@ -52,6 +60,8 @@ export function TaskCard({ task, activityName, onToggle, onView, onEdit, onDelet
 
         <View className="flex-row flex-wrap items-center gap-1.5">
           <Badge label={priority.label} variant={priority.variant} size="sm" />
+          {overdue && <Badge label="Overdue" variant="error" size="sm" />}
+          {dueToday && <Badge label="Due today" variant="warning" size="sm" />}
           {dateLabel && (
             <View className="flex-row items-center gap-1">
               <Icon name="Calendar" size={12} />
