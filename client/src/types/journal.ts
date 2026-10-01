@@ -10,7 +10,13 @@ export interface JournalEntry {
   createdAt: string;
   updatedAt: string;
   wordCount: number;
+  /** Up to 3 photo URLs — see server/lib/storage.js's MAX_JOURNAL_PHOTOS. */
+  photoUrls: string[];
 }
+
+/** Max photos a single journal entry can carry — mirrors server/lib/storage.js's
+ * MAX_JOURNAL_PHOTOS (hand-duplicated the same way xp.ts/xpService.js already are). */
+export const MAX_JOURNAL_PHOTOS = 3;
 
 /** Display order for mood pickers/filters. Icon, color, and label live in
  * MoodIcon.tsx (MOOD_ICON_MAP) — the single source of truth for mood presentation. */

@@ -13,6 +13,7 @@ export interface ApiJournalEntry {
   word_count: number;
   created_at: string;
   updated_at: string;
+  photo_urls: string[] | null;
 }
 
 export interface CreateJournalPayload {
@@ -20,6 +21,9 @@ export interface CreateJournalPayload {
   content: string;
   mood: Mood | null;
   tags: string[];
+  /** A mix of existing https:// URLs and new data: URIs from pickImage() — the server
+   * uploads whichever are data: URIs and passes the rest through unchanged. */
+  photoUrls?: string[];
 }
 
 export interface UpdateJournalPayload {
@@ -28,6 +32,7 @@ export interface UpdateJournalPayload {
   mood?: Mood | null;
   tags?: string[];
   isFavorite?: boolean;
+  photoUrls?: string[];
 }
 
 function mapApiJournalEntry(row: ApiJournalEntry): JournalEntry {
@@ -41,6 +46,7 @@ function mapApiJournalEntry(row: ApiJournalEntry): JournalEntry {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     wordCount: row.word_count,
+    photoUrls: row.photo_urls ?? [],
   };
 }
 
@@ -56,6 +62,7 @@ export const journalService = {
       content: payload.content,
       mood: payload.mood,
       tags: payload.tags,
+      photo_urls: payload.photoUrls,
     });
     return { entry: mapApiJournalEntry(data.entry), xp: data.xp };
   },
@@ -67,6 +74,7 @@ export const journalService = {
       mood: payload.mood,
       tags: payload.tags,
       is_favorite: payload.isFavorite,
+      photo_urls: payload.photoUrls,
     });
     return mapApiJournalEntry(data.entry);
   },

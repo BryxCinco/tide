@@ -6,7 +6,7 @@ const cors = require('cors');
 require('dotenv').config();
 
 const { supabaseAdmin, supabaseAuth, initError } = require('./lib/supabaseClient');
-const { ensureAvatarsBucket } = require('./lib/storage');
+const { ensureAvatarsBucket, ensureJournalPhotosBucket } = require('./lib/storage');
 const authRoutes = require('./routes/auth');
 const activitiesRoutes = require('./routes/activities');
 const sessionsRoutes = require('./routes/sessions');
@@ -137,6 +137,7 @@ app.use('/api/insights', insightsRoutes);
 // and the app instance is reused across warm invocations), same effective "once at
 // startup" behavior as the old plain-`node index.js` local server.
 ensureAvatarsBucket().catch((err) => console.error('[storage] bootstrap failed:', err.message));
+ensureJournalPhotosBucket().catch((err) => console.error('[storage] bootstrap failed:', err.message));
 
 // Catches anything a route handler throws or rejects with (Express 5 forwards async
 // errors here automatically, no wrapper needed per route) and turns it into a JSON 500

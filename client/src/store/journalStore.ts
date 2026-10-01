@@ -21,8 +21,8 @@ interface JournalState {
   error: string | null;
 
   fetchEntries: () => Promise<void>;
-  addEntry: (entry: { title: string; content: string; mood: Mood | null; tags: string[] }) => Promise<JournalEntry>;
-  updateEntry: (id: string, updates: Partial<Pick<JournalEntry, 'title' | 'content' | 'mood' | 'tags' | 'isFavorite'>>) => void;
+  addEntry: (entry: { title: string; content: string; mood: Mood | null; tags: string[]; photoUrls?: string[] }) => Promise<JournalEntry>;
+  updateEntry: (id: string, updates: Partial<Pick<JournalEntry, 'title' | 'content' | 'mood' | 'tags' | 'isFavorite' | 'photoUrls'>>) => void;
   deleteEntry: (id: string) => void;
   toggleFavorite: (id: string) => void;
   setSearchQuery: (query: string) => void;
@@ -66,7 +66,7 @@ export const useJournalStore = create<JournalState>()(
       // Genuinely async (unlike taskStore.addTask) — JournalEditor captures the returned
       // id in React state (savedId) and reuses it for every subsequent autosave, so a
       // temporary local id swapped out later would silently break those follow-up saves.
-      addEntry: async ({ title, content, mood, tags }) => {
+      addEntry: async ({ title, content, mood, tags, photoUrls }) => {
         if (isGuestMode()) {
           const now = new Date().toISOString();
           const entry: JournalEntry = {
@@ -79,12 +79,13 @@ export const useJournalStore = create<JournalState>()(
             wordCount: countWords(content),
             createdAt: now,
             updatedAt: now,
+            photoUrls: photoUrls ?? [],
           };
           set((state) => ({ entries: [entry, ...state.entries] }));
           return entry;
         }
 
-        const { entry: newEntry, xp } = await journalService.create({ title, content, mood, tags });
+        const { entry: newEntry, xp } = await journalService.create({ title, content, mood, tags, photoUrls });
         set((state) => ({ entries: [newEntry, ...state.entries] }));
         useLevelStore.getState().applyXpResult(xp);
         return newEntry;

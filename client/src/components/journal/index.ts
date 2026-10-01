@@ -3,6 +3,8 @@ export * from './InterestTags';
 export * from './JournalCard';
 export * from './JournalEditor';
 export * from './JournalFilters';
+export * from './JournalPhotoPicker';
 export * from './MoodIcon';
 export * from './MoodSelector';
+export * from './PhotoViewerModal';
 export * from './SearchBar';

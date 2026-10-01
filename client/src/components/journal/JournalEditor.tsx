@@ -12,6 +12,7 @@ import { countWords, formatMonthDayYear, formatTime, formatWeekday, formatWeekda
 import { shadows } from '../../utils/theme';
 import { BackButton, Button, Text } from '../ui';
 import { InterestTags } from './InterestTags';
+import { JournalPhotoPicker } from './JournalPhotoPicker';
 import { MoodSelector } from './MoodSelector';
 
 export interface JournalEditorProps {
@@ -39,6 +40,7 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
   const [content, setContent] = useState(entry?.content ?? '');
   const [mood, setMood] = useState<Mood | null>(entry?.mood ?? null);
   const [tags, setTags] = useState<string[]>(entry?.tags ?? []);
+  const [photoUris, setPhotoUris] = useState<string[]>(entry?.photoUrls ?? []);
   const [savedId, setSavedId] = useState(entry?.id);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [isContentFocused, setIsContentFocused] = useState(false);
@@ -50,12 +52,16 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
 
   const isCreatingRef = useRef(false);
 
+  // A photo-only entry (no text typed) is still real content worth saving — same bar as
+  // title/content, just extended now that photos are a legitimate way to start an entry.
+  const hasContent = () => Boolean(title.trim() || content.trim() || photoUris.length > 0);
+
   const persist = async () => {
     const trimmedTitle = title.trim() || 'Untitled';
-    if (!title.trim() && !content.trim()) return;
+    if (!hasContent()) return;
 
     if (savedId) {
-      updateEntry(savedId, { title: trimmedTitle, content, mood, tags });
+      updateEntry(savedId, { title: trimmedTitle, content, mood, tags, photoUrls: photoUris });
       return;
     }
 
@@ -65,7 +71,7 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
     if (isCreatingRef.current) return;
     isCreatingRef.current = true;
     try {
-      const created = await addEntry({ title: trimmedTitle, content, mood, tags });
+      const created = await addEntry({ title: trimmedTitle, content, mood, tags, photoUrls: photoUris });
       setSavedId(created.id);
     } catch {
       // Failure is silent here (autosave retries on the next tick); a manual Save's
@@ -76,7 +82,7 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
   };
 
   useEffect(() => {
-    if (!title.trim() && !content.trim()) return;
+    if (!hasContent()) return;
 
     setSaveState('saving');
     const timeout = setTimeout(async () => {
@@ -85,10 +91,10 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
     }, AUTO_SAVE_DELAY);
 
     return () => clearTimeout(timeout);
-    // `persist` closes over title/content/mood/tags and is recreated every render —
-    // depending on it directly (instead of these four) would restart the timer on every keystroke.
+    // `persist` closes over title/content/mood/tags/photoUris and is recreated every render —
+    // depending on it directly (instead of these five) would restart the timer on every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, content, mood, tags]);
+  }, [title, content, mood, tags, photoUris]);
 
   const handleSave = async () => {
     await persist();
@@ -157,6 +163,8 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
         <MoodSelector value={mood} onChange={setMood} />
 
         <InterestTags value={tags} onChange={setTags} />
+
+        <JournalPhotoPicker photoUris={photoUris} onChange={setPhotoUris} />
 
         <View className="gap-2">
           <Text variant="label" color="muted">
