@@ -90,7 +90,8 @@ function buildDatetimeMessage(timezone) {
 const TOOLS_SAFETY_NOTE = `You have access to these tools — call one whenever it matches
 what the user is asking for, instead of just describing what you would do:
 
-Tasks: createTask, listTasks, listMissedTasks, updateTask, completeTask, rescheduleTask, deleteTask
+Tasks: createTask, listTasks, listMissedTasks, updateTask, completeTask, rescheduleTask,
+deleteTask, suggestTasks
 Mood & journal: logMood, getMoodHistory, addJournalEntry, searchJournals, reflectOnJournal
 Time & stats: startTimer, getTodayStats, getWeeklySummary, getActivityStats, getStreakInfo,
 suggestActivity, suggestSpecialQuest, getLevelInfo, getLeaderboard

@@ -335,6 +335,21 @@ const tools = [
   {
     type: 'function',
     function: {
+      name: 'suggestTasks',
+      description:
+        'Suggest 3-5 concrete tasks the user might want to create, drawn from their overdue backlog, goals/to-dos mentioned in recent journal entries, a neglected activity, and how many tasks they already have open. Each comes with a reason. Use this for "suggest some tasks" / "what should I do this week" style requests. To actually add one, use createTask.',
+      parameters: {
+        type: 'object',
+        properties: {
+          count: { type: 'number', description: 'How many suggestions to return, 1-5. Defaults to 3.' },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'addJournalEntry',
       description: 'Write a new journal entry for the user.',
       parameters: {
@@ -1028,6 +1043,129 @@ toolHandlers.suggestSpecialQuest = async ({ userId, confirm, title, description,
   return {
     ...suggestion,
     message: `Suggested quest: "${suggestion.title}" (+${suggestion.xp} XP) — ${suggestion.reason} Ask the user if they'd like to add it; only on a clear yes, call this tool again with confirm:true and this exact title/description/xp/icon/category.`,
+  };
+};
+
+// Matches a sentence containing a first-person goal/intent phrase ("I need to...", "I
+// should...") — the loose signal suggestTasks uses to pull candidate tasks out of free-form
+// journal prose, since journal_entries has no structured "todo" field of its own.
+const GOAL_PHRASE_PATTERN = /\b(i need to|i should|i have to|i want to|i'm going to|i am going to|i plan to|i must)\b\s*/i;
+
+function extractGoalCandidates(content) {
+  if (!content) return [];
+  const sentences = content
+    .split(/(?<=[.!?\n])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const candidates = [];
+  for (const sentence of sentences) {
+    if (!GOAL_PHRASE_PATTERN.test(sentence)) continue;
+    let cleaned = sentence.replace(GOAL_PHRASE_PATTERN, '').replace(/[.!?]+$/, '').trim();
+    if (!cleaned) continue;
+    cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    if (cleaned.length > 80) cleaned = `${cleaned.slice(0, 77).trimEnd()}...`;
+    candidates.push(cleaned);
+  }
+  return candidates;
+}
+
+toolHandlers.suggestTasks = async ({ userId, count }) => {
+  const wantCount = Math.max(1, Math.min(count || 3, 5));
+
+  const [tasksRes, journalRes, activitiesRes, logsRes] = await Promise.all([
+    supabaseAdmin.from('tasks').select('title, status, due_date').eq('user_id', userId),
+    supabaseAdmin.from('journal_entries').select('content, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(5),
+    supabaseAdmin.from('activities').select('id, name, is_archived').eq('user_id', userId),
+    supabaseAdmin.from('time_logs').select('activity_id, ended_at').eq('user_id', userId),
+  ]);
+
+  if (tasksRes.error) throw new Error(tasksRes.error.message);
+  if (journalRes.error) throw new Error(journalRes.error.message);
+  if (activitiesRes.error) throw new Error(activitiesRes.error.message);
+  if (logsRes.error) throw new Error(logsRes.error.message);
+
+  const tasks = tasksRes.data || [];
+  const existingTitles = new Set(tasks.map((t) => (t.title || '').toLowerCase()));
+  const candidates = [];
+
+  // Signal 1: overdue backlog.
+  const nowIso = new Date().toISOString();
+  const overdueCount = tasks.filter((t) => t.status !== 'done' && t.due_date && t.due_date < nowIso).length;
+  if (overdueCount > 0) {
+    candidates.push({
+      title: 'Clear your overdue tasks',
+      description: `You have ${overdueCount} overdue task${overdueCount === 1 ? '' : 's'} — tackle the oldest first.`,
+      priority: 'high',
+      reason: `${overdueCount} task(s) are past their due date.`,
+    });
+  }
+
+  // Signal 2: goals/to-dos mentioned in recent journal entries (at most 2 per entry, so one
+  // long entry can't crowd out every other signal).
+  for (const entry of journalRes.data || []) {
+    const goals = extractGoalCandidates(entry.content).slice(0, 2);
+    for (const title of goals) {
+      if (existingTitles.has(title.toLowerCase())) continue;
+      candidates.push({
+        title,
+        description: 'You mentioned this in your journal.',
+        priority: 'medium',
+        reason: `From your journal entry on ${new Date(entry.created_at).toDateString()}.`,
+      });
+    }
+  }
+
+  // Signal 3: the most neglected (or never-tried) active activity.
+  const pool = (activitiesRes.data || []).filter((a) => !a.is_archived);
+  if (pool.length > 0) {
+    const lastDoneByActivity = {};
+    for (const log of logsRes.data || []) {
+      if (!log.activity_id || !log.ended_at) continue;
+      if (!lastDoneByActivity[log.activity_id] || log.ended_at > lastDoneByActivity[log.activity_id]) {
+        lastDoneByActivity[log.activity_id] = log.ended_at;
+      }
+    }
+    const now = Date.now();
+    const mostNeglected = pool
+      .map((activity) => {
+        const lastDone = lastDoneByActivity[activity.id];
+        const daysSince = lastDone ? Math.floor((now - new Date(lastDone).getTime()) / 86400000) : Infinity;
+        return { activity, daysSince };
+      })
+      .sort((a, b) => b.daysSince - a.daysSince)[0];
+
+    if (mostNeglected && mostNeglected.daysSince > 0) {
+      candidates.push({
+        title: `Spend time on ${mostNeglected.activity.name}`,
+        priority: 'low',
+        description:
+          mostNeglected.daysSince === Infinity
+            ? "You haven't tried this activity yet."
+            : `You haven't done this in ${mostNeglected.daysSince} day(s).`,
+        reason: mostNeglected.daysSince === Infinity ? 'Never tracked.' : `${mostNeglected.daysSince} days since your last session.`,
+      });
+    }
+  }
+
+  // Signal 4: a growing open-task backlog, even without any single overdue item.
+  const openCount = tasks.filter((t) => t.status !== 'done').length;
+  if (openCount >= 5) {
+    candidates.push({
+      title: 'Do a task triage',
+      description: `You have ${openCount} open tasks — pick the top 3 to focus on this week.`,
+      priority: 'medium',
+      reason: `${openCount} tasks are still open.`,
+    });
+  }
+
+  const suggestions = candidates.slice(0, wantCount);
+
+  return {
+    suggestions,
+    message: suggestions.length
+      ? suggestions.map((s) => `${s.title} — ${s.reason}`).join(' / ')
+      : "I don't see enough to go on yet — try logging a session or writing a journal entry first.",
   };
 };
 
