@@ -15,12 +15,22 @@ export interface LanguageMeta {
   flag: string;
 }
 
+// Alphabetical by englishName — LanguageModal renders this order as-is, so the sort lives
+// here rather than being redone client-side on every render.
 export const LANGUAGES: LanguageMeta[] = [
+  { code: 'ar', nativeName: 'العربية', englishName: 'Arabic', flag: '🇸🇦' },
+  { code: 'zh', nativeName: '中文', englishName: 'Chinese', flag: '🇨🇳' },
   { code: 'en', nativeName: 'English', englishName: 'English', flag: '🇺🇸' },
   { code: 'fil', nativeName: 'Filipino', englishName: 'Filipino', flag: '🇵🇭' },
-  { code: 'es', nativeName: 'Español', englishName: 'Spanish', flag: '🇪🇸' },
+  { code: 'fr', nativeName: 'Français', englishName: 'French', flag: '🇫🇷' },
+  { code: 'de', nativeName: 'Deutsch', englishName: 'German', flag: '🇩🇪' },
+  { code: 'id', nativeName: 'Bahasa Indonesia', englishName: 'Indonesian', flag: '🇮🇩' },
+  { code: 'it', nativeName: 'Italiano', englishName: 'Italian', flag: '🇮🇹' },
   { code: 'ja', nativeName: '日本語', englishName: 'Japanese', flag: '🇯🇵' },
-  { code: 'zh', nativeName: '中文', englishName: 'Chinese', flag: '🇨🇳' },
+  { code: 'ko', nativeName: '한국어', englishName: 'Korean', flag: '🇰🇷' },
+  { code: 'ru', nativeName: 'Русский', englishName: 'Russian', flag: '🇷🇺' },
+  { code: 'es', nativeName: 'Español', englishName: 'Spanish', flag: '🇪🇸' },
+  { code: 'tr', nativeName: 'Türkçe', englishName: 'Turkish', flag: '🇹🇷' },
 ];
 
 export function translate(language: Language, key: TranslationKey): string {

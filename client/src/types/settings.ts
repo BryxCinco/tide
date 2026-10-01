@@ -1,5 +1,5 @@
 export type ThemePreference = 'light' | 'dark' | 'system';
-export type Language = 'en' | 'fil' | 'es' | 'ja' | 'zh';
+export type Language = 'en' | 'fil' | 'es' | 'ja' | 'zh' | 'ar' | 'ru' | 'ko' | 'id' | 'fr' | 'de' | 'tr' | 'it';
 export type WeekStart = 'monday' | 'sunday';
 export type TimeFormat = '12h' | '24h';
 
