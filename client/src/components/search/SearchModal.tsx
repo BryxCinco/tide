@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
 import { TextInput } from '../ui/SoundTextInput';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { MIN_QUERY_LENGTH, useSearchController } from '../../hooks/useSearch';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -71,15 +71,28 @@ export function SearchModal({ visible, onClose }: SearchModalProps) {
 
   const { query, setQuery, activeIndex, groups, select, handleKey, reset } = useSearchController(onClose);
 
+  // See Modal.tsx's matching comment — `if (!visible) return null` used to unmount this
+  // whole tree synchronously the instant `visible` went false, before the close `withTiming`
+  // below ever got to visually play. `shouldRender` stays true until that animation actually
+  // finishes; the render-phase update (not an effect) keeps opening exactly as instant as
+  // before.
+  const [shouldRender, setShouldRender] = useState(visible);
+  if (visible && !shouldRender) {
+    setShouldRender(true);
+  }
+
   useEffect(() => {
-    progress.value = withTiming(visible ? 1 : 0, { duration: 200, easing: Easing.out(Easing.cubic) });
     if (visible) {
+      progress.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.cubic) });
       reset();
       // RNModal mounts its content on the next tick on web — a microtask delay lets the
       // TextInput actually exist before we try to focus it.
       const focusTimeout = setTimeout(() => inputRef.current?.focus(), 50);
       return () => clearTimeout(focusTimeout);
     }
+    progress.value = withTiming(0, { duration: 200, easing: Easing.out(Easing.cubic) }, (finished) => {
+      if (finished) runOnJS(setShouldRender)(false);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
@@ -89,7 +102,7 @@ export function SearchModal({ visible, onClose }: SearchModalProps) {
     transform: [{ translateY: (1 - progress.value) * -16 }, { scale: 0.98 + progress.value * 0.02 }],
   }));
 
-  if (!visible) return null;
+  if (!shouldRender) return null;
 
   const hasEnoughQuery = query.trim().length >= MIN_QUERY_LENGTH;
 
@@ -98,7 +111,7 @@ export function SearchModal({ visible, onClose }: SearchModalProps) {
   };
 
   return (
-    <RNModal visible={visible} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+    <RNModal visible={shouldRender} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       {/* Re-establishes the theme's CSS custom properties inside this portaled subtree —
           see Modal.tsx's matching comment for why RNModal on web needs this at all. */}
       <View className={isPhone ? 'flex-1 pt-20' : 'flex-1 items-center pt-32'} style={isDark ? darkVars : lightVars}>

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { Modal as RNModal, Platform, View } from 'react-native';
 import { Pressable } from './SoundPressable';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 
 import { useResponsive } from '../../hooks/useResponsive';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -61,13 +61,31 @@ export function Modal({ visible, onClose, title, icon, tone = 'accent', children
   const [closeHovered, setCloseHovered] = useState(false);
   const progress = useSharedValue(0);
 
+  // Stays mounted through the close animation instead of unmounting the instant `visible`
+  // goes false — gating the early return below on `visible` directly used to unmount this
+  // whole tree synchronously on the same render, before the close `withTiming` below ever
+  // got a chance to visually play (its effect still ran, just against nothing left on
+  // screen). The render-phase update here (not an effect) is what keeps opening instant —
+  // see React's "adjusting state when a prop changes" pattern: calling setState during
+  // render like this is safe and re-renders before paint, no flash.
+  const [shouldRender, setShouldRender] = useState(visible);
+  if (visible && !shouldRender) {
+    setShouldRender(true);
+  }
+
   useEffect(() => {
     if (visible) {
       // Spring only on the way in — a bounce on close would fight the "gone" feeling of a
       // dismiss, so closing still uses the flat ease-out from before.
       progress.value = withSpring(1, { damping: 16, stiffness: 180, mass: 0.9 });
     } else {
-      progress.value = withTiming(0, { duration: isPhone ? SHEET_DURATION : CENTERED_DURATION, easing: Easing.in(Easing.cubic) });
+      progress.value = withTiming(
+        0,
+        { duration: isPhone ? SHEET_DURATION : CENTERED_DURATION, easing: Easing.in(Easing.cubic) },
+        (finished) => {
+          if (finished) runOnJS(setShouldRender)(false);
+        }
+      );
     }
   }, [visible, isPhone, progress]);
 
@@ -91,7 +109,7 @@ export function Modal({ visible, onClose, title, icon, tone = 'accent', children
     };
   });
 
-  if (!visible) {
+  if (!shouldRender) {
     return null;
   }
 
@@ -108,7 +126,7 @@ export function Modal({ visible, onClose, title, icon, tone = 'accent', children
   };
 
   return (
-    <RNModal visible={visible} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+    <RNModal visible={shouldRender} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       {/* React Native Web's <Modal> renders through a portal straight onto `document.body`
           (see react-native-web's ModalPortal.js), completely outside the root <View> in
           app/_layout.tsx that carries the theme's `--color-*` CSS custom properties as an
