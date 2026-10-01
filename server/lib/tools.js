@@ -351,6 +351,21 @@ const tools = [
   {
     type: 'function',
     function: {
+      name: 'reflectOnJournal',
+      description:
+        'Pull a journal entry (and light pattern data from the user\'s recent entries) to reflect on. Use this for "reflect on my journal" / "what patterns do you see" style requests — write the actual empathetic reflection yourself in your reply, using what this tool returns.',
+      parameters: {
+        type: 'object',
+        properties: {
+          journalId: { type: 'string', description: 'Specific entry to reflect on. Omit to use the most recent entry.' },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'getWeather',
       description: "Get the current weather for a city. Defaults to Manila if the user doesn't name a location.",
       parameters: {
@@ -966,6 +981,66 @@ toolHandlers.searchJournals = async ({ userId, query, limit }) => {
     message: journalResults.length
       ? `Found ${journalResults.length} journal entr${journalResults.length === 1 ? 'y' : 'ies'} matching "${query}".`
       : `No journal entries found matching "${query}".`,
+  };
+};
+
+// Returns the entry plus light pattern data (dominant mood, recurring tags across the last
+// 10 entries) — the actual empathetic reflection is written by the model itself in its next
+// reply, guided by the `message` instruction below and the SYSTEM_PROMPT's own reflection
+// guidance. Hand-writing canned reflection text here would read as generic; the model has
+// the entry's full content to work with and can tailor it, the same way every other "stats"
+// tool in this file hands back facts for the model to narrate rather than a finished string.
+toolHandlers.reflectOnJournal = async ({ userId, journalId }) => {
+  let journalQuery = supabaseAdmin.from('journal_entries').select('*').eq('user_id', userId);
+  journalQuery = journalId ? journalQuery.eq('id', journalId) : journalQuery.order('created_at', { ascending: false }).limit(1);
+
+  const { data: entries, error: journalError } = await journalQuery;
+  if (journalError) throw new Error(journalError.message);
+  const journal = entries?.[0];
+
+  if (!journal) {
+    return {
+      found: false,
+      message: journalId ? "I couldn't find that journal entry." : "You don't have any journal entries yet — want to write one?",
+    };
+  }
+
+  const { data: recent, error: recentError } = await supabaseAdmin
+    .from('journal_entries')
+    .select('mood, tags, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  if (recentError) throw new Error(recentError.message);
+
+  const moodCounts = {};
+  const tagCounts = {};
+  for (const entry of recent || []) {
+    if (entry.mood) moodCounts[entry.mood] = (moodCounts[entry.mood] || 0) + 1;
+    for (const tag of entry.tags || []) tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+  }
+  const dominantMood = Object.entries(moodCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+  const recurringTags = Object.entries(tagCounts)
+    .filter(([, count]) => count >= 2)
+    .map(([tag]) => tag);
+
+  return {
+    found: true,
+    journal: {
+      id: journal.id,
+      title: journal.title,
+      content: journal.content,
+      mood: journal.mood,
+      tags: journal.tags,
+      createdAt: journal.created_at,
+    },
+    patterns: { dominantMoodRecently: dominantMood, recurringTags, entriesConsidered: (recent || []).length },
+    message:
+      "Here is the journal entry and light pattern data from the user's recent entries. Write the reflection yourself: " +
+      'acknowledge what they shared empathetically, point out 1-2 patterns (mood or recurring themes — only ones the ' +
+      'data actually supports), suggest 1-2 actionable takeaways, and end with a genuine reflective follow-up question. ' +
+      "Don't just repeat these fields back as a list.",
   };
 };
 
