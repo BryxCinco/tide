@@ -44,6 +44,10 @@ export interface ActivityBreakdownSlice {
   trendPercent: number;
   /** ISO date of the most recent session logged under this activity. */
   lastSessionDate: string;
+  /** Up to 5 real sessions for this activity within the window, newest first — backs
+   * ActivityHistory's expandable row. Optional since mock data (WeeklyProgressWidget,
+   * pending its own real-data pass) doesn't set it. */
+  recentSessions?: { date: string; seconds: number }[];
 }
 
 /** One point on the mood-trend line. `score` is null for a day with no journal entry —

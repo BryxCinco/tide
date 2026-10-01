@@ -18,14 +18,15 @@ import {
   TimeFilter,
 } from '@/components/insights';
 import { BackButton, ErrorState, ResponsiveContainer, SkeletonChart, Text } from '@/components/ui';
-import { buildInsightsForRange, mockInsightsData } from '@/mocks/mockInsights';
+import { getApiErrorMessage } from '@/services/api';
+import { insightsService, type InsightsRangeData, type InsightsSummary } from '@/services/insights.service';
 import { useQuestStore } from '@/store/questStore';
 import { useStreakStore } from '@/store/streakStore';
 import { useTaskStore } from '@/store/taskStore';
 import { useTimerStore } from '@/store/timerStore';
-import type { CustomInsightsRange, InsightsRange, MonthYearRange } from '@/types/insights';
+import type { ActivityBreakdownSlice, CustomInsightsRange, HeatmapDay, InsightsRange, MonthYearRange } from '@/types/insights';
 import { formatDuration } from '@/utils/formatTime';
-import { formatMonthYear, fromDateKey } from '@/utils/formatDate';
+import { formatMonthYear, fromDateKey, toDateKey } from '@/utils/formatDate';
 
 /** Heatmap always shows the most recent 30 days regardless of the selected range — a true
  * year-long contribution graph needs GitHub's own layout (53 columns x 7 rows), which is a
@@ -127,18 +128,72 @@ export default function InsightsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const { days, endDate } = rangeToWindow(range, customRange, monthYearRange);
+  const endKey = toDateKey(endDate);
+
+  // Summary (Productivity Score/Weekly Summary/Tracked Time), the time+mood series, and the
+  // activity breakdown all follow the selected range, so they're fetched together. The
+  // heatmap is a fixed trailing 30-day window regardless of range (see HEATMAP_DAYS), fetched
+  // once on mount — same split the mock builder it replaces used.
+  const [summary, setSummary] = useState<InsightsSummary | null>(null);
+  const [rangeData, setRangeData] = useState<InsightsRangeData>({ time: [], mood: [] });
+  const [activityBreakdown, setActivityBreakdown] = useState<ActivityBreakdownSlice[]>([]);
+  const [rangeLoading, setRangeLoading] = useState(true);
+  const [rangeError, setRangeError] = useState<string | null>(null);
+
+  const [heatmapData, setHeatmapData] = useState<HeatmapDay[]>([]);
+  const [heatmapLoading, setHeatmapLoading] = useState(true);
+  const [heatmapError, setHeatmapError] = useState<string | null>(null);
+
+  const fetchRangeData = async () => {
+    setRangeLoading(true);
+    setRangeError(null);
+    try {
+      const [summaryRes, rangeRes, activityRes] = await Promise.all([
+        insightsService.getSummary(days, endKey),
+        insightsService.getRange(days, endKey),
+        insightsService.getActivityBreakdown(days, endKey),
+      ]);
+      setSummary(summaryRes);
+      setRangeData(rangeRes);
+      setActivityBreakdown(activityRes);
+    } catch (err) {
+      setRangeError(getApiErrorMessage(err));
+    } finally {
+      setRangeLoading(false);
+    }
+  };
+
+  const fetchHeatmap = async () => {
+    setHeatmapLoading(true);
+    setHeatmapError(null);
+    try {
+      setHeatmapData(await insightsService.getHeatmap(HEATMAP_DAYS, toDateKey(new Date())));
+    } catch (err) {
+      setHeatmapError(getApiErrorMessage(err));
+    } finally {
+      setHeatmapLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRangeData();
+    // Re-fetches whenever the selected window changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days, endKey]);
+
+  useEffect(() => {
+    fetchHeatmap();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await refetchAll();
+    await Promise.all([refetchAll(), fetchRangeData(), fetchHeatmap()]);
     setRefreshing(false);
   };
 
-  const { days, endDate } = rangeToWindow(range, customRange, monthYearRange);
-  // endDate's getTime() (not the Date object itself) as the memo key — a new Date instance
-  // with the same value is created on every render, which would otherwise defeat useMemo.
-  const rangeData = useMemo(() => buildInsightsForRange(days, endDate), [days, endDate.getTime()]);
-  const heatmapData = useMemo(() => buildInsightsForRange(HEATMAP_DAYS).heatmap, []);
-  const totalSeconds = rangeData.time.reduce((sum, entry) => sum + entry.seconds, 0);
+  const totalSeconds = summary?.totalSeconds ?? 0;
 
   const rangeLabel =
     range === 'custom' && customRange
@@ -188,24 +243,36 @@ export default function InsightsScreen() {
               platform. See BentoCard.tsx for the native-grid caveat. */}
           <View className="gap-4 md:grid md:grid-cols-2 md:gap-4 lg:grid-cols-4">
             <BentoCard size="hero" title="Productivity Score" icon="Target">
-              {tasksLoading ? <SkeletonChart /> : <ProductivityScore score={mockInsightsData.productivityScore} />}
+              {rangeError ? (
+                <ErrorState message={rangeError} onRetry={fetchRangeData} />
+              ) : rangeLoading || !summary ? (
+                <SkeletonChart />
+              ) : (
+                <ProductivityScore score={summary.productivityScore} />
+              )}
             </BentoCard>
 
             <BentoCard size="sm" title="Tracked Time" icon="Clock">
-              <TotalHoursCard seconds={totalSeconds} trend={mockInsightsData.totalTimeTrend} />
+              {rangeLoading || !summary ? <SkeletonChart /> : <TotalHoursCard seconds={totalSeconds} trend={summary.totalTimeTrend} />}
             </BentoCard>
 
             <BentoCard size="sm" title="Mood Trend" icon="Smile">
-              <MoodTrend data={rangeData.mood} />
+              {rangeLoading ? <SkeletonChart /> : <MoodTrend data={rangeData.mood} />}
             </BentoCard>
 
             <BentoCard size="wide" title="Time Tracked" icon="BarChart3">
-              <TimeChart data={rangeData.time} />
+              {rangeLoading ? <SkeletonChart /> : <TimeChart data={rangeData.time} />}
             </BentoCard>
 
             <BentoCard size="wide" title="Activity Breakdown" icon="PieChart">
-              <ActivityDonut slices={mockInsightsData.activityBreakdown} />
-              <ActivityHistory slices={mockInsightsData.activityBreakdown} />
+              {rangeLoading ? (
+                <SkeletonChart />
+              ) : (
+                <>
+                  <ActivityDonut slices={activityBreakdown} />
+                  <ActivityHistory slices={activityBreakdown} />
+                </>
+              )}
             </BentoCard>
 
             <BentoCard size="wide" title="AI Suggestions" icon="Sparkles">
@@ -213,7 +280,13 @@ export default function InsightsScreen() {
             </BentoCard>
 
             <BentoCard size="lg" title="Last 30 Days" icon="CalendarDays">
-              <Heatmap days={heatmapData} />
+              {heatmapError ? (
+                <ErrorState message={heatmapError} onRetry={fetchHeatmap} />
+              ) : heatmapLoading ? (
+                <SkeletonChart />
+              ) : (
+                <Heatmap days={heatmapData} />
+              )}
             </BentoCard>
 
             <BentoCard size="lg" title="Task Stats" icon="ListChecks">
@@ -233,7 +306,7 @@ export default function InsightsScreen() {
             </BentoCard>
 
             <BentoCard size="lg" title="Weekly Summary" icon="ListChecks">
-              <SummaryCard items={mockInsightsData.weeklySummary} />
+              {rangeLoading || !summary ? <SkeletonChart /> : <SummaryCard items={summary.weeklySummary} />}
             </BentoCard>
 
             <BentoCard size="lg" title="History" icon="History">

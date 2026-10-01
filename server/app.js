@@ -19,6 +19,7 @@ const levelsRoutes = require('./routes/levels');
 const profileRoutes = require('./routes/profile');
 const debugRagRoutes = require('./routes/debugRag');
 const chatRoutes = require('./routes/chat');
+const insightsRoutes = require('./routes/insights');
 
 const app = express();
 
@@ -130,6 +131,7 @@ app.use('/api/profile', profileRoutes);
 // Phase 11.3 debug endpoint — see routes/debugRag.js's own comment.
 app.use('/api/debug/rag', debugRagRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/insights', insightsRoutes);
 
 // Runs once per cold-start container on Vercel (this module's top-level code executes once
 // and the app instance is reused across warm invocations), same effective "once at

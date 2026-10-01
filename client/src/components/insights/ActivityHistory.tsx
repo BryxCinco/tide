@@ -14,18 +14,6 @@ export interface ActivityHistoryProps {
 
 type SortKey = 'time' | 'name' | 'trend';
 
-/** Deterministic (id-seeded, not Math.random) illustrative session breakdown for the
- * expanded row — same mock convention as the rest of mockInsights.ts. */
-function mockSessionsFor(slice: ActivityBreakdownSlice): { date: string; seconds: number }[] {
-  const seed = slice.id.split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-  const fractions = [0.5, 0.3, 0.2];
-  return fractions.map((fraction, i) => {
-    const date = new Date(slice.lastSessionDate);
-    date.setDate(date.getDate() - i * (1 + (seed % 3)));
-    return { date: date.toISOString().slice(0, 10), seconds: Math.round(slice.seconds * fraction) };
-  });
-}
-
 function SortButton({ label, active, direction, onPress }: { label: string; active: boolean; direction: 'asc' | 'desc'; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} className="flex-row items-center gap-1 py-1">
@@ -38,9 +26,8 @@ function SortButton({ label, active, direction, onPress }: { label: string; acti
 }
 
 /**
- * Sortable table below ActivityDonut — same mock activityBreakdown data (illustrative,
- * like the rest of this Insights screen pending Phase 10's real backend), extended with
- * trend/lastSessionDate. Tapping a row expands a small deterministic session breakdown.
+ * Sortable table below ActivityDonut. Tapping a row expands its real recentSessions (up to
+ * 5, newest first) from the backend — see server/lib/insightsService.js's getActivityBreakdown.
  */
 export function ActivityHistory({ slices }: ActivityHistoryProps) {
   const [sortKey, setSortKey] = useState<SortKey>('time');
@@ -113,16 +100,22 @@ export function ActivityHistory({ slices }: ActivityHistoryProps) {
 
               {isExpanded && (
                 <View className="ml-5 gap-1 border-l border-subtle pb-2 pl-4">
-                  {mockSessionsFor(slice).map((session, i) => (
-                    <View key={i} className="flex-row items-center justify-between py-1">
-                      <Text variant="caption" color="muted" className="normal-case tracking-normal">
-                        {formatDateKeyShort(session.date)}
-                      </Text>
-                      <Text variant="caption" color="secondary" className="normal-case tracking-normal">
-                        {formatDuration(session.seconds)}
-                      </Text>
-                    </View>
-                  ))}
+                  {(slice.recentSessions ?? []).length === 0 ? (
+                    <Text variant="caption" color="muted" className="py-1 normal-case tracking-normal">
+                      No sessions in this window.
+                    </Text>
+                  ) : (
+                    (slice.recentSessions ?? []).map((session, i) => (
+                      <View key={i} className="flex-row items-center justify-between py-1">
+                        <Text variant="caption" color="muted" className="normal-case tracking-normal">
+                          {formatDateKeyShort(session.date)}
+                        </Text>
+                        <Text variant="caption" color="secondary" className="normal-case tracking-normal">
+                          {formatDuration(session.seconds)}
+                        </Text>
+                      </View>
+                    ))
+                  )}
                 </View>
               )}
             </View>
