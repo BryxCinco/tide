@@ -281,10 +281,72 @@ async function generateWithTools({ userId, userQuery, context, stats, history = 
   return { content: "Something went wrong. Please try again.", usage: null, toolsUsed };
 }
 
+const VALID_INSIGHT_TYPES = ['priority', 'balance', 'improvement', 'celebration'];
+
+// Separate, short system prompt rather than reusing SYSTEM_PROMPT — this isn't a
+// conversation turn (no persona, no "keep it to 2-4 sentences"), it's a single structured
+// extraction task, so it gets its own tight instruction set and JSON-mode response.
+const INSIGHTS_SYSTEM_PROMPT = `You analyze a user's real productivity stats and return concrete
+suggestions as JSON only.
+
+Return exactly this shape, nothing else — no markdown fences, no commentary outside the JSON:
+{"suggestions": [{"title": string, "description": string, "type": "priority" | "balance" | "improvement" | "celebration"}]}
+
+Rules:
+- 3 to 5 suggestions.
+- "priority": which overdue or pending task to focus on first (only if there are any).
+- "balance": the activity time mix is lopsided — suggest reducing or reorganizing one.
+- "improvement": a specific activity's time dropped or could improve — suggest one concrete
+  technique (e.g. a 25-minute focus block), not generic advice.
+- "celebration": something genuinely worth celebrating in the numbers (a streak, a rise in
+  focus time) — only include this if the data actually supports it; never fabricate one.
+- Ground every suggestion in the numbers given below. Never invent data not present there.
+- If the data is too thin for a meaningful suggestion, return fewer than 3 rather than
+  padding with generic filler.
+- title: under 8 words. description: one concrete, actionable sentence.`;
+
+/** One-shot structured call (not a conversation — no history, no tools) for the Insights
+ * screen's "AI Suggestions" card. `stats` should be real backend data (retrieveStats' output
+ * plus an overdue-tasks summary), never client-supplied mock numbers — the whole point of
+ * JSON-mode + this prompt's "never invent data" rule is suggestions the user can trust. */
+async function generateInsightSuggestions({ stats }) {
+  const completion = await groq.chat.completions.create({
+    model: MODEL,
+    messages: [
+      { role: 'system', content: INSIGHTS_SYSTEM_PROMPT },
+      { role: 'user', content: `Here are the user's real stats:\n${JSON.stringify(stats, null, 2)}` },
+    ],
+    temperature: 0.5,
+    max_tokens: 500,
+    response_format: { type: 'json_object' },
+  });
+
+  let parsed;
+  try {
+    parsed = JSON.parse(completion.choices[0]?.message?.content || '{}');
+  } catch (err) {
+    parsed = { suggestions: [] };
+  }
+
+  const suggestions = Array.isArray(parsed.suggestions)
+    ? parsed.suggestions
+        .filter((s) => s && typeof s.title === 'string' && typeof s.description === 'string')
+        .slice(0, 5)
+        .map((s) => ({
+          title: s.title.slice(0, 120),
+          description: s.description.slice(0, 280),
+          type: VALID_INSIGHT_TYPES.includes(s.type) ? s.type : 'improvement',
+        }))
+    : [];
+
+  return { suggestions, usage: completion.usage };
+}
+
 module.exports = {
   generateResponse,
   generateResponseStream,
   generateWithTools,
+  generateInsightSuggestions,
   MODEL,
   SYSTEM_PROMPT,
   DEFAULT_TIMEZONE,

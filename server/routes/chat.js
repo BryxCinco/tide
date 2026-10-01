@@ -1,7 +1,8 @@
 const express = require('express');
 const { requireAuth } = require('../middleware/auth');
 const { retrieveRelevantContext, retrieveStats, buildContextString } = require('../lib/ragService');
-const { generateResponse, generateResponseStream, generateWithTools } = require('../lib/llmService');
+const { generateResponse, generateResponseStream, generateWithTools, generateInsightSuggestions } = require('../lib/llmService');
+const { toolHandlers } = require('../lib/tools');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -124,6 +125,34 @@ router.post('/stream', async (req, res) => {
     console.error('[chat/stream] error:', err.message);
     res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
     res.end();
+  }
+});
+
+// POST /api/chat/insights — Insights screen's "AI Suggestions" card. Deliberately ignores
+// any activity-breakdown the client might send (the Insights screen's own donut chart is
+// still mock data as of this writing) and builds `stats` entirely from real backend data:
+// retrieveStats already computes focus time/streak/a genuine per-activity breakdown from
+// time_logs, topped up with listMissedTasks' real overdue-task summary for the "priority"
+// suggestion type.
+router.post('/insights', async (req, res) => {
+  try {
+    const [stats, missed] = await Promise.all([
+      retrieveStats(req.user.id, { days: 7 }),
+      toolHandlers.listMissedTasks({ userId: req.user.id }),
+    ]);
+
+    const { suggestions, usage } = await generateInsightSuggestions({
+      stats: {
+        ...stats,
+        overdueTaskCount: missed.count,
+        overdueTaskTitles: (missed.tasks || []).slice(0, 5).map((t) => t.title),
+      },
+    });
+
+    res.json({ suggestions, usage });
+  } catch (err) {
+    console.error('[chat/insights] error:', err.message);
+    res.status(500).json({ error: 'Failed to generate suggestions', detail: err.message });
   }
 });
 

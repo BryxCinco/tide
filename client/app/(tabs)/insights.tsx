@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ActivityDonut,
   ActivityHistory,
+  AiSuggestions,
   BentoCard,
   Heatmap,
   HistoryView,
@@ -201,6 +202,10 @@ export default function InsightsScreen() {
             <BentoCard size="wide" title="Activity Breakdown" icon="PieChart">
               <ActivityDonut slices={mockInsightsData.activityBreakdown} />
               <ActivityHistory slices={mockInsightsData.activityBreakdown} />
+            </BentoCard>
+
+            <BentoCard size="wide" title="AI Suggestions" icon="Sparkles">
+              <AiSuggestions />
             </BentoCard>
 
             <BentoCard size="lg" title="Last 30 Days" icon="CalendarDays">

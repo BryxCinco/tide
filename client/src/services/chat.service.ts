@@ -16,6 +16,14 @@ export interface ChatResponse {
   durationMs: number;
 }
 
+export type InsightSuggestionType = 'priority' | 'balance' | 'improvement' | 'celebration';
+
+export interface InsightSuggestion {
+  title: string;
+  description: string;
+  type: InsightSuggestionType;
+}
+
 function toApiHistory(history: ChatMessage[]) {
   return history.map((m) => ({ role: m.role, content: m.content }));
 }
@@ -45,6 +53,19 @@ export const chatService = {
         timezone: getDeviceTimezone(),
       });
       return data;
+    } catch (err) {
+      throw new Error(getApiErrorMessage(err));
+    }
+  },
+
+  /** POST /api/chat/insights — Insights screen's "AI Suggestions" card. No request body:
+   * the server builds its own real stats (focus time, streak, a genuine per-activity
+   * breakdown, overdue tasks) rather than trusting whatever the client has on screen, since
+   * the Insights screen's own Activity Breakdown chart is still mock data. */
+  async getInsightSuggestions(): Promise<InsightSuggestion[]> {
+    try {
+      const { data } = await api.post<{ suggestions: InsightSuggestion[] }>('/api/chat/insights');
+      return data.suggestions;
     } catch (err) {
       throw new Error(getApiErrorMessage(err));
     }

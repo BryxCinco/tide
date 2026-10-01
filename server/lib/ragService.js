@@ -247,6 +247,13 @@ async function retrieveStats(userId, options = {}) {
     currentStreak: streakRes.data ? streakRes.data.current_streak : 0,
     mostProductiveDay,
     topActivity,
+    // Real per-activity minutes over the last 30 days — was already computed above for
+    // topActivity but never exposed. generateInsightSuggestions (llmService.js) uses this
+    // as its actual "activity breakdown" input, since the client's Insights screen donut
+    // is still mock data (a pre-existing gap, not something to feed into a real AI prompt).
+    activityBreakdownMinutes: Object.fromEntries(
+      Object.entries(byActivity).map(([name, seconds]) => [name, Math.round(seconds / 60)]),
+    ),
   };
 }
 

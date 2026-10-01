@@ -1,5 +1,6 @@
 export * from './ActivityDonut';
 export * from './ActivityHistory';
+export * from './AiSuggestions';
 export * from './BentoCard';
 export * from './Heatmap';
 export * from './HistoryView';
