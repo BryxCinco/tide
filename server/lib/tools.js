@@ -613,7 +613,11 @@ toolHandlers.deleteTask = async ({ userId, taskTitle, confirm }) => {
     return { matched: false, message: `I couldn't find a task matching "${taskTitle}".` };
   }
 
-  if (!confirm) {
+  // The model's raw JSON arg isn't guaranteed to be an actual boolean (a weaker tool-calling
+  // model can emit the string "false") — `!confirm` alone would treat that truthy string as
+  // confirmed and delete on the very first call, skipping the confirmation step entirely.
+  const isConfirmed = confirm === true || confirm === 'true';
+  if (!isConfirmed) {
     return {
       needsConfirmation: true,
       task: { id: match.id, title: match.title },
@@ -940,7 +944,10 @@ toolHandlers.suggestActivity = async ({ userId, count }) => {
 const SPECIAL_QUEST_CATEGORIES = ['focus', 'journal', 'tasks', 'wellness', 'growth'];
 
 toolHandlers.suggestSpecialQuest = async ({ userId, confirm, title, description, xp, icon, category }) => {
-  if (confirm) {
+  // See deleteTask's identical comment — the model's raw JSON arg isn't guaranteed to be an
+  // actual boolean.
+  const isConfirmed = confirm === true || confirm === 'true';
+  if (isConfirmed) {
     if (!title) {
       return { error: 'missing quest details', message: "I need the quest's details to add it — ask me to suggest one again first." };
     }
