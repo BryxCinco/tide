@@ -25,12 +25,14 @@ import { Button, EmptyState, ResponsiveContainer } from '@/components/ui';
 import { mockFocusActivities, mockFocusScore, mockHeroFocus, mockQuickActions } from '@/mocks/mockDashboard';
 import { getVisibleWidgets, useDashboardStore } from '@/store/dashboardStore';
 import { useJournalStore } from '@/store/journalStore';
+import { useLevelStore } from '@/store/levelStore';
 import { useQuestStore } from '@/store/questStore';
 import { useStreakStore } from '@/store/streakStore';
 import { isTaskOverdue, useTaskStore } from '@/store/taskStore';
 import { useTimerStore } from '@/store/timerStore';
 import type { StatItem, WidgetId } from '@/types/dashboard';
 import { formatDuration } from '@/utils/formatTime';
+import { progressToNextLevel } from '@/utils/xp';
 
 export default function DashboardScreen() {
   const [taskModalVisible, setTaskModalVisible] = useState(false);
@@ -48,6 +50,9 @@ export default function DashboardScreen() {
   const fetchStreak = useStreakStore((s) => s.fetchStreak);
   const journalCount = useJournalStore((s) => s.entries.length);
   const streak = useQuestStore((s) => s.streak);
+  const level = useLevelStore((s) => s.level);
+  const totalXp = useLevelStore((s) => s.totalXp);
+  const fetchLevel = useLevelStore((s) => s.fetchLevel);
 
   // DailyQuestCard fetches today's quests itself on its own mount (it's reused on both the
   // Dashboard and Tasks screen) — calling fetchTodayQuests again here would just be a
@@ -56,12 +61,13 @@ export default function DashboardScreen() {
     fetchTodaySessions();
     fetchTasks();
     fetchStreak();
+    fetchLevel();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchTodaySessions(), fetchTasks(), fetchStreak()]);
+    await Promise.all([fetchTodaySessions(), fetchTasks(), fetchStreak(), fetchLevel()]);
     setRefreshing(false);
   };
 
@@ -80,6 +86,7 @@ export default function DashboardScreen() {
     { id: 'tasks', label: 'Open Tasks', value: `${openTasksCount}`, icon: 'ListChecks', tint: 'purple' },
     { id: 'streak', label: 'Streak', value: `${streak} day${streak === 1 ? '' : 's'}`, icon: 'Flame', tint: 'muted' },
     { id: 'missed-tasks', label: 'Missed Tasks', value: `${missedTasksCount}`, icon: 'AlertTriangle', tint: missedTasksCount > 0 ? 'red' : 'muted' },
+    { id: 'level', label: 'Level', value: `Level ${level}`, icon: 'Trophy', tint: 'teal', progress: progressToNextLevel(totalXp) },
   ];
 
   const heroSubtitle = todaySessions.length > 0 ? `${formatDuration(todayTotalSeconds)} tracked today` : mockHeroFocus.subtitle;

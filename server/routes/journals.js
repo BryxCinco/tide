@@ -2,6 +2,7 @@ const express = require('express');
 const { supabaseAdmin } = require('../lib/supabaseClient');
 const { requireAuth } = require('../middleware/auth');
 const { upsertEmbedding, deleteEmbedding, buildJournalContent } = require('../lib/embeddingPipeline');
+const { awardXp } = require('../lib/xpService');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -44,7 +45,12 @@ router.post('/', async (req, res) => {
     metadata: { title: data.title, mood: data.mood },
   }).catch((err) => console.error('[journals] embedding failed:', err.message));
 
-  res.status(201).json({ entry: data });
+  const xp = await awardXp(req.user.id, 15, 'journal entry').catch((err) => {
+    console.error('[journals] XP award failed:', err.message);
+    return null;
+  });
+
+  res.status(201).json({ entry: data, xp });
 });
 
 router.patch('/:id', async (req, res) => {

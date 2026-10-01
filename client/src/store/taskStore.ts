@@ -7,6 +7,7 @@ import type { Task, TaskPriority, TaskStatus } from '../types/task';
 import { hasAuthToken, isGuestMode } from '../utils/authFlags';
 import { toDateKey } from '../utils/formatDate';
 import { storage } from '../utils/storage';
+import { useLevelStore } from './levelStore';
 import { showToast } from './toastStore';
 
 export type TaskFilter = 'all' | 'today' | 'done' | 'overdue';
@@ -123,10 +124,13 @@ export const useTaskStore = create<TaskState>()(
           tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...localPatch } : t)),
         }));
         if (isGuestMode()) return;
-        taskService.update(id, updates).catch((err) => {
-          set({ tasks: previous });
-          showToast(getApiErrorMessage(err), 'error');
-        });
+        taskService
+          .update(id, updates)
+          .then(({ xp }) => useLevelStore.getState().applyXpResult(xp))
+          .catch((err) => {
+            set({ tasks: previous });
+            showToast(getApiErrorMessage(err), 'error');
+          });
       },
 
       deleteTask: (id) => {
@@ -158,10 +162,13 @@ export const useTaskStore = create<TaskState>()(
           tasks: state.tasks.map((t) => (t.id === id ? { ...t, status: nextStatus, completedAt } : t)),
         }));
         if (isGuestMode()) return;
-        taskService.update(id, { status: nextStatus, completedAt: completedAt ?? null }).catch((err) => {
-          set({ tasks: previous });
-          showToast(getApiErrorMessage(err), 'error');
-        });
+        taskService
+          .update(id, { status: nextStatus, completedAt: completedAt ?? null })
+          .then(({ xp }) => useLevelStore.getState().applyXpResult(xp))
+          .catch((err) => {
+            set({ tasks: previous });
+            showToast(getApiErrorMessage(err), 'error');
+          });
       },
 
       setFilter: (filter) => set({ filter }),

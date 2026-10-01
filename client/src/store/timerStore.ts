@@ -5,6 +5,7 @@ import { getApiErrorMessage } from '../services/api';
 import { mapApiSession, sessionService } from '../services/session.service';
 import { hasAuthToken, isGuestMode } from '../utils/authFlags';
 import { useActivityStore } from './activityStore';
+import { useLevelStore } from './levelStore';
 import { showToast } from './toastStore';
 import type { Activity } from '../types/activity';
 import type { Session } from '../types/timer';
@@ -224,6 +225,7 @@ export const useTimerStore = create<TimerState>()((set, get) => ({
         startedAt: startDate.toISOString(),
         endedAt: endDate.toISOString(),
       })
+      .then(({ xp }) => useLevelStore.getState().applyXpResult(xp))
       .catch((err) => {
         showToast(`Session tracked locally, but didn't sync: ${getApiErrorMessage(err)}`, 'error');
       });

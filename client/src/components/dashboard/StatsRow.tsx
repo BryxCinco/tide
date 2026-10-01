@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import type { AccentTone, StatItem } from '../../types/dashboard';
 import { cn } from '../../utils/cn';
 import { colors } from '../../utils/theme';
-import { Icon, Text } from '../ui';
+import { Icon, ProgressBar, Text } from '../ui';
 
 // 'muted' has no explicit icon color — Icon's own default already resolves to the
 // theme-reactive muted tone, so omitting it here (rather than a static light-mode hex)
@@ -69,6 +69,8 @@ function StatCard({ stat }: { stat: StatItem }) {
           {stat.label}
         </Text>
       </View>
+
+      {stat.progress !== undefined && <ProgressBar value={stat.progress} variant="teal" size="sm" />}
 
       {stat.trend && (
         <Text variant="caption" color="accent" className="normal-case tracking-normal">

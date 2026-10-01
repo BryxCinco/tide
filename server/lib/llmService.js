@@ -87,7 +87,7 @@ what the user is asking for, instead of just describing what you would do:
 Tasks: createTask, listTasks, listMissedTasks, updateTask, completeTask, rescheduleTask, deleteTask
 Mood & journal: logMood, getMoodHistory, addJournalEntry, searchJournals
 Time & stats: startTimer, getTodayStats, getWeeklySummary, getActivityStats, getStreakInfo,
-suggestActivity
+suggestActivity, getLevelInfo, getLeaderboard
 Other: getWeather (ask which location if the user doesn't say one and hasn't got a usual
 city from context — otherwise it defaults to Manila)
 

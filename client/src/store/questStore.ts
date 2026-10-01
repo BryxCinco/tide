@@ -9,6 +9,7 @@ import { hasAuthToken, isGuestMode } from '../utils/authFlags';
 import { toDateKey } from '../utils/formatDate';
 import { generateDailyQuests } from '../utils/questGenerator';
 import { storage } from '../utils/storage';
+import { useLevelStore } from './levelStore';
 import { showToast } from './toastStore';
 
 export interface CustomQuestInput {
@@ -140,12 +141,13 @@ export const useQuestStore = create<QuestState>()(
         if (isGuestMode()) return;
 
         questService.complete(id, isCompleted).then(
-          ({ streak }) => {
+          ({ streak, xp }) => {
             // Only present when this completion finished off every quest for the day — see
             // the comment on quest.service.ts's complete(). Un-completing never arrives with
             // a streak update (the server doesn't revoke an already-credited day), so the
             // locally displayed streak can stay stale until the next fetchTodayQuests().
             if (streak) set({ streak: streak.currentStreak });
+            useLevelStore.getState().applyXpResult(xp);
           },
           (err) => {
             set({ todayQuests: previous });

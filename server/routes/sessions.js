@@ -2,6 +2,7 @@ const express = require('express');
 const { supabaseAdmin } = require('../lib/supabaseClient');
 const { requireAuth } = require('../middleware/auth');
 const { upsertEmbedding, deleteEmbedding, buildSessionContent } = require('../lib/embeddingPipeline');
+const { awardXp } = require('../lib/xpService');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -53,7 +54,12 @@ router.post('/', async (req, res) => {
     metadata: { activity_name: data.activity_name, date: data.ended_at || data.started_at },
   }).catch((err) => console.error('[sessions] embedding failed:', err.message));
 
-  res.status(201).json({ session: data });
+  const xp = await awardXp(req.user.id, Math.round((data.duration_seconds || 0) / 60), 'session logged').catch((err) => {
+    console.error('[sessions] XP award failed:', err.message);
+    return null;
+  });
+
+  res.status(201).json({ session: data, xp });
 });
 
 router.delete('/:id', async (req, res) => {

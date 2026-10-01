@@ -10,6 +10,7 @@ import { guestStorage } from '../utils/guestStorage';
 import { storage } from '../utils/storage';
 import { useActivityStore } from './activityStore';
 import { useJournalStore } from './journalStore';
+import { useLevelStore } from './levelStore';
 import { useQuestStore } from './questStore';
 import { useTaskStore } from './taskStore';
 import { useTimerStore } from './timerStore';
@@ -34,6 +35,7 @@ function resetDomainStores(): void {
   useActivityStore.getState().reset();
   useQuestStore.getState().reset();
   useTimerStore.getState().resetAccountData();
+  useLevelStore.getState().reset();
 }
 
 interface AuthState {

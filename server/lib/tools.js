@@ -7,6 +7,9 @@ const {
   buildSessionContent,
 } = require('./embeddingPipeline');
 const { retrieveStats, retrieveRelevantContext } = require('./ragService');
+const { awardXp, xpForLevel } = require('./xpService');
+
+const TASK_COMPLETE_XP = { low: 10, medium: 20, high: 30, critical: 50 };
 
 // WMO weather codes, as returned by Open-Meteo's `current_weather.weathercode` — this is
 // their fixed vocabulary (https://open-meteo.com/en/docs), not something TIDE defines.
@@ -281,6 +284,22 @@ const tools = [
   {
     type: 'function',
     function: {
+      name: 'getLevelInfo',
+      description: "Get the user's current level, total XP, and progress toward the next level.",
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'getLeaderboard',
+      description: "Get the top 10 users by total XP (shown anonymously) — for motivational 'how do I compare' questions.",
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'suggestActivity',
       description:
         'Suggest a few activities for the user to try, weighted toward ones they haven\'t done recently, each with a short reason. Use this for "suggest something" / "what should I do" / "I\'m bored" style requests.',
@@ -456,6 +475,11 @@ toolHandlers.completeTask = async ({ userId, taskTitle }) => {
   if (error) throw new Error(error.message);
 
   embedTaskInBackground(userId, data);
+  // findTaskByTitle's onlyOpen:true guarantees this was a not-done -> done transition, so
+  // no extra guard is needed here (unlike updateTask below).
+  await awardXp(userId, TASK_COMPLETE_XP[data.priority] || TASK_COMPLETE_XP.medium, 'task completed via AI').catch((err) =>
+    console.error('[tools] completeTask XP award failed:', err.message),
+  );
 
   return { task: data, matched: true, message: `Marked "${data.title}" as done.` };
 };
@@ -511,6 +535,14 @@ toolHandlers.updateTask = async ({ userId, taskTitle, updates = {} }) => {
   if (error) throw new Error(error.message);
 
   embedTaskInBackground(userId, data);
+
+  // match (fetched before the patch) carries the pre-update status — only award XP on the
+  // not-done -> done transition, not on every edit of an already-done task.
+  if (patch.status === 'done' && match.status !== 'done') {
+    await awardXp(userId, TASK_COMPLETE_XP[data.priority] || TASK_COMPLETE_XP.medium, 'task completed via AI').catch((err) =>
+      console.error('[tools] updateTask XP award failed:', err.message),
+    );
+  }
 
   return { task: data, message: `Updated "${data.title}".` };
 };
@@ -666,6 +698,12 @@ toolHandlers.startTimer = async ({ userId, activityName, durationMinutes }) => {
     content: buildSessionContent(data),
     metadata: { activity_name: data.activity_name, date: data.ended_at || data.started_at },
   }).catch((err) => console.error('[tools] startTimer embedding failed:', err.message));
+
+  if (durationSeconds > 0) {
+    await awardXp(userId, Math.round(durationSeconds / 60), 'session logged via AI').catch((err) =>
+      console.error('[tools] startTimer XP award failed:', err.message),
+    );
+  }
 
   return {
     session: data,
@@ -844,6 +882,43 @@ toolHandlers.suggestActivity = async ({ userId, count }) => {
   };
 };
 
+toolHandlers.getLevelInfo = async ({ userId }) => {
+  const { data, error } = await supabaseAdmin.from('user_levels').select('total_xp, level').eq('user_id', userId).single();
+
+  // PGRST116 = no row yet — same defensive default as xpService.awardXp.
+  if (error && error.code !== 'PGRST116') throw new Error(error.message);
+
+  const totalXp = data?.total_xp ?? 0;
+  const level = data?.level ?? 1;
+  const floor = xpForLevel(level);
+  const ceiling = xpForLevel(level + 1);
+  const xpToNext = Math.max(0, ceiling - totalXp);
+  const progress = ceiling === floor ? 100 : Math.round(((totalXp - floor) / (ceiling - floor)) * 100);
+
+  return {
+    level,
+    totalXp,
+    xpToNext,
+    progress,
+    message: `Level ${level}, ${totalXp} total XP — ${xpToNext} XP to level ${level + 1}.`,
+  };
+};
+
+toolHandlers.getLeaderboard = async () => {
+  const { data, error } = await supabaseAdmin.from('user_levels').select('level, total_xp').order('total_xp', { ascending: false }).limit(10);
+
+  if (error) throw new Error(error.message);
+
+  const leaderboard = (data || []).map((row, i) => ({ rank: i + 1, level: row.level, totalXp: row.total_xp }));
+
+  return {
+    leaderboard,
+    message: leaderboard.length
+      ? `Top ${leaderboard.length}: ${leaderboard.map((r) => `#${r.rank} Level ${r.level} (${r.totalXp} XP)`).join(', ')}.`
+      : 'No one has earned XP yet.',
+  };
+};
+
 toolHandlers.addJournalEntry = async ({ userId, title, content, mood, tags }) => {
   if (!title || !title.trim() || !content || !content.trim()) {
     return { error: 'title and content are required', message: 'I need both a title and some content to save a journal entry — what would you like it to say?' };
@@ -871,6 +946,8 @@ toolHandlers.addJournalEntry = async ({ userId, title, content, mood, tags }) =>
     content: buildJournalContent(data),
     metadata: { title: data.title, mood: data.mood },
   }).catch((err) => console.error('[tools] addJournalEntry embedding failed:', err.message));
+
+  await awardXp(userId, 15, 'journal entry via AI').catch((err) => console.error('[tools] addJournalEntry XP award failed:', err.message));
 
   return { entry: data, message: `Added journal entry: "${data.title}"` };
 };

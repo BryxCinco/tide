@@ -15,6 +15,7 @@ const journalsRoutes = require('./routes/journals');
 const questsRoutes = require('./routes/quests');
 const settingsRoutes = require('./routes/settings');
 const streaksRoutes = require('./routes/streaks');
+const levelsRoutes = require('./routes/levels');
 const profileRoutes = require('./routes/profile');
 const debugRagRoutes = require('./routes/debugRag');
 const chatRoutes = require('./routes/chat');
@@ -96,6 +97,7 @@ app.use('/api/journal-entries', journalsRoutes);
 app.use('/api/quests', questsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/streaks', streaksRoutes);
+app.use('/api/levels', levelsRoutes);
 app.use('/api/profile', profileRoutes);
 // Phase 11.3 debug endpoint — see routes/debugRag.js's own comment.
 app.use('/api/debug/rag', debugRagRoutes);

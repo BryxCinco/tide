@@ -1,4 +1,5 @@
 import type { JournalEntry, Mood } from '../types/journal';
+import type { XpResult } from '../types/xp';
 import { api } from './api';
 
 export interface ApiJournalEntry {
@@ -49,14 +50,14 @@ export const journalService = {
     return data.entries.map(mapApiJournalEntry);
   },
 
-  async create(payload: CreateJournalPayload): Promise<JournalEntry> {
-    const { data } = await api.post<{ entry: ApiJournalEntry }>('/api/journal-entries', {
+  async create(payload: CreateJournalPayload): Promise<{ entry: JournalEntry; xp: XpResult | null }> {
+    const { data } = await api.post<{ entry: ApiJournalEntry; xp: XpResult | null }>('/api/journal-entries', {
       title: payload.title,
       content: payload.content,
       mood: payload.mood,
       tags: payload.tags,
     });
-    return mapApiJournalEntry(data.entry);
+    return { entry: mapApiJournalEntry(data.entry), xp: data.xp };
   },
 
   async update(id: string, payload: UpdateJournalPayload): Promise<JournalEntry> {

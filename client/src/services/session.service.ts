@@ -1,4 +1,5 @@
 import type { Session } from '../types/timer';
+import type { XpResult } from '../types/xp';
 import { formatClockTime } from '../utils/formatTime';
 import { api } from './api';
 
@@ -47,8 +48,8 @@ export const sessionService = {
     return data.sessions;
   },
 
-  async create(payload: CreateSessionPayload): Promise<ApiSession> {
-    const { data } = await api.post<{ session: ApiSession }>('/api/sessions', {
+  async create(payload: CreateSessionPayload): Promise<{ session: ApiSession; xp: XpResult | null }> {
+    const { data } = await api.post<{ session: ApiSession; xp: XpResult | null }>('/api/sessions', {
       activity_id: payload.activityId,
       activity_name: payload.activityName,
       duration_seconds: payload.durationSeconds,
@@ -57,7 +58,7 @@ export const sessionService = {
       started_at: payload.startedAt,
       ended_at: payload.endedAt,
     });
-    return data.session;
+    return { session: data.session, xp: data.xp };
   },
 
   async remove(id: string): Promise<void> {

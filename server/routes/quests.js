@@ -1,9 +1,13 @@
 const express = require('express');
 const { supabaseAdmin } = require('../lib/supabaseClient');
 const { requireAuth } = require('../middleware/auth');
+const { awardXp } = require('../lib/xpService');
 
 const router = express.Router();
 router.use(requireAuth);
+
+// Streak lengths that earn a one-time bonus on top of the day's own quest XP.
+const STREAK_MILESTONES = [7, 30, 100];
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
@@ -51,6 +55,13 @@ async function bumpStreakIfDayComplete(userId, dateKey) {
     .single();
 
   if (updateError) return null;
+
+  if (STREAK_MILESTONES.includes(nextCurrent)) {
+    await awardXp(userId, 100, `${nextCurrent}-day streak bonus`).catch((err) =>
+      console.error('[quests] streak bonus XP award failed:', err.message),
+    );
+  }
+
   return updated;
 }
 
@@ -128,10 +139,16 @@ router.patch('/:id', async (req, res) => {
   } else if ('recurrence_type' in req.body) {
     update.recurrence_type = req.body.recurrence_type;
   }
+  let wasCompleted = false;
   if ('is_completed' in req.body) {
     togglingCompletion = true;
     update.is_completed = Boolean(req.body.is_completed);
     update.completed_at = update.is_completed ? new Date().toISOString() : null;
+
+    // Fetched up front so completion XP only fires on the not-completed -> completed
+    // transition, not on every resend of is_completed: true for an already-completed quest.
+    const { data: existing } = await supabaseAdmin.from('quests').select('is_completed').eq('id', req.params.id).eq('user_id', req.user.id).single();
+    wasCompleted = Boolean(existing?.is_completed);
   }
 
   const { data: quest, error } = await supabaseAdmin
@@ -145,9 +162,16 @@ router.patch('/:id', async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   if (!quest) return res.status(404).json({ error: 'Quest not found' });
 
-  const streak = togglingCompletion && update.is_completed ? await bumpStreakIfDayComplete(req.user.id, quest.date) : null;
+  const justCompleted = togglingCompletion && update.is_completed && !wasCompleted;
+  const streak = justCompleted ? await bumpStreakIfDayComplete(req.user.id, quest.date) : null;
+  const xp = justCompleted
+    ? await awardXp(req.user.id, quest.xp || 25, 'quest completed').catch((err) => {
+        console.error('[quests] XP award failed:', err.message);
+        return null;
+      })
+    : null;
 
-  res.json({ quest, streak });
+  res.json({ quest, streak, xp });
 });
 
 // DELETE /api/quests/:id — custom (user-created) quests only; system-generated ones can be

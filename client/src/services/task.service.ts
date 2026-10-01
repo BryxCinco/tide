@@ -1,4 +1,5 @@
 import type { Task, TaskPriority, TaskStatus } from '../types/task';
+import type { XpResult } from '../types/xp';
 import { api } from './api';
 
 export interface ApiTask {
@@ -78,8 +79,8 @@ export const taskService = {
     return mapApiTask(data.task);
   },
 
-  async update(id: string, payload: UpdateTaskPayload): Promise<Task> {
-    const { data } = await api.patch<{ task: ApiTask }>(`/api/tasks/${id}`, {
+  async update(id: string, payload: UpdateTaskPayload): Promise<{ task: Task; xp: XpResult | null }> {
+    const { data } = await api.patch<{ task: ApiTask; xp: XpResult | null }>(`/api/tasks/${id}`, {
       title: payload.title,
       description: payload.description,
       status: payload.status,
@@ -89,7 +90,7 @@ export const taskService = {
       tags: payload.tags,
       completed_at: payload.completedAt,
     });
-    return mapApiTask(data.task);
+    return { task: mapApiTask(data.task), xp: data.xp };
   },
 
   async remove(id: string): Promise<void> {

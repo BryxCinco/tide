@@ -2,9 +2,12 @@ const express = require('express');
 const { supabaseAdmin } = require('../lib/supabaseClient');
 const { requireAuth } = require('../middleware/auth');
 const { upsertEmbedding, deleteEmbedding, buildTaskContent } = require('../lib/embeddingPipeline');
+const { awardXp } = require('../lib/xpService');
 
 const router = express.Router();
 router.use(requireAuth);
+
+const TASK_COMPLETE_XP = { low: 10, medium: 20, high: 30, critical: 50 };
 
 router.get('/', async (req, res) => {
   const { data, error } = await supabaseAdmin
@@ -53,6 +56,11 @@ router.post('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   const { title, description, status, priority, activity_type, due_date, tags } = req.body;
 
+  // Fetched up front so completion XP only fires on the todo/in-progress -> done
+  // transition, not on every subsequent edit of an already-done task (which would otherwise
+  // resend status: 'done' and double-award).
+  const { data: existing } = await supabaseAdmin.from('tasks').select('status').eq('id', req.params.id).eq('user_id', req.user.id).single();
+
   const update = { title, description, status, priority, activity_type, due_date, tags };
   // completed_at follows status unless the caller passes it explicitly.
   if (req.body.completed_at !== undefined) {
@@ -82,7 +90,15 @@ router.patch('/:id', async (req, res) => {
     metadata: { title: data.title, status: data.status, priority: data.priority },
   }).catch((err) => console.error('[tasks] embedding failed:', err.message));
 
-  res.json({ task: data });
+  let xp = null;
+  if (existing && existing.status !== 'done' && data.status === 'done') {
+    xp = await awardXp(req.user.id, TASK_COMPLETE_XP[data.priority] || TASK_COMPLETE_XP.medium, 'task completed').catch((err) => {
+      console.error('[tasks] XP award failed:', err.message);
+      return null;
+    });
+  }
+
+  res.json({ task: data, xp });
 });
 
 router.delete('/:id', async (req, res) => {

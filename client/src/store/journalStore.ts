@@ -7,6 +7,7 @@ import type { JournalEntry, Mood } from '../types/journal';
 import { hasAuthToken, isGuestMode } from '../utils/authFlags';
 import { countWords } from '../utils/formatDate';
 import { storage } from '../utils/storage';
+import { useLevelStore } from './levelStore';
 import { showToast } from './toastStore';
 
 export type JournalFilter = 'all' | 'week' | 'month' | 'favorites';
@@ -83,8 +84,9 @@ export const useJournalStore = create<JournalState>()(
           return entry;
         }
 
-        const newEntry = await journalService.create({ title, content, mood, tags });
+        const { entry: newEntry, xp } = await journalService.create({ title, content, mood, tags });
         set((state) => ({ entries: [newEntry, ...state.entries] }));
+        useLevelStore.getState().applyXpResult(xp);
         return newEntry;
       },
 

@@ -5,6 +5,7 @@ export * from './DeleteAccountModal';
 export * from './EditProfileModal';
 export * from './FeedbackModal';
 export * from './LanguageModal';
+export * from './LevelCard';
 export * from './LogoutModal';
 export * from './OptionPickerModal';
 export * from './ProfileCover';

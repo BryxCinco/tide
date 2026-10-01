@@ -11,6 +11,7 @@ import {
   EditProfileModal,
   FeedbackModal,
   LanguageModal,
+  LevelCard,
   LogoutModal,
   OptionPickerModal,
   ProfileCover,
@@ -155,6 +156,8 @@ export default function ProfileScreen() {
               className="py-4"
             />
           )}
+
+          <LevelCard />
 
           <StatsRow />
 

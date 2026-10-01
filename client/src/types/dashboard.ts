@@ -15,6 +15,9 @@ export interface StatItem {
   tint: AccentTone;
   /** e.g. "+18%" or "Personal best!" — free-form, not always a percentage. */
   trend?: string;
+  /** 0-100 — renders a slim ProgressBar under the label instead of/alongside `trend` (used
+   * by the Level card's XP-to-next-level bar). Omit for a plain stat with no bar. */
+  progress?: number;
 }
 
 export interface FocusActivity {
