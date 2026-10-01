@@ -315,6 +315,26 @@ const tools = [
   {
     type: 'function',
     function: {
+      name: 'suggestSpecialQuest',
+      description:
+        'Analyze the user\'s weakest area (journaling gap, session gap, task completion rate, streak) and suggest ONE custom quest to address it, with XP and a reason. Two-step like deleteTask: first call with confirm omitted/false just returns the suggestion — relay it and ask "want me to add this quest?". Only on a clear yes, call again with confirm:true AND the exact title/description/xp/icon/category from the first call, to actually create it.',
+      parameters: {
+        type: 'object',
+        properties: {
+          confirm: { type: 'boolean', description: 'Must be true to actually create the quest. Leave false/omitted on the first call.' },
+          title: { type: 'string', description: 'Only on confirm:true — the exact title from the suggestion.' },
+          description: { type: 'string', description: 'Only on confirm:true — the exact description from the suggestion.' },
+          xp: { type: 'number', description: 'Only on confirm:true — the exact xp amount from the suggestion.' },
+          icon: { type: 'string', description: 'Only on confirm:true — the exact icon name from the suggestion.' },
+          category: { type: 'string', description: 'Only on confirm:true — the exact category from the suggestion.' },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'addJournalEntry',
       description: 'Write a new journal entry for the user.',
       parameters: {
@@ -894,6 +914,120 @@ toolHandlers.suggestActivity = async ({ userId, count }) => {
   return {
     suggestions,
     message: suggestions.map((s) => `${s.activityName} — ${s.reason}`).join(' / '),
+  };
+};
+
+// DESTRUCTIVE-ish two-step, same shape as deleteTask: the first call (confirm falsy) only
+// analyzes and suggests, touching nothing. The second call (confirm:true) actually inserts —
+// and since tool-call/tool-result messages don't persist across separate HTTP requests (see
+// deleteTask's own comment on this), the model has to echo back the exact title/description/
+// xp/icon from the first call rather than this handler remembering what it suggested.
+const SPECIAL_QUEST_CATEGORIES = ['focus', 'journal', 'tasks', 'wellness', 'growth'];
+
+toolHandlers.suggestSpecialQuest = async ({ userId, confirm, title, description, xp, icon, category }) => {
+  if (confirm) {
+    if (!title) {
+      return { error: 'missing quest details', message: "I need the quest's details to add it — ask me to suggest one again first." };
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('quests')
+      .insert({
+        user_id: userId,
+        title,
+        description: description || null,
+        xp: xp || 25,
+        icon: icon || 'Sparkles',
+        // Must be one of the client's fixed QuestCategory values (see
+        // client/src/types/quest.ts) — an unrecognized category breaks the quest card's
+        // color/label lookup there, so an unexpected value falls back to 'growth' rather
+        // than passing through whatever the model sent.
+        category: SPECIAL_QUEST_CATEGORIES.includes(category) ? category : 'growth',
+        date: new Date().toISOString().slice(0, 10),
+        is_custom: true,
+        is_active: true,
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    return { added: true, quest: data, message: `Added "${data.title}" to today's quests (+${data.xp} XP).` };
+  }
+
+  const [journalRes, sessionRes, tasksRes, streakRes] = await Promise.all([
+    supabaseAdmin.from('journal_entries').select('created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(1),
+    supabaseAdmin.from('time_logs').select('ended_at').eq('user_id', userId).order('ended_at', { ascending: false }).limit(1),
+    supabaseAdmin.from('tasks').select('status').eq('user_id', userId),
+    supabaseAdmin.from('streaks').select('current_streak').eq('user_id', userId).single(),
+  ]);
+
+  if (journalRes.error) throw new Error(journalRes.error.message);
+  if (sessionRes.error) throw new Error(sessionRes.error.message);
+  if (tasksRes.error) throw new Error(tasksRes.error.message);
+  // PGRST116 = no streaks row yet — default to 0 rather than erroring.
+  if (streakRes.error && streakRes.error.code !== 'PGRST116') throw new Error(streakRes.error.message);
+
+  const daysSince = (iso) => (iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : null);
+  const daysSinceJournal = daysSince(journalRes.data?.[0]?.created_at);
+  const daysSinceSession = daysSince(sessionRes.data?.[0]?.ended_at);
+  const tasks = tasksRes.data || [];
+  const completionRate = tasks.length ? tasks.filter((t) => t.status === 'done').length / tasks.length : null;
+  const currentStreak = streakRes.data?.current_streak ?? 0;
+
+  // Checked weakest-signal-first: a journaling gap matters more than a slightly stale
+  // session, which matters more than a so-so completion rate — each branch only fires once
+  // the ones before it don't apply, so the user gets ONE suggestion, not four.
+  let suggestion;
+  if (daysSinceJournal === null || daysSinceJournal >= 3) {
+    suggestion = {
+      title: 'Write 3 journal entries this week',
+      description: 'Reflect on your week, even briefly — a few lines count.',
+      xp: 150,
+      icon: 'BookOpen',
+      category: 'journal',
+      reason: daysSinceJournal === null ? "You haven't written a journal entry yet." : `You haven't journaled in ${daysSinceJournal} days.`,
+    };
+  } else if (daysSinceSession === null || daysSinceSession >= 2) {
+    suggestion = {
+      title: 'Complete 2 focus sessions today',
+      description: 'Any activity counts — just start the timer.',
+      xp: 100,
+      icon: 'Timer',
+      category: 'focus',
+      reason: daysSinceSession === null ? "You haven't logged a focus session yet." : `You haven't tracked a session in ${daysSinceSession} days.`,
+    };
+  } else if (completionRate !== null && completionRate < 0.5) {
+    suggestion = {
+      title: 'Complete 3 tasks this week',
+      description: 'Clear out a few of your open tasks.',
+      xp: 120,
+      icon: 'CheckSquare',
+      category: 'tasks',
+      reason: `Only ${Math.round(completionRate * 100)}% of your tasks are completed right now.`,
+    };
+  } else if (currentStreak === 0) {
+    suggestion = {
+      title: "Complete today's quests to start a streak",
+      description: 'Finish every quest today to get your streak going.',
+      xp: 50,
+      icon: 'Flame',
+      category: 'growth',
+      reason: "You don't have an active streak yet.",
+    };
+  } else {
+    suggestion = {
+      title: 'Keep the momentum going',
+      description: "Complete today's quests to extend your streak.",
+      xp: 75,
+      icon: 'Flame',
+      category: 'growth',
+      reason: `You're on a ${currentStreak}-day streak — nice work.`,
+    };
+  }
+
+  return {
+    ...suggestion,
+    message: `Suggested quest: "${suggestion.title}" (+${suggestion.xp} XP) — ${suggestion.reason} Ask the user if they'd like to add it; only on a clear yes, call this tool again with confirm:true and this exact title/description/xp/icon/category.`,
   };
 };
 
