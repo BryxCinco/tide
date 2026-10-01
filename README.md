@@ -4,7 +4,7 @@
 
 TIDE combines focus-session tracking, mood journaling, and task management with an AI Coach that can see your real history (via retrieval-augmented generation) and act on it directly (via tool-calling) — log a mood, create or complete a task, suggest a quest, reflect on a journal entry, or just tell you how your week went.
 
-> **Status:** actively developed, not yet a polished v1.0. See [Known limitations](#known-limitations) before treating any environment as production.
+> **Status:** v1.0.0. See [Known limitations](#known-limitations) for what's still rough around the edges.
 
 ## Screenshots
 
@@ -16,7 +16,7 @@ _Add screenshots here — e.g. `docs/screenshots/dashboard.png`, `docs/screensho
 - **Journaling with mood** — mood selector, tags, search, and AI reflection on request
 - **Task management with XP** — single-due-date tasks, overdue/due-today badges, and a leveling system (XP for completing tasks, logging sessions, journaling, finishing quests, and streak milestones)
 - **Custom activities** — predefined + user-created, with per-activity history
-- **Insights & analytics** — task stats, journal/session history, and AI-generated suggestions grounded in your real weekly stats (see [Known limitations](#known-limitations) — several Insights charts are still mock data)
+- **Insights & analytics** — productivity score, mood trend, activity breakdown, heatmap, and task stats, all computed from your real tracked data, plus AI-generated suggestions grounded in the same stats
 - **AI Coach** — RAG + agentic tool-calling (Groq) across 23 tools: create/update/complete/delete/reschedule tasks, log mood, suggest tasks or a custom quest, reflect on a journal entry, check level/leaderboard, weather, and more
 - **13 languages** — en, fil, es, ja, zh, ar, ru, ko, id, fr, de, tr, it
 - **Dark mode**, Google sign-in (with optional password setup), and guest mode (local-only, no account)
@@ -86,9 +86,11 @@ Run the SQL files in `server/migrations/` against your Supabase project's SQL Ed
 
 ## Known limitations
 
-- **Insights screen is mostly mock data.** Of its ~10 cards, only AI Suggestions, Task Stats, and History read real data. Productivity Score, Activity Breakdown, Heatmap, Time Tracked, Mood Trend, and Weekly Summary are still backed by `client/src/mocks/mockInsights.ts` and render identically for every user regardless of what they've actually tracked. The real per-activity data these would need (`activityBreakdownMinutes`) already exists server-side (`server/lib/ragService.js`) and is wired into the AI Suggestions prompt, but not into these charts.
 - **Web bundle is ~12MB** (target was <5MB). The JS entry point is ~5.8MB; most of the rest is Inter font files — only 4 of the ~18 bundled weights are actually loaded (`client/app/_layout.tsx`'s `useFonts` call). Switching to the per-weight `@expo-google-fonts/inter/<weight>` subpackages instead of the monolithic package should recover most of this.
+- The Dashboard's "Weekly Progress" widget (`client/src/components/dashboard/widgets/WeeklyProgressWidget.tsx`) still reads mock data — separate from the Insights screen (which is now fully real), out of scope for that pass.
 - Export Data doesn't include today's timer sessions until the Timer tab has been opened at least once this session (`timerStore` isn't persisted).
+- `activities`/`time_logs`/`tasks`/etc. have no migration file for their base schema (it predates this repo's `migrations/` directory) — RLS on those tables should be double-checked directly in the Supabase dashboard rather than assumed from code.
+- `client-old/` (a pre-Expo Vite scaffold, ~89MB) is still tracked in the repo; left in place pending a decision on whether to remove it.
 
 ## License
 
