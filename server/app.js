@@ -45,7 +45,31 @@ if (initError) {
   console.error('[app] Supabase client failed to initialize:', initError.message);
 }
 
-app.use(cors());
+// Wide-open cors() reflects any Origin — fine while this was dev-only, not once it's a
+// public production API. ALLOWED_ORIGINS (comma-separated, set in Vercel env vars) lets
+// the deployed frontend through; the hardcoded entries cover local dev and the known
+// production frontend so this still works out of the box without that var set. Requests
+// with no Origin header (native apps, curl, server-to-server) are always allowed — CORS
+// only ever governs browser requests in the first place.
+const DEFAULT_ALLOWED_ORIGINS = [
+  'https://tide-rust.vercel.app',
+  'http://localhost:8081',
+  'http://localhost:19006',
+];
+const ALLOWED_ORIGINS = [
+  ...DEFAULT_ALLOWED_ORIGINS,
+  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()) : []),
+];
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+        return callback(null, true);
+      }
+      callback(new Error(`CORS: origin ${origin} not allowed`));
+    },
+  })
+);
 // Default is 100kb — a 2MB avatar/cover photo picked as a base64 data: URI (see
 // imageUpload.ts) runs ~2.7MB once encoded, which the default limit was rejecting with a
 // 413. profile.js decodes and uploads it to Storage rather than storing the base64 itself,
@@ -74,11 +98,15 @@ app.get('/api/health', async (req, res) => {
   res.json({ status: 'ok', supabaseConnected: true });
 });
 
-// Temporary diagnostic endpoint — reports whether each required env var is present (never
-// its value) and whether the Supabase clients actually initialized. Safe to leave up (no
-// secrets ever leave this response), but it's naming your exact env var set to anyone who
-// requests it, so consider removing or gating it once the deployment is healthy again.
+// Diagnostic endpoint — reports whether each required env var is present (never its value)
+// and whether the Supabase clients actually initialized. No secrets ever leave this
+// response, but it does name the exact env var set and internal init errors to anyone who
+// requests it, so it's gated off in production now that the deployment is stable; still
+// available in dev/preview for the Vercel env-var gotcha noted above.
 app.get('/api/debug', (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).json({ error: 'Not found' });
+  }
   res.json({
     envVars: getEnvStatus(),
     nodeEnv: process.env.NODE_ENV || null,
