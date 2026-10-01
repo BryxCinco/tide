@@ -22,7 +22,8 @@ import {
 import { CalendarWidget, StreakWidget, TimeWidget, WeatherWidget, WeeklyProgressWidget } from '@/components/dashboard/widgets';
 import { TaskFormModal } from '@/components/tasks';
 import { Button, EmptyState, ResponsiveContainer } from '@/components/ui';
-import { mockFocusActivities, mockFocusScore, mockHeroFocus, mockQuickActions } from '@/mocks/mockDashboard';
+import { MOOD_ICON_MAP } from '@/components/journal/MoodIcon';
+import { mockHeroFocus, mockQuickActions } from '@/mocks/mockDashboard';
 import { getVisibleWidgets, useDashboardStore } from '@/store/dashboardStore';
 import { useJournalStore } from '@/store/journalStore';
 import { useLevelStore } from '@/store/levelStore';
@@ -30,9 +31,12 @@ import { useQuestStore } from '@/store/questStore';
 import { useStreakStore } from '@/store/streakStore';
 import { isTaskOverdue, useTaskStore } from '@/store/taskStore';
 import { useTimerStore } from '@/store/timerStore';
-import type { StatItem, WidgetId } from '@/types/dashboard';
+import type { AccentTone, FocusActivity, JournalPreview, StatItem, TimeLogEntry, WidgetId } from '@/types/dashboard';
+import { formatEntryDate } from '@/utils/formatDate';
 import { formatDuration } from '@/utils/formatTime';
 import { progressToNextLevel } from '@/utils/xp';
+
+const FOCUS_BREAKDOWN_TINTS: AccentTone[] = ['teal', 'blue', 'purple'];
 
 export default function DashboardScreen() {
   const [taskModalVisible, setTaskModalVisible] = useState(false);
@@ -48,7 +52,9 @@ export default function DashboardScreen() {
   const tasks = useTaskStore((s) => s.tasks);
   const fetchTasks = useTaskStore((s) => s.fetchTasks);
   const fetchStreak = useStreakStore((s) => s.fetchStreak);
-  const journalCount = useJournalStore((s) => s.entries.length);
+  const journalEntries = useJournalStore((s) => s.entries);
+  const fetchJournalEntries = useJournalStore((s) => s.fetchEntries);
+  const journalCount = journalEntries.length;
   const streak = useQuestStore((s) => s.streak);
   const level = useLevelStore((s) => s.level);
   const totalXp = useLevelStore((s) => s.totalXp);
@@ -62,12 +68,13 @@ export default function DashboardScreen() {
     fetchTasks();
     fetchStreak();
     fetchLevel();
+    fetchJournalEntries();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchTodaySessions(), fetchTasks(), fetchStreak(), fetchLevel()]);
+    await Promise.all([fetchTodaySessions(), fetchTasks(), fetchStreak(), fetchLevel(), fetchJournalEntries()]);
     setRefreshing(false);
   };
 
@@ -91,6 +98,67 @@ export default function DashboardScreen() {
 
   const heroSubtitle = todaySessions.length > 0 ? `${formatDuration(todayTotalSeconds)} tracked today` : mockHeroFocus.subtitle;
 
+  // Real per-activity breakdown for today, grouped from todaySessions (which already carry
+  // their activity's label snapshotted at completion time — see Session's own doc comment),
+  // sorted largest-first so the most relevant activity reads first.
+  const focusActivities: FocusActivity[] = useMemo(() => {
+    const totals = new Map<string, { label: string; seconds: number }>();
+    for (const session of todaySessions) {
+      const existing = totals.get(session.activityId);
+      if (existing) {
+        existing.seconds += session.durationSeconds;
+      } else {
+        totals.set(session.activityId, { label: session.activityLabel, seconds: session.durationSeconds });
+      }
+    }
+    return Array.from(totals.entries())
+      .sort((a, b) => b[1].seconds - a[1].seconds)
+      .map(([id, data], index) => ({
+        id,
+        label: data.label,
+        duration: formatDuration(data.seconds),
+        percentage: todayTotalSeconds > 0 ? Math.round((data.seconds / todayTotalSeconds) * 100) : 0,
+        tint: FOCUS_BREAKDOWN_TINTS[index % FOCUS_BREAKDOWN_TINTS.length],
+      }));
+  }, [todaySessions, todayTotalSeconds]);
+
+  // "What fraction of the day so far have you spent in a tracked focus session" — real and
+  // derivable from data that already exists, unlike a fabricated "productivity" score. Capped
+  // at 100 since someone tracking overlapping/edited sessions could otherwise exceed it.
+  const focusScore = useMemo(() => {
+    const now = new Date();
+    const secondsSinceMidnight = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+    if (secondsSinceMidnight <= 0) return 0;
+    return Math.min(100, Math.round((todayTotalSeconds / secondsSinceMidnight) * 100));
+  }, [todayTotalSeconds]);
+
+  const recentActivityEntries: TimeLogEntry[] = useMemo(
+    () =>
+      todaySessions.slice(0, 5).map((session) => ({
+        id: session.id,
+        activity: session.activityLabel,
+        icon: session.icon as TimeLogEntry['icon'],
+        tint: 'teal',
+        startTime: session.startTime,
+        endTime: session.endTime,
+        duration: formatDuration(session.durationSeconds),
+      })),
+    [todaySessions]
+  );
+
+  const recentJournalEntries: JournalPreview[] = useMemo(
+    () =>
+      journalEntries.slice(0, 3).map((entry) => ({
+        id: entry.id,
+        date: formatEntryDate(entry.createdAt),
+        title: entry.title,
+        preview: entry.content,
+        mood: entry.mood ? MOOD_ICON_MAP[entry.mood].label : undefined,
+        tags: entry.tags,
+      })),
+    [journalEntries]
+  );
+
   const renderWidget = (id: WidgetId): ReactNode => {
     switch (id) {
       case 'hero':
@@ -100,15 +168,15 @@ export default function DashboardScreen() {
       case 'tasks':
         return <TodaysTasks onAddTask={() => setTaskModalVisible(true)} />;
       case 'focusFlow':
-        return <FocusFlow score={mockFocusScore} activities={mockFocusActivities} />;
+        return <FocusFlow score={focusScore} activities={focusActivities} />;
       case 'quote':
         return <QuoteCard />;
       case 'quickActions':
         return <QuickActions actions={mockQuickActions} />;
       case 'recentActivity':
-        return <RecentActivity entries={[]} />;
+        return <RecentActivity entries={recentActivityEntries} />;
       case 'recentJournal':
-        return <RecentJournal entries={[]} />;
+        return <RecentJournal entries={recentJournalEntries} />;
       case 'insights':
         // The real Insights screen is Phase 7 — this is a placeholder widget, not a bug.
         return <EmptyState icon="BarChart3" title="Weekly Insights" description="Coming soon — trends across your time and mood." />;
