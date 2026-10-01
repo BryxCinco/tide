@@ -25,7 +25,7 @@ import { useTaskStore } from '@/store/taskStore';
 import { useTimerStore } from '@/store/timerStore';
 import type { CustomInsightsRange, InsightsRange, MonthYearRange } from '@/types/insights';
 import { formatDuration } from '@/utils/formatTime';
-import { formatMonthYear } from '@/utils/formatDate';
+import { formatMonthYear, fromDateKey } from '@/utils/formatDate';
 
 /** Heatmap always shows the most recent 30 days regardless of the selected range — a true
  * year-long contribution graph needs GitHub's own layout (53 columns x 7 rows), which is a
@@ -61,14 +61,18 @@ function rangeToWindow(range: InsightsRange, customRange?: CustomInsightsRange, 
     }
     case 'custom': {
       if (!customRange) return { days: 7, endDate: today };
-      const start = new Date(customRange.start).getTime();
-      const end = new Date(customRange.end).getTime();
+      // customRange.start/.end are local-calendar "YYYY-MM-DD" date-key strings (see
+      // toDateKey's own comment on why those exist) — `new Date(dateKeyString)` parses as
+      // UTC midnight, not local midnight, which silently shifts the whole window back a day
+      // for anyone west of UTC. fromDateKey is the matching local-midnight parser.
+      const start = fromDateKey(customRange.start).getTime();
+      const end = fromDateKey(customRange.end).getTime();
       const requestedDays = Math.max(1, Math.round((end - start) / 86400000) + 1);
       // Same reasoning as dropping 'year'/'all': TimeChart/MoodTrend can't usefully render
       // hundreds of bars/labels. A custom range can still request that many days (the
       // picker doesn't limit span), so clamp to the most recent MAX_CUSTOM_RANGE_DAYS days
       // of whatever was picked rather than rendering the same broken wall of labels.
-      return { days: Math.min(requestedDays, MAX_CUSTOM_RANGE_DAYS), endDate: new Date(customRange.end) };
+      return { days: Math.min(requestedDays, MAX_CUSTOM_RANGE_DAYS), endDate: fromDateKey(customRange.end) };
     }
   }
 }
