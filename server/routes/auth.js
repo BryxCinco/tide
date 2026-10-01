@@ -91,6 +91,35 @@ router.post('/login', async (req, res) => {
   });
 });
 
+// PATCH /api/auth/password — changes the signed-in user's password. Verifies currentPassword
+// via signInWithPassword (same call login uses) before applying the change via the admin API,
+// so a left-open session alone isn't enough to lock the real owner out. For a Google-only
+// account (no password set yet), that verify step always fails — SetPasswordModal (the Google
+// post-sign-in flow, see authStore's completeGoogleSignIn) is the correct path for them, not
+// this route.
+router.patch('/password', requireAuth, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'currentPassword and newPassword are required' });
+  }
+  if (newPassword.length < 8 || !/[a-zA-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+    return res.status(400).json({ error: 'New password must be at least 8 characters and include a letter and a number' });
+  }
+
+  const { error: verifyError } = await supabaseAuth.auth.signInWithPassword({ email: req.user.email, password: currentPassword });
+  if (verifyError) {
+    return res.status(401).json({ error: 'Current password is incorrect' });
+  }
+
+  const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(req.user.id, { password: newPassword });
+  if (updateError) {
+    return res.status(500).json({ error: updateError.message });
+  }
+
+  res.json({ success: true });
+});
+
 router.post('/logout', requireAuth, async (req, res) => {
   const token = req.headers.authorization.slice(7);
   const { error } = await supabaseAdmin.auth.admin.signOut(token, 'global');

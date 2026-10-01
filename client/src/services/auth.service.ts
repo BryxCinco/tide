@@ -60,6 +60,10 @@ export const authService = {
     await api.post('/api/auth/logout');
   },
 
+  async changePassword(currentPassword: string, newPassword: string) {
+    await api.patch('/api/auth/password', { currentPassword, newPassword });
+  },
+
   /** Irreversible — deletes every row belonging to this account, its uploaded files, and
    * the Supabase Auth user itself. See server/routes/auth.js's DELETE /account. */
   async deleteAccount() {

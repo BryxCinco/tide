@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
+import { getApiErrorMessage } from '../../services/api';
+import { authService } from '../../services/auth.service';
 import { showToast } from '../../store/toastStore';
 import { Button, Input, Modal } from '../ui';
 
@@ -9,15 +11,15 @@ export interface ChangePasswordModalProps {
   onClose: () => void;
 }
 
-/** Mock, same as Delete Account — there's no auth backend with a real password to check
- * against yet. Unlike the old "Coming soon" row this replaces, it still validates its
- * inputs for real (non-empty, new/confirm matching) before "succeeding", so it isn't a
- * dead end. */
+/** For a Google-only account (no password set yet), `currentPassword` can never verify —
+ * that's expected, not a bug here; SetPasswordModal (shown right after a Google sign-in)
+ * is their path to a first password, not this screen. */
 export function ChangePasswordModal({ visible, onClose }: ChangePasswordModalProps) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -27,13 +29,13 @@ export function ChangePasswordModal({ visible, onClose }: ChangePasswordModalPro
     setError(null);
   }, [visible]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!current || !next || !confirm) {
       setError('Fill in every field.');
       return;
     }
-    if (next.length < 8) {
-      setError('New password must be at least 8 characters.');
+    if (next.length < 8 || !/[a-zA-Z]/.test(next) || !/[0-9]/.test(next)) {
+      setError('New password must be at least 8 characters and include a letter and a number.');
       return;
     }
     if (next !== confirm) {
@@ -41,8 +43,16 @@ export function ChangePasswordModal({ visible, onClose }: ChangePasswordModalPro
       return;
     }
 
-    onClose();
-    showToast('Password updated');
+    setIsSaving(true);
+    try {
+      await authService.changePassword(current, next);
+      onClose();
+      showToast('Password updated');
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -62,8 +72,8 @@ export function ChangePasswordModal({ visible, onClose }: ChangePasswordModalPro
         <Input label="Confirm new password" value={confirm} onChangeText={setConfirm} secureTextEntry />
 
         <View className="flex-row gap-3">
-          <Button title="Cancel" variant="secondary" fullWidth onPress={onClose} />
-          <Button title="Update Password" variant="primary" fullWidth onPress={handleSubmit} />
+          <Button title="Cancel" variant="secondary" fullWidth onPress={onClose} disabled={isSaving} />
+          <Button title="Update Password" variant="primary" fullWidth loading={isSaving} onPress={handleSubmit} />
         </View>
       </View>
     </Modal>
