@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { TextInput } from '../ui/SoundTextInput';
@@ -10,7 +11,7 @@ import { cn } from '../../utils/cn';
 import { confirmAsync } from '../../utils/confirm';
 import { countWords, formatMonthDayYear, formatTime, formatWeekday, formatWeekdayMonthDay } from '../../utils/formatDate';
 import { shadows } from '../../utils/theme';
-import { BackButton, Button, Text } from '../ui';
+import { BackButton, Button, ConfirmationModal, Text } from '../ui';
 import { InterestTags } from './InterestTags';
 import { JournalPhotoPicker } from './JournalPhotoPicker';
 import { MoodSelector } from './MoodSelector';
@@ -44,6 +45,7 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
   const [savedId, setSavedId] = useState(entry?.id);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [isContentFocused, setIsContentFocused] = useState(false);
+  const [showSavedModal, setShowSavedModal] = useState(false);
   const themeColors = useThemeColors();
   const isDark = useThemeStore((s) => s.theme === 'dark');
 
@@ -96,9 +98,11 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, content, mood, tags, photoUris]);
 
+  // Unlike autosave (which fires silently every 3s while typing — a modal there would be
+  // constant and unusable), an explicit Save tap is a deliberate action worth confirming.
   const handleSave = async () => {
     await persist();
-    onDone();
+    setShowSavedModal(true);
   };
 
   const handleDelete = async () => {
@@ -195,6 +199,19 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
 
         {savedId && <Button title="Delete Entry" variant="danger" size="md" fullWidth onPress={handleDelete} />}
       </ScrollView>
+
+      <ConfirmationModal
+        visible={showSavedModal}
+        onClose={onDone}
+        variant="success"
+        icon="BookOpen"
+        title="Entry Saved!"
+        message="Your thoughts have been recorded."
+        autoDismissMs={3000}
+        primaryAction={{ label: 'View Entry', onPress: () => setShowSavedModal(false) }}
+        secondaryAction={{ label: 'Write Another', onPress: () => router.replace('/journal/new') }}
+        tertiaryAction={{ label: 'Done', onPress: onDone }}
+      />
     </View>
   );
 }

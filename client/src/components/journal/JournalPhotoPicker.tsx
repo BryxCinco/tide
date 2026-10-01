@@ -52,6 +52,7 @@ export function JournalPhotoPicker({ photoUris, onChange, disabled }: JournalPho
 
     onChange([...photoUris, result.uri]);
     setPickerVisible(false);
+    showToast('Photo added to your entry!');
   };
 
   const handleRemove = (index: number) => {

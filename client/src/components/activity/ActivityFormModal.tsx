@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, useWindowDimensions, View } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
@@ -8,7 +9,7 @@ import type { Activity } from '../../types/activity';
 import { cn } from '../../utils/cn';
 import { confirmAsync } from '../../utils/confirm';
 import { colors } from '../../utils/theme';
-import { Button, Icon, Input, Modal, Text, type IconName } from '../ui';
+import { Button, ConfirmationModal, Icon, Input, Modal, Text, type IconName } from '../ui';
 
 export interface ActivityFormModalProps {
   visible: boolean;
@@ -17,10 +18,15 @@ export interface ActivityFormModalProps {
   activity?: Activity;
   /** Called with the created/updated activity right before the modal closes. */
   onSaved?: (activity: Activity) => void;
+  /** False from the Timer's "+ Custom" chip — that flow already auto-selects the new
+   * activity for the session about to start (onSaved), so a "Created! Start Session?"
+   * confirmation on top of that would just be redundant. Defaults to true for every other
+   * call site (the Activity Manager screen). */
+  showSuccessModal?: boolean;
 }
 
 /** Shared by the Activity Manager screen and the Timer's "+ Custom" chip. */
-export function ActivityFormModal({ visible, onClose, activity, onSaved }: ActivityFormModalProps) {
+export function ActivityFormModal({ visible, onClose, activity, onSaved, showSuccessModal = true }: ActivityFormModalProps) {
   const addActivity = useActivityStore((s) => s.addActivity);
   const updateActivity = useActivityStore((s) => s.updateActivity);
   const deleteActivity = useActivityStore((s) => s.deleteActivity);
@@ -31,13 +37,20 @@ export function ActivityFormModal({ visible, onClose, activity, onSaved }: Activ
   const [icon, setIcon] = useState(ICON_OPTIONS[0]);
   const [color, setColor] = useState(PRESET_COLORS[0]);
   const [error, setError] = useState<string | null>(null);
+  const [createdActivity, setCreatedActivity] = useState<Activity | null>(null);
 
-  useEffect(() => {
-    if (!visible) return;
+  const resetForm = () => {
     setName(activity?.name ?? '');
     setIcon(activity?.icon ?? ICON_OPTIONS[0]);
     setColor(activity?.color ?? PRESET_COLORS[0]);
     setError(null);
+  };
+
+  useEffect(() => {
+    if (!visible) return;
+    resetForm();
+    setCreatedActivity(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, activity]);
 
   const isEditing = Boolean(activity);
@@ -63,7 +76,11 @@ export function ActivityFormModal({ visible, onClose, activity, onSaved }: Activ
     try {
       const created = await addActivity({ name: trimmed, icon, color });
       onSaved?.(created);
-      onClose();
+      if (showSuccessModal) {
+        setCreatedActivity(created);
+      } else {
+        onClose();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save this activity. Please try again.');
     } finally {
@@ -163,6 +180,31 @@ export function ActivityFormModal({ visible, onClose, activity, onSaved }: Activ
           {canDelete && <Button title="Delete Activity" variant="danger" size="md" fullWidth onPress={handleDelete} />}
         </View>
       </ScrollView>
+
+      <ConfirmationModal
+        visible={Boolean(createdActivity)}
+        onClose={onClose}
+        variant="success"
+        icon="CheckCircle"
+        title="Activity Created!"
+        message={`"${createdActivity?.name}" is now available in your picker.`}
+        autoDismissMs={3000}
+        primaryAction={{
+          label: 'Start Session',
+          onPress: () => {
+            router.push('/timer');
+            onClose();
+          },
+        }}
+        secondaryAction={{
+          label: 'Create Another',
+          onPress: () => {
+            setCreatedActivity(null);
+            resetForm();
+          },
+        }}
+        tertiaryAction={{ label: 'Done', onPress: onClose }}
+      />
     </Modal>
   );
 }

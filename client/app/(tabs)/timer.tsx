@@ -269,6 +269,7 @@ export default function TimerScreen() {
         visible={customModalVisible}
         onClose={() => setCustomModalVisible(false)}
         onSaved={(created) => setActivity(created)}
+        showSuccessModal={false}
       />
 
       <Modal visible={completeModalVisible} onClose={() => setCompleteModalVisible(false)} title="Session Complete!" icon="PartyPopper" tone="accent" size="sm">

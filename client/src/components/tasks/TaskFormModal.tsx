@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text as RNText, useWindowDimensions, View } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
@@ -12,7 +13,7 @@ import { cn } from '../../utils/cn';
 import { confirmAsync } from '../../utils/confirm';
 import { formatDateKeyShort, toDateKey } from '../../utils/formatDate';
 import { shadows } from '../../utils/theme';
-import { Button, CalendarPicker, Icon, Input, Modal, Text, type IconName } from '../ui';
+import { Button, CalendarPicker, ConfirmationModal, Icon, Input, Modal, Text, type IconName } from '../ui';
 
 export interface TaskFormModalProps {
   visible: boolean;
@@ -91,12 +92,12 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [activityError, setActivityError] = useState<string | null>(null);
   const [calendarVisible, setCalendarVisible] = useState(false);
+  const [createdTask, setCreatedTask] = useState<Task | null>(null);
   const todayKey = useMemo(() => toDateKey(new Date()), []);
 
   const isEditing = Boolean(task);
 
-  useEffect(() => {
-    if (!visible) return;
+  const resetForm = () => {
     setTitle(task?.title ?? '');
     setDescription(task?.description ?? '');
     setStatus(task?.status ?? 'todo');
@@ -108,6 +109,13 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
     setError(null);
     setActivityError(null);
     setCalendarVisible(false);
+  };
+
+  useEffect(() => {
+    if (!visible) return;
+    resetForm();
+    setCreatedTask(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, task]);
 
   const addTagFromDraft = () => {
@@ -144,10 +152,10 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
 
     if (task) {
       updateTask(task.id, base);
+      onClose();
     } else {
-      addTask(base);
+      setCreatedTask(addTask(base));
     }
-    onClose();
   };
 
   const handleDelete = async () => {
@@ -334,6 +342,34 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
           )}
         </View>
       </Modal>
+
+      {/* Nested like the CalendarPicker modal above — the outer form modal deliberately
+          stays open underneath so "Create Another" can reset straight back into it without
+          a close/reopen flicker. */}
+      <ConfirmationModal
+        visible={Boolean(createdTask)}
+        onClose={onClose}
+        variant="success"
+        icon="CheckCircle"
+        title="Task Created!"
+        message={`"${createdTask?.title}" has been added to your list.`}
+        autoDismissMs={3000}
+        primaryAction={{
+          label: 'View Task',
+          onPress: () => {
+            router.push('/tasks');
+            onClose();
+          },
+        }}
+        secondaryAction={{
+          label: 'Create Another',
+          onPress: () => {
+            setCreatedTask(null);
+            resetForm();
+          },
+        }}
+        tertiaryAction={{ label: 'Done', onPress: onClose }}
+      />
     </Modal>
   );
 }

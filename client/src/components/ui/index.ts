@@ -5,6 +5,7 @@ export * from './Badge';
 export * from './Button';
 export * from './CalendarPicker';
 export * from './Card';
+export * from './ConfirmationModal';
 export * from './Divider';
 export * from './EmptyState';
 export * from './ErrorState';
