@@ -29,8 +29,30 @@ export const registerSchema = z
     }
   });
 
+/** Same password rules as registerSchema's — used by SetPasswordModal, where a Google-only
+ * account sets a password for the first time rather than registering. */
+export const setPasswordSchema = z
+  .object({
+    password: z
+      .string()
+      .min(8, 'Password must be at least 8 characters')
+      .regex(/[A-Za-z]/, 'Password must contain at least one letter')
+      .regex(/[0-9]/, 'Password must contain at least one number'),
+    confirmPassword: z.string(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.password !== data.confirmPassword) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Passwords do not match',
+        path: ['confirmPassword'],
+      });
+    }
+  });
+
 export type LoginForm = z.infer<typeof loginSchema>;
 export type RegisterForm = z.infer<typeof registerSchema>;
+export type SetPasswordForm = z.infer<typeof setPasswordSchema>;
 
 export type PasswordStrength = 'weak' | 'medium' | 'strong';
 

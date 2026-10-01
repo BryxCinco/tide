@@ -202,3 +202,26 @@ export async function signInWithGoogle(): Promise<boolean> {
   });
   return true;
 }
+
+/**
+ * True if the currently signed-in Supabase user's only identity is Google — i.e. they
+ * signed up/in exclusively via Google and have never set a password, so email/password
+ * login isn't available to them yet. Used right after a Google sign-in completes (see
+ * authStore's completeGoogleSignIn) to decide whether to prompt SetPasswordModal. Lives
+ * here rather than in authStore because this `supabase` client is this file's boundary —
+ * see lib/supabase.ts's own comment on why nothing else in the app touches it directly.
+ */
+export async function hasOnlyGoogleIdentity(): Promise<boolean> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) return false;
+  const identities = data.user.identities ?? [];
+  return identities.length > 0 && identities.every((identity) => identity.provider === 'google');
+}
+
+/** Sets a password on the currently signed-in Supabase user — what lets a Google-only
+ * account (see hasOnlyGoogleIdentity above) also sign in with email/password afterward.
+ * Requires a live session, so this only ever makes sense to call post-sign-in (SetPasswordModal). */
+export async function setSupabasePassword(password: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) throw new Error(error.message);
+}

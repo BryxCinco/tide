@@ -21,7 +21,7 @@ import { Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { OAuthCallbackScreen } from '@/components/auth';
+import { OAuthCallbackScreen, SetPasswordModal } from '@/components/auth';
 import { SearchModal } from '@/components/search';
 import { Loader, OfflineBanner, Toast } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
@@ -193,6 +193,9 @@ function RootNavigator() {
       </Stack>
 
       {isAuthenticated && <SearchModal visible={isSearchOpen} onClose={() => setIsSearchOpen(false)} />}
+      {/* Self-driven by authStore's needsPasswordSetup — see SetPasswordModal's own comment
+          for why this lives here rather than on a specific screen. */}
+      {isAuthenticated && <SetPasswordModal />}
     </>
   );
 }

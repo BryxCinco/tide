@@ -21,6 +21,10 @@ const USER_SCOPED_TABLES = [
   // behind here was blocking supabaseAdmin.auth.admin.deleteUser() with a foreign-key
   // "Database error deleting user" (found via a throwaway test-account delete during 11.5).
   'embeddings',
+  // Added post-Phase 12.1 — user_levels.user_id has the same FK-to-auth.users shape as
+  // embeddings above, and would hit the exact same deleteUser() failure for any account
+  // that's earned XP (i.e. everyone, once Phase 12.1's levels system shipped).
+  'user_levels',
 ];
 
 // POST /api/auth/signup — creates the auth.users row; the DB trigger (handle_new_user)
@@ -48,6 +52,22 @@ router.post('/signup', async (req, res) => {
   });
 });
 
+// True if this email belongs to an account whose only sign-in identity is Google — i.e. it
+// has no password set, so a wrong-password-shaped 401 here is actually "there's no password
+// to check against." Looked up via `profiles.email` (admin's auth API has no getUserByEmail)
+// then auth.admin.getUserById for the real identity list. Best-effort: any failure here just
+// falls back to the plain invalid-credentials message, same as before this existed.
+async function isGoogleOnlyAccount(email) {
+  const { data: profile } = await supabaseAdmin.from('profiles').select('id').eq('email', email).maybeSingle();
+  if (!profile) return false;
+
+  const { data: userData, error } = await supabaseAdmin.auth.admin.getUserById(profile.id);
+  if (error || !userData?.user) return false;
+
+  const identities = userData.user.identities || [];
+  return identities.length > 0 && identities.every((identity) => identity.provider === 'google');
+}
+
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -58,6 +78,10 @@ router.post('/login', async (req, res) => {
   const { data, error } = await supabaseAuth.auth.signInWithPassword({ email, password });
 
   if (error) {
+    const googleOnly = await isGoogleOnlyAccount(email).catch(() => false);
+    if (googleOnly) {
+      return res.status(401).json({ error: 'This account uses Google sign-in. Try Google, or set a password first.', code: 'google_only' });
+    }
     return res.status(401).json({ error: error.message });
   }
 

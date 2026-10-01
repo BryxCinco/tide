@@ -2,7 +2,14 @@ import { create } from 'zustand';
 
 import { AUTH_TOKEN_KEY, AUTH_USER_KEY, getApiErrorMessage, onUnauthorized, registerTokenGetter } from '../services/api';
 import { authService, mapProfileToUser } from '../services/auth.service';
-import { onGoogleSignIn, onGoogleTokenRefresh, signInWithGoogle, type GoogleSessionTokens } from '../services/googleAuth.service';
+import {
+  hasOnlyGoogleIdentity,
+  onGoogleSignIn,
+  onGoogleTokenRefresh,
+  setSupabasePassword,
+  signInWithGoogle,
+  type GoogleSessionTokens,
+} from '../services/googleAuth.service';
 import { profileService, type UpdateProfilePayload } from '../services/profile.service';
 import type { User } from '../types/user';
 import { setGuestMode, setHasAuthToken } from '../utils/authFlags';
@@ -17,6 +24,12 @@ import { useTimerStore } from './timerStore';
 
 const TOKEN_KEY = AUTH_TOKEN_KEY;
 const USER_KEY = AUTH_USER_KEY;
+
+// Keyed per-user (not a single flag) so a shared device logging into a different Google
+// account doesn't inherit someone else's "don't ask me again" decision.
+function passwordPromptedKey(userId: string): string {
+  return `tide_password_prompted_${userId}`;
+}
 
 /**
  * taskStore/journalStore/activityStore/questStore each persist to a single, non-user-scoped
@@ -45,6 +58,10 @@ interface AuthState {
   isGuest: boolean;
   isLoading: boolean;
   error: string | null;
+  /** True once completeGoogleSignIn finds this is a Google-only account (no password set)
+   * that hasn't already skipped the prompt this device — SetPasswordModal (mounted once in
+   * app/_layout.tsx, same pattern as Toast) watches this directly. */
+  needsPasswordSetup: boolean;
 
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
@@ -58,6 +75,12 @@ interface AuthState {
    * hands back a session, on both platforms (see that file's comment for why this can't
    * just be inline in loginWithGoogle). Not meant to be called directly by UI code. */
   completeGoogleSignIn: (tokens: GoogleSessionTokens) => Promise<void>;
+  /** SetPasswordModal's "Set Password" action — sets the password on the live Supabase
+   * session, then marks this user as prompted so it never shows again. */
+  setPassword: (password: string) => Promise<void>;
+  /** SetPasswordModal's "Skip for now" (and its backdrop/close) — just marks this user as
+   * prompted without setting anything. */
+  skipPasswordSetup: () => Promise<void>;
   loginAsGuest: () => Promise<void>;
   linkGuestToAccount: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -102,6 +125,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   isGuest: false,
   isLoading: false,
   error: null,
+  needsPasswordSetup: false,
 
   login: async (email, password) => {
     set({ isLoading: true, error: null });
@@ -193,6 +217,18 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       set({ user, token: tokens.accessToken, isAuthenticated: true, isGuest: false, isLoading: false });
       console.log('[OAuth Debug] authStore state after completeGoogleSignIn:', useAuthStore.getState());
       console.log('[OAuth Debug] completeGoogleSignIn end (success).');
+
+      // Supplementary, not part of sign-in itself — a failure here (network hiccup, whatever)
+      // just means the prompt doesn't show this time, not a failed sign-in. Fired after the
+      // state above so the main app is already showing before this resolves.
+      try {
+        const alreadyPrompted = await storage.getItem(passwordPromptedKey(user.id));
+        if (!alreadyPrompted && (await hasOnlyGoogleIdentity())) {
+          set({ needsPasswordSetup: true });
+        }
+      } catch (err) {
+        console.log('[OAuth Debug] password-setup check failed (non-fatal):', err);
+      }
     } catch (err) {
       console.log('[OAuth Debug] completeGoogleSignIn FAILED:', err);
       // Not re-thrown — there's no caller left waiting on a promise by the time this runs
@@ -200,6 +236,19 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       // OAuthCallbackScreen (app root) watches `error` directly to show this.
       set({ error: getApiErrorMessage(err), isLoading: false });
     }
+  },
+
+  setPassword: async (password) => {
+    const user = get().user;
+    await setSupabasePassword(password);
+    if (user) await storage.setItem(passwordPromptedKey(user.id), 'true');
+    set({ needsPasswordSetup: false });
+  },
+
+  skipPasswordSetup: async () => {
+    const user = get().user;
+    if (user) await storage.setItem(passwordPromptedKey(user.id), 'true');
+    set({ needsPasswordSetup: false });
   },
 
   loginAsGuest: async () => {
@@ -276,7 +325,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     }
     resetDomainStores();
 
-    set({ user: null, token: null, isAuthenticated: false, isGuest: false });
+    set({ user: null, token: null, isAuthenticated: false, isGuest: false, needsPasswordSetup: false });
   },
 
   restoreSession: async () => {
@@ -361,7 +410,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 onUnauthorized(() => {
   console.log('[OAuth Debug] onUnauthorized fired — this will set isAuthenticated=false. Previous state:', useAuthStore.getState());
   resetDomainStores();
-  useAuthStore.setState({ user: null, token: null, isAuthenticated: false, isGuest: false });
+  useAuthStore.setState({ user: null, token: null, isAuthenticated: false, isGuest: false, needsPasswordSetup: false });
   console.log('[OAuth Debug] isAuthenticated=false set by onUnauthorized.');
 });
 

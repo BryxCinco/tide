@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, router } from 'expo-router';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   KeyboardAvoidingView,
@@ -15,13 +15,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Divider, Input, Text } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
-import { getApiErrorMessage } from '@/services/api';
+import { getApiErrorCode, getApiErrorMessage } from '@/services/api';
 import { showToast } from '@/store/toastStore';
 import { loginSchema, type LoginForm } from '@/utils/validation';
 
 export default function LoginScreen() {
   const { login, loginWithGoogle, loginAsGuest, isLoading, error, clearError } = useAuth();
   const passwordRef = useRef<TextInput>(null);
+  // Set when a password-login attempt 401s specifically because this account has no
+  // password (Google-only) — a sharper message + "try Google instead" CTA than the generic
+  // error banner below, which still covers every other failure (wrong password, etc).
+  const [isGoogleOnlyAccount, setIsGoogleOnlyAccount] = useState(false);
 
   const {
     control,
@@ -34,11 +38,17 @@ export default function LoginScreen() {
 
   const onSubmit = async (data: LoginForm) => {
     clearError();
+    setIsGoogleOnlyAccount(false);
     try {
       await login(data.email, data.password);
       router.replace('/');
-    } catch {
-      // Failure is surfaced via useAuth().error below.
+    } catch (err) {
+      // Other failures (wrong password, unknown email, ...) are surfaced via useAuth().error
+      // below — this just adds a sharper message for the one case that isn't really "wrong
+      // password" at all.
+      if (getApiErrorCode(err) === 'google_only') {
+        setIsGoogleOnlyAccount(true);
+      }
     }
   };
 
@@ -54,6 +64,7 @@ export default function LoginScreen() {
 
   const handleGoogleLogin = async () => {
     clearError();
+    setIsGoogleOnlyAccount(false);
     try {
       await loginWithGoogle();
       // No explicit navigation here on purpose — on web the tab is about to navigate away
@@ -141,8 +152,28 @@ export default function LoginScreen() {
             </Pressable>
 
             {error && (
-              <View className="mb-4 rounded-md border border-error/30 bg-error/10 px-3 py-2">
+              <View className="mb-4 gap-3 rounded-md border border-error/30 bg-error/10 px-3 py-2">
                 <RNText className="text-caption text-error">{error}</RNText>
+                {/* The backend's error message already says "try Google" — this just turns
+                    that into something tappable instead of leaving the user to go find the
+                    Google button themselves. "Set a password first?" leads to the same
+                    place: there's no session yet to set a password ON, so Google sign-in is
+                    the only real next step either way — see SetPasswordModal, which is what
+                    actually appears once that sign-in completes. */}
+                {isGoogleOnlyAccount && (
+                  <View className="flex-row flex-wrap gap-3">
+                    <Pressable onPress={handleGoogleLogin} hitSlop={8}>
+                      <Text variant="caption" color="accent" className="font-medium normal-case tracking-normal">
+                        Try Google
+                      </Text>
+                    </Pressable>
+                    <Pressable onPress={handleGoogleLogin} hitSlop={8}>
+                      <Text variant="caption" color="accent" className="font-medium normal-case tracking-normal">
+                        Set a password first?
+                      </Text>
+                    </Pressable>
+                  </View>
+                )}
               </View>
             )}
 

@@ -80,3 +80,16 @@ export function getApiErrorMessage(err: unknown, fallback = 'Something went wron
   }
   return err instanceof Error ? err.message : fallback;
 }
+
+/** Pulls the backend's own `{ code: "..." }` out of a failed request, when it sent one —
+ * most error responses don't (getApiErrorMessage's plain `.error` string is enough for a
+ * toast), but a few need the UI to branch on *why* it failed, not just display a message
+ * (e.g. login.tsx's 'google_only' case). Undefined when there's no code, same as a plain
+ * message-only error. */
+export function getApiErrorCode(err: unknown): string | undefined {
+  if (axios.isAxiosError(err)) {
+    const data = err.response?.data as { code?: string } | undefined;
+    return data?.code;
+  }
+  return undefined;
+}
