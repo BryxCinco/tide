@@ -16,13 +16,25 @@ import {
 import { BackButton, Button, ErrorState, Input, Modal, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
 import { useTimer } from '@/hooks/useTimer';
 import { useActivityStore } from '@/store/activityStore';
+import { showToast } from '@/store/toastStore';
 import { DEFAULT_FOCUS_ACTIVITY } from '@/mocks/mockActivities';
 import { INTEREST_TAGS } from '@/mocks/mockTimer';
+import { sessionService } from '@/services/session.service';
 import type { Activity } from '@/types/activity';
+import { hasAuthToken, isGuestMode } from '@/utils/authFlags';
 import { confirmAsync } from '@/utils/confirm';
 import { formatDuration } from '@/utils/formatTime';
 import { hapticNotification } from '@/utils/haptics';
 import { soundManager } from '@/utils/soundManager';
+
+/** Weighted random pick for "Surprise Me" — activities not done in the last 7 days get 2x
+ * the odds of one that was, so the suggestion leans toward what's been neglected instead of
+ * being a flat coin flip. */
+function pickSurpriseActivity(activities: Activity[], recentIds: Set<string>): Activity | undefined {
+  if (activities.length === 0) return undefined;
+  const weighted = activities.flatMap((activity) => Array(recentIds.has(activity.id) ? 1 : 2).fill(activity));
+  return weighted[Math.floor(Math.random() * weighted.length)];
+}
 
 const BREAK_DURATION_SECONDS = 5 * 60;
 
@@ -67,10 +79,22 @@ export default function TimerScreen() {
   );
   const [customModalVisible, setCustomModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // Activity ids with a session in the last 7 days — "Surprise Me" weights against these so
+  // it leans toward what's been neglected. Fetched once; a feature-only nicety, so a failure
+  // (or guest mode, which has no backend to ask) just falls back to a flat random pick.
+  const [recentActivityIds, setRecentActivityIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchActivities();
     fetchTodaySessions();
+    if (!isGuestMode() && hasAuthToken()) {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      sessionService
+        .list({ from: sevenDaysAgo.toISOString() })
+        .then((rows) => setRecentActivityIds(new Set(rows.map((r) => r.activity_id).filter((id): id is string => Boolean(id)))))
+        .catch(() => {});
+    }
     // Intentionally once on mount — re-fires only via pull-to-refresh below, not on every
     // render these functions get a new identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -93,6 +117,13 @@ export default function TimerScreen() {
       if (!confirmed) return;
     }
     setActivity(activity);
+  };
+
+  const handleSurpriseMe = () => {
+    const picked = pickSurpriseActivity(activities, recentActivityIds);
+    if (!picked) return;
+    handleSelectActivity(picked);
+    showToast(`Try: ${picked.name}!`, 'success');
   };
 
   const status = isRunning ? 'running' : isPaused ? 'paused' : 'idle';
@@ -190,6 +221,7 @@ export default function TimerScreen() {
             onSelect={handleSelectActivity}
             onDeselect={isSessionActive ? undefined : clearActivity}
             onAddCustom={isSessionActive ? undefined : () => setCustomModalVisible(true)}
+            onShuffle={handleSurpriseMe}
           />
 
           <InterestTags tags={INTEREST_TAGS} selectedTags={selectedTags} onToggle={toggleTag} />

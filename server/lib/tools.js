@@ -281,6 +281,21 @@ const tools = [
   {
     type: 'function',
     function: {
+      name: 'suggestActivity',
+      description:
+        'Suggest a few activities for the user to try, weighted toward ones they haven\'t done recently, each with a short reason. Use this for "suggest something" / "what should I do" / "I\'m bored" style requests.',
+      parameters: {
+        type: 'object',
+        properties: {
+          count: { type: 'number', description: 'How many suggestions to return. Defaults to 3.' },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'addJournalEntry',
       description: 'Write a new journal entry for the user.',
       parameters: {
@@ -778,6 +793,54 @@ toolHandlers.getStreakInfo = async ({ userId }) => {
     longestStreak: streak.longest_streak,
     lastActivityDate: streak.last_activity_date,
     message: `Current streak: ${streak.current_streak} day(s). Longest ever: ${streak.longest_streak} day(s).`,
+  };
+};
+
+toolHandlers.suggestActivity = async ({ userId, count }) => {
+  const [{ data: activities, error: actError }, { data: logs, error: logError }] = await Promise.all([
+    supabaseAdmin.from('activities').select('id, name, is_archived').eq('user_id', userId),
+    supabaseAdmin.from('time_logs').select('activity_id, ended_at').eq('user_id', userId),
+  ]);
+  if (actError) throw new Error(actError.message);
+  if (logError) throw new Error(logError.message);
+
+  const pool = (activities || []).filter((a) => !a.is_archived);
+  if (pool.length === 0) {
+    return { suggestions: [], message: "You don't have any activities set up yet — add one first." };
+  }
+
+  const lastDoneByActivity = {};
+  for (const log of logs || []) {
+    if (!log.activity_id || !log.ended_at) continue;
+    if (!lastDoneByActivity[log.activity_id] || log.ended_at > lastDoneByActivity[log.activity_id]) {
+      lastDoneByActivity[log.activity_id] = log.ended_at;
+    }
+  }
+
+  const now = Date.now();
+  // Never-done activities sort first (Infinity), then most-neglected first — shuffled before
+  // that sort so similarly-stale activities don't always come back in the same order.
+  const scored = pool
+    .map((activity) => {
+      const lastDone = lastDoneByActivity[activity.id];
+      const daysSince = lastDone ? Math.floor((now - new Date(lastDone).getTime()) / 86400000) : Infinity;
+      const reason =
+        daysSince === Infinity
+          ? "You haven't tried this one yet."
+          : daysSince === 0
+            ? "You did this today — keep the momentum going."
+            : `You haven't done this in ${daysSince} day${daysSince === 1 ? '' : 's'}.`;
+      return { activityName: activity.name, reason, daysSince };
+    })
+    .sort(() => Math.random() - 0.5)
+    .sort((a, b) => b.daysSince - a.daysSince);
+
+  const n = Math.max(1, Math.min(count || 3, pool.length));
+  const suggestions = scored.slice(0, n).map(({ activityName, reason }) => ({ activityName, reason }));
+
+  return {
+    suggestions,
+    message: suggestions.map((s) => `${s.activityName} — ${s.reason}`).join(' / '),
   };
 };
 
