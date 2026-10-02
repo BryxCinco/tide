@@ -145,7 +145,7 @@ export default function LoginScreen() {
               />
             </View>
 
-            <Pressable className="mb-6 mt-2 self-end" onPress={() => {}} hitSlop={8}>
+            <Pressable className="mb-6 mt-2 self-end" onPress={() => router.push('/(auth)/forgot-password')} hitSlop={8}>
               <Text variant="caption" color="accent" className="normal-case tracking-normal">
                 Forgot password?
               </Text>

@@ -50,9 +50,14 @@ export const setPasswordSchema = z
     }
   });
 
+export const forgotPasswordSchema = z.object({
+  email: z.email('Enter a valid email address'),
+});
+
 export type LoginForm = z.infer<typeof loginSchema>;
 export type RegisterForm = z.infer<typeof registerSchema>;
 export type SetPasswordForm = z.infer<typeof setPasswordSchema>;
+export type ForgotPasswordForm = z.infer<typeof forgotPasswordSchema>;
 
 export type PasswordStrength = 'weak' | 'medium' | 'strong';
 

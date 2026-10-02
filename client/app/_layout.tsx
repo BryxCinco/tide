@@ -36,9 +36,18 @@ SplashScreen.preventAutoHideAsync();
  * from a Google OAuth redirect — this is what used to be a blank, stuck page (see
  * OAuthCallbackScreen's own comment for the full mechanism). Computed once via a lazy
  * useState initializer, not re-checked on every render — the URL gets cleaned up once the
- * callback resolves, so re-reading it later would just see it's gone and doesn't need to. */
+ * callback resolves, so re-reading it later would just see it's gone and doesn't need to.
+ *
+ * Excludes /reset-password explicitly: a password-recovery email link lands there with its
+ * own `?code=`, and this check otherwise can't tell the two apart (both are a bare `?code=`
+ * on whatever page the browser loaded). Without the exclusion this would hijack that load
+ * into OAuthCallbackScreen — which replaces the entire RootNavigator, including the
+ * /reset-password route itself — leaving the user stuck on "Signing you in..." until it
+ * times out, and googleAuth.service.ts's own module-scope listener would separately try to
+ * consume the same one-time-use recovery code as if it were a Google sign-in code. */
 function hasOAuthCallbackParams(): boolean {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
+  if (window.location.pathname === '/reset-password') return false;
   const params = new URLSearchParams(window.location.search);
   const result = params.has('code') || params.has('error') || params.has('error_description');
   console.log('[OAuth Debug] app/_layout.tsx: hasOAuthCallbackParams() =', result, 'search =', window.location.search);

@@ -94,8 +94,13 @@ supabase.auth.onAuthStateChange((event, session) => {
  * (legitimate) exchange had just issued — which is why sign-in used to appear to succeed
  * and then fail moments later. Runs once at module load — the only point in time this page
  * load will ever see this particular `?code=`.
+ *
+ * Excludes /reset-password: passwordReset.service.ts's confirmPasswordReset() does its own
+ * exchangeCodeForSession() there for a password-recovery `?code=`, not an OAuth one —
+ * consuming it here first would leave nothing left to exchange (a PKCE code is single-use)
+ * and would wrongly run Google sign-in completion off a recovery code.
  */
-if (Platform.OS === 'web' && typeof window !== 'undefined') {
+if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location.pathname !== '/reset-password') {
   const code = new URLSearchParams(window.location.search).get('code');
   if (code) {
     console.log('[OAuth Debug] (web) manual exchangeCodeForSession starting for code:', `${code.slice(0, 12)}...`);

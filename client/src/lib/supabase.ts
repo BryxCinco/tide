@@ -12,10 +12,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 /**
- * Client-side Supabase instance, used ONLY for the Google OAuth handshake (see
- * services/googleAuth.service.ts). Every other auth/data operation in this app goes
- * through the Express backend instead, which holds the service-role key; this client only
- * ever carries the public anon key.
+ * Client-side Supabase instance, used ONLY for flows that need supabase-js's own local PKCE
+ * state: the Google OAuth handshake (see services/googleAuth.service.ts) and the
+ * forgot/reset-password recovery handshake (see services/passwordReset.service.ts) — both
+ * generate a code_verifier that has to live in THIS device/browser's storage for the later
+ * exchangeCodeForSession() to find. Every other auth/data operation in this app goes through
+ * the Express backend instead, which holds the service-role key; this client only ever
+ * carries the public anon key.
  *
  * `detectSessionInUrl: false` is deliberate, not the default-off you'd expect for a plain
  * client — it used to be `true`, which is supabase-js's normal way of handling this exact
