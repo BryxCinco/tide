@@ -160,6 +160,9 @@ export default function DashboardScreen() {
   );
 
   const renderWidget = (id: WidgetId): ReactNode => {
+    // Instance (2nd arg WidgetGrid passes) isn't needed yet — every widget still renders
+    // identically regardless of which instance it is (see WidgetInstance.config's own
+    // comment). Only `type` (aliased `id` here, matching every case below) matters today.
     switch (id) {
       case 'hero':
         return <HeroCard label={mockHeroFocus.label} subtitle={heroSubtitle} />;

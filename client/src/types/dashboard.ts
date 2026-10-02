@@ -88,18 +88,30 @@ export type WidgetId =
   | 'streak'
   | 'todaysRoutine';
 
-export interface WidgetConfig {
-  id: WidgetId;
+/** sm/md/lg occupy increasing fractions of a row (see WidgetGrid's responsive columns:
+ * phone 1-col, tablet 2-col, desktop 3-col); 'full' always takes the entire row regardless
+ * of column count. Replaces the old binary 'full' | 'compact' — 'compact' widgets migrate
+ * to 'sm' (see dashboardStore's persisted-prefs migration). */
+export type WidgetSize = 'sm' | 'md' | 'lg' | 'full';
+
+/**
+ * One placed widget. `id` is this specific instance's unique id (stable across reorders/
+ * edits); `type` says which widget component to render — the two are equal for every
+ * widget's first/default instance, and only diverge once a second instance of the same
+ * type is added (Phase 13 Fix 5: multiple instances of one widget, e.g. two Stats Rows).
+ */
+export interface WidgetInstance {
+  id: string;
+  type: WidgetId;
   enabled: boolean;
   /** Lower renders first. Not necessarily contiguous — reorder rewrites all of them. */
   order: number;
-  /** 'compact' widgets (the small Fix-8 tiles: Time/Calendar/Weather/Weekly Progress/
-   * Streak) wrap multiple-per-row in WidgetGrid instead of each taking a full row like
-   * every other widget ('full', the default when omitted — every widget from before this
-   * field existed). */
-  size?: 'full' | 'compact';
+  size: WidgetSize;
+  /** Reserved for a future per-instance setting (e.g. which stats a duplicated Stats Row
+   * shows) — no widget component reads this yet, so it's always empty today. */
+  config?: Record<string, unknown>;
 }
 
 export interface DashboardPreferences {
-  widgets: WidgetConfig[];
+  widgets: WidgetInstance[];
 }
