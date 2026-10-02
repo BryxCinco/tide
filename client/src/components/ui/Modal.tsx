@@ -90,6 +90,10 @@ export function Modal({
   const themeColors = useThemeColors();
   const isDark = useThemeStore((s) => s.theme === 'dark');
   const [closeHovered, setCloseHovered] = useState(false);
+  // The phone drag-handle pill sits above ModalLayout's own header/body/footer, inside the
+  // same height-capped box — measured so ModalLayout's maxHeight budget for the header/
+  // footer/body split accounts for the space it actually takes, not just the box's own cap.
+  const [handleHeight, setHandleHeight] = useState(0);
   const progress = useSharedValue(0);
 
   // Stays mounted through the close animation instead of unmounting the instant `visible`
@@ -283,6 +287,7 @@ export function Modal({
                   className="items-center pt-3"
                   accessibilityRole="button"
                   accessibilityLabel="Close"
+                  onLayout={(event) => setHandleHeight(event.nativeEvent.layout.height)}
                 >
                   <View className="h-1 w-10 rounded-full" style={{ backgroundColor: themeColors.border.hover }} />
                 </Pressable>
@@ -295,6 +300,7 @@ export function Modal({
                 scrollable={scrollable}
                 isFull={isFull}
                 bottomInset={isPhone ? insets.bottom : 0}
+                maxHeight={isFull ? undefined : maxHeightPx - (isPhone ? handleHeight : 0)}
               />
             </View>
           </KeyboardAvoidingView>

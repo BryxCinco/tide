@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { ScrollView, View } from 'react-native';
+import { useState } from 'react';
+import { ScrollView, View, type LayoutChangeEvent } from 'react-native';
 
 import { cn } from '../../utils/cn';
 
@@ -22,6 +23,10 @@ export interface ModalLayoutProps {
   /** Extra bottom padding under the footer (or body, if there's no footer) — the phone
    * bottom-sheet's safe-area inset, so content/actions never sit under the home indicator. */
   bottomInset?: number;
+  /** The modal box's own height cap (Modal.tsx's `maxHeightPx`) — `undefined` for `isFull`,
+   * which already fills 100% of the screen and needs no separate budget. Used to work out how
+   * much of that budget the body actually gets to keep once the header/footer take theirs. */
+  maxHeight?: number;
 }
 
 /**
@@ -31,21 +36,41 @@ export interface ModalLayoutProps {
  * action buttons in the footer can never get scrolled out of view or pushed off the bottom of
  * a short viewport — the two symptoms this layout exists to rule out for good.
  *
- * Relies on a standard (if easy to get backwards) flexbox fact: a column container whose
- * height is "auto, capped at maxHeight" hugs short content exactly (no stretching, no
- * scrollbar) and only forces its flexGrow child (the body) to fill the leftover space once
- * content actually exceeds that cap. Modal.tsx supplies that maxHeight on the surrounding
- * box; this component only needs to mark header/footer as non-shrinking and the body as the
- * one flexible section.
+ * Deliberately does NOT lean on "flexShrink the body, let the max-height ancestor squeeze
+ * it" — that's the usual flexbox recipe for this layout, but it depends on a flex container
+ * whose own size is 'auto' (content-hugging) correctly re-distributing shrink to a flex-basis
+ * 'auto' child once an ancestor's max-height clamps it smaller than the children's combined
+ * natural size, and ScrollView's own natural size is its full, unclamped content height. Yoga
+ * (and browsers, for what it's worth) are inconsistent enough about that specific combination
+ * that it previously shipped with the footer silently rendered past the clamped box's bottom
+ * edge, invisible under `overflow: hidden`. Measuring the header/footer via onLayout and
+ * handing the body an explicit `maxHeight` number instead sidesteps that ambiguity entirely —
+ * a plain `maxHeight` on a block correctly hugs shorter content and caps longer content, no
+ * flex-distribution corner case involved.
  */
-export function ModalLayout({ header, body, footer, scrollable = true, isFull = false, bottomInset = 0 }: ModalLayoutProps) {
+export function ModalLayout({ header, body, footer, scrollable = true, isFull = false, bottomInset = 0, maxHeight }: ModalLayoutProps) {
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const [footerHeight, setFooterHeight] = useState(0);
+
+  const onHeaderLayout = (event: LayoutChangeEvent) => setHeaderHeight(event.nativeEvent.layout.height);
+  const onFooterLayout = (event: LayoutChangeEvent) => setFooterHeight(event.nativeEvent.layout.height);
+
+  // Only meaningful for a capped (non-`full`) modal — `maxHeight` is undefined for `full`,
+  // which already has a definite, full-screen height that ordinary `flex: 1` resolves
+  // correctly against (no auto-sizing ambiguity there).
+  const bodyMaxHeight = maxHeight == null ? undefined : Math.max(0, maxHeight - headerHeight - footerHeight);
+
   return (
-    <View style={isFull ? { flex: 1 } : { flexShrink: 1 }}>
-      {header && <View style={{ flexShrink: 0 }}>{header}</View>}
+    <View style={isFull ? { flex: 1 } : undefined}>
+      {header && (
+        <View style={{ flexShrink: 0 }} onLayout={onHeaderLayout}>
+          {header}
+        </View>
+      )}
 
       {scrollable ? (
         <ScrollView
-          style={{ flexGrow: 1, flexShrink: 1 }}
+          style={isFull ? { flex: 1 } : bodyMaxHeight != null ? { maxHeight: bodyMaxHeight } : undefined}
           contentContainerStyle={isFull ? { flexGrow: 1 } : undefined}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -55,13 +80,19 @@ export function ModalLayout({ header, body, footer, scrollable = true, isFull = 
           </View>
         </ScrollView>
       ) : (
-        <View className={cn('p-7', isFull && 'flex-1')} style={[isFull && { flex: 1 }, !footer && { paddingBottom: 28 + bottomInset }]}>
+        <View
+          className={cn('p-7', isFull && 'flex-1')}
+          style={[
+            isFull ? { flex: 1 } : bodyMaxHeight != null ? { maxHeight: bodyMaxHeight } : undefined,
+            !footer && { paddingBottom: 28 + bottomInset },
+          ]}
+        >
           {body}
         </View>
       )}
 
       {footer && (
-        <View style={{ flexShrink: 0, paddingBottom: 20 + bottomInset }} className="border-t border-subtle px-7 pt-5">
+        <View style={{ flexShrink: 0, paddingBottom: 20 + bottomInset }} className="border-t border-subtle px-7 pt-5" onLayout={onFooterLayout}>
           {footer}
         </View>
       )}
