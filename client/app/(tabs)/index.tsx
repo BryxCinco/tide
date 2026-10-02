@@ -19,7 +19,7 @@ import {
   TodaysTasks,
   WidgetGrid,
 } from '@/components/dashboard';
-import { CalendarWidget, StreakWidget, TimeWidget, WeatherWidget, WeeklyProgressWidget } from '@/components/dashboard/widgets';
+import { CalendarWidget, StreakWidget, TimeWidget, TodaysRoutineWidget, WeatherWidget, WeeklyProgressWidget } from '@/components/dashboard/widgets';
 import { TaskFormModal } from '@/components/tasks';
 import { Button, EmptyState, ResponsiveContainer } from '@/components/ui';
 import { MOOD_ICON_MAP } from '@/components/journal/MoodIcon';
@@ -192,6 +192,8 @@ export default function DashboardScreen() {
         return <WeeklyProgressWidget />;
       case 'streak':
         return <StreakWidget />;
+      case 'todaysRoutine':
+        return <TodaysRoutineWidget />;
       default:
         return null;
     }

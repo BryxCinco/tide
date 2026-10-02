@@ -4,10 +4,18 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { createSeedActivities } from '../mocks/mockActivities';
 import { activityService } from '../services/activity.service';
 import { getApiErrorMessage } from '../services/api';
-import type { Activity } from '../types/activity';
+import type { Activity, DayCode, RecurrenceType } from '../types/activity';
 import { hasAuthToken, isGuestMode } from '../utils/authFlags';
+import { toDateKey } from '../utils/formatDate';
 import { storage } from '../utils/storage';
 import { showToast } from './toastStore';
+
+type RecurrenceInput = {
+  recurrenceType?: RecurrenceType;
+  recurrenceDays?: DayCode[];
+  startDate?: string;
+  endDate?: string | null;
+};
 
 interface ActivityState {
   activities: Activity[];
@@ -15,8 +23,8 @@ interface ActivityState {
   error: string | null;
 
   fetchActivities: () => Promise<void>;
-  addActivity: (input: { name: string; icon: string; color: string }) => Promise<Activity>;
-  updateActivity: (id: string, updates: Partial<Pick<Activity, 'name' | 'icon' | 'color'>>) => void;
+  addActivity: (input: { name: string; icon: string; color: string } & RecurrenceInput) => Promise<Activity>;
+  updateActivity: (id: string, updates: Partial<Pick<Activity, 'name' | 'icon' | 'color' | 'recurrenceType' | 'recurrenceDays' | 'startDate' | 'endDate'>>) => void;
   /** Custom activities only — predefined ones can be edited but not removed. */
   deleteActivity: (id: string) => void;
   toggleFavorite: (id: string) => void;
@@ -85,7 +93,7 @@ export const useActivityStore = create<ActivityState>()(
         }
       },
 
-      addActivity: async ({ name, icon, color }) => {
+      addActivity: async ({ name, icon, color, recurrenceType, recurrenceDays, startDate, endDate }) => {
         if (isGuestMode()) {
           const activity: Activity = {
             id: `local_${Date.now()}`,
@@ -96,12 +104,16 @@ export const useActivityStore = create<ActivityState>()(
             isFavorite: false,
             isArchived: false,
             createdAt: new Date().toISOString(),
+            recurrenceType: recurrenceType ?? 'none',
+            recurrenceDays: recurrenceDays ?? [],
+            startDate: startDate ?? toDateKey(new Date()),
+            endDate: endDate ?? null,
           };
           set((state) => ({ activities: [...state.activities, activity] }));
           return activity;
         }
 
-        const activity = await activityService.create({ name, icon, color, category: 'custom' });
+        const activity = await activityService.create({ name, icon, color, category: 'custom', recurrenceType, recurrenceDays, startDate, endDate });
         set((state) => ({ activities: [...state.activities, activity] }));
         return activity;
       },

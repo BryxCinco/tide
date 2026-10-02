@@ -18,13 +18,13 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { name, icon, color, category, is_favorite } = req.body;
+  const { name, icon, color, category, is_favorite, recurrence_type, recurrence_days, start_date, end_date } = req.body;
 
   if (!name) return res.status(400).json({ error: 'name is required' });
 
   const { data, error } = await supabaseAdmin
     .from('activities')
-    .insert({ user_id: req.user.id, name, icon, color, category, is_favorite })
+    .insert({ user_id: req.user.id, name, icon, color, category, is_favorite, recurrence_type, recurrence_days, start_date, end_date })
     .select()
     .single();
 
@@ -42,11 +42,11 @@ router.post('/', async (req, res) => {
 });
 
 router.patch('/:id', async (req, res) => {
-  const { name, icon, color, category, is_favorite, is_archived } = req.body;
+  const { name, icon, color, category, is_favorite, is_archived, recurrence_type, recurrence_days, start_date, end_date } = req.body;
 
   const { data, error } = await supabaseAdmin
     .from('activities')
-    .update({ name, icon, color, category, is_favorite, is_archived })
+    .update({ name, icon, color, category, is_favorite, is_archived, recurrence_type, recurrence_days, start_date, end_date })
     .eq('id', req.params.id)
     .eq('user_id', req.user.id)
     .select()

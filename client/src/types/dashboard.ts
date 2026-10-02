@@ -85,7 +85,8 @@ export type WidgetId =
   | 'calendar'
   | 'weather'
   | 'weeklyProgress'
-  | 'streak';
+  | 'streak'
+  | 'todaysRoutine';
 
 export interface WidgetConfig {
   id: WidgetId;

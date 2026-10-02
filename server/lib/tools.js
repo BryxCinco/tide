@@ -888,9 +888,33 @@ toolHandlers.getStreakInfo = async ({ userId }) => {
   };
 };
 
+// Mirrors client/src/utils/activityRecurrence.ts's isActivityScheduledOn — hand-duplicated
+// the same way xp.ts/xpService.js already are (client/server are separate projects).
+const RECURRENCE_DAY_CODES = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+function isActivityScheduledToday(activity) {
+  if (!activity.recurrence_type || activity.recurrence_type === 'none') return false;
+  const today = new Date();
+  const todayKey = today.toISOString().slice(0, 10);
+  if (activity.start_date && todayKey < activity.start_date) return false;
+  if (activity.end_date && todayKey > activity.end_date) return false;
+
+  switch (activity.recurrence_type) {
+    case 'daily':
+      return true;
+    case 'weekly':
+      return new Date(activity.start_date).getDay() === today.getDay();
+    case 'monthly':
+      return new Date(activity.start_date).getDate() === today.getDate();
+    case 'custom':
+      return (activity.recurrence_days || []).includes(RECURRENCE_DAY_CODES[today.getDay()]);
+    default:
+      return false;
+  }
+}
+
 toolHandlers.suggestActivity = async ({ userId, count }) => {
   const [{ data: activities, error: actError }, { data: logs, error: logError }] = await Promise.all([
-    supabaseAdmin.from('activities').select('id, name, is_archived').eq('user_id', userId),
+    supabaseAdmin.from('activities').select('id, name, is_archived, recurrence_type, recurrence_days, start_date, end_date').eq('user_id', userId),
     supabaseAdmin.from('time_logs').select('activity_id, ended_at').eq('user_id', userId),
   ]);
   if (actError) throw new Error(actError.message);
@@ -910,22 +934,27 @@ toolHandlers.suggestActivity = async ({ userId, count }) => {
   }
 
   const now = Date.now();
-  // Never-done activities sort first (Infinity), then most-neglected first — shuffled before
-  // that sort so similarly-stale activities don't always come back in the same order.
+  // Scheduled-for-today activities sort first (regardless of staleness — that's the whole
+  // point of a routine), then never-done (Infinity), then most-neglected first — shuffled
+  // before the final sort so similarly-stale activities don't always come back in the same
+  // order.
   const scored = pool
     .map((activity) => {
       const lastDone = lastDoneByActivity[activity.id];
       const daysSince = lastDone ? Math.floor((now - new Date(lastDone).getTime()) / 86400000) : Infinity;
-      const reason =
-        daysSince === Infinity
+      const scheduledToday = isActivityScheduledToday(activity);
+      const reason = scheduledToday
+        ? "It's on your routine for today."
+        : daysSince === Infinity
           ? "You haven't tried this one yet."
           : daysSince === 0
             ? "You did this today — keep the momentum going."
             : `You haven't done this in ${daysSince} day${daysSince === 1 ? '' : 's'}.`;
-      return { activityName: activity.name, reason, daysSince };
+      return { activityName: activity.name, reason, daysSince, scheduledToday };
     })
     .sort(() => Math.random() - 0.5)
-    .sort((a, b) => b.daysSince - a.daysSince);
+    .sort((a, b) => b.daysSince - a.daysSince)
+    .sort((a, b) => Number(b.scheduledToday) - Number(a.scheduledToday));
 
   const n = Math.max(1, Math.min(count || 3, pool.length));
   const suggestions = scored.slice(0, n).map(({ activityName, reason }) => ({ activityName, reason }));

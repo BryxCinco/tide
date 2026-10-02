@@ -42,13 +42,26 @@ export const DEFAULT_FOCUS_ACTIVITY: Activity = {
   isFavorite: false,
   isArchived: false,
   createdAt: new Date(0).toISOString(),
+  recurrenceType: 'none',
+  recurrenceDays: [],
+  startDate: new Date(0).toISOString().slice(0, 10),
+  endDate: null,
 };
 
 /** The 6 activities Phase 5 shipped with, now living as `category: 'predefined'` rows
  * in activityStore instead of a separate static list. */
 export function createSeedActivities(): Activity[] {
   const now = new Date().toISOString();
-  const base = { category: 'predefined' as const, isFavorite: false, isArchived: false, createdAt: now };
+  const base = {
+    category: 'predefined' as const,
+    isFavorite: false,
+    isArchived: false,
+    createdAt: now,
+    recurrenceType: 'none' as const,
+    recurrenceDays: [],
+    startDate: now.slice(0, 10),
+    endDate: null,
+  };
 
   return [
     { id: 'deep-work', name: 'Deep Work', icon: 'Brain', color: '#14B8A6', ...base },

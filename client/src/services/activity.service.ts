@@ -1,4 +1,5 @@
-import type { Activity, ActivityCategory } from '../types/activity';
+import type { Activity, ActivityCategory, DayCode, RecurrenceType } from '../types/activity';
+import { toDateKey } from '../utils/formatDate';
 import { api } from './api';
 
 export interface ApiActivity {
@@ -11,6 +12,10 @@ export interface ApiActivity {
   is_favorite: boolean;
   is_archived: boolean;
   created_at: string;
+  recurrence_type: string | null;
+  recurrence_days: string[] | null;
+  start_date: string | null;
+  end_date: string | null;
 }
 
 export interface CreateActivityPayload {
@@ -19,6 +24,10 @@ export interface CreateActivityPayload {
   color: string;
   category?: ActivityCategory;
   isFavorite?: boolean;
+  recurrenceType?: RecurrenceType;
+  recurrenceDays?: DayCode[];
+  startDate?: string;
+  endDate?: string | null;
 }
 
 export interface UpdateActivityPayload {
@@ -28,6 +37,10 @@ export interface UpdateActivityPayload {
   category?: ActivityCategory;
   isFavorite?: boolean;
   isArchived?: boolean;
+  recurrenceType?: RecurrenceType;
+  recurrenceDays?: DayCode[];
+  startDate?: string;
+  endDate?: string | null;
 }
 
 function mapApiActivity(row: ApiActivity): Activity {
@@ -40,6 +53,10 @@ function mapApiActivity(row: ApiActivity): Activity {
     isFavorite: row.is_favorite,
     isArchived: row.is_archived,
     createdAt: row.created_at,
+    recurrenceType: (row.recurrence_type as RecurrenceType | null) ?? 'none',
+    recurrenceDays: (row.recurrence_days as DayCode[] | null) ?? [],
+    startDate: row.start_date ?? toDateKey(new Date()),
+    endDate: row.end_date,
   };
 }
 
@@ -56,6 +73,10 @@ export const activityService = {
       color: payload.color,
       category: payload.category,
       is_favorite: payload.isFavorite,
+      recurrence_type: payload.recurrenceType,
+      recurrence_days: payload.recurrenceDays,
+      start_date: payload.startDate,
+      end_date: payload.endDate,
     });
     return mapApiActivity(data.activity);
   },
@@ -68,6 +89,10 @@ export const activityService = {
       category: payload.category,
       is_favorite: payload.isFavorite,
       is_archived: payload.isArchived,
+      recurrence_type: payload.recurrenceType,
+      recurrence_days: payload.recurrenceDays,
+      start_date: payload.startDate,
+      end_date: payload.endDate,
     });
     return mapApiActivity(data.activity);
   },

@@ -2,9 +2,11 @@ import { View } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
 
 import type { Activity } from '../../types/activity';
+import { recurrenceBadgeLabel } from '../../utils/activityRecurrence';
 import { hexToRgba } from '../../utils/color';
 import { colors } from '../../utils/theme';
 import { cn } from '../../utils/cn';
+import { formatDateKeyShort } from '../../utils/formatDate';
 import { Badge, Icon, Text, VisibleDeleteButton, type IconName } from '../ui';
 
 export interface ActivityRowProps {
@@ -41,6 +43,7 @@ export function ActivityRow({
   onToggleHide,
 }: ActivityRowProps) {
   const isCustom = activity.category === 'custom';
+  const recurrenceLabel = recurrenceBadgeLabel(activity);
   return (
     <View className="flex-row items-center gap-3 rounded-xl border border-subtle bg-base p-3">
       <Pressable onPress={onInfo} className="flex-1 flex-row items-center gap-3">
@@ -51,12 +54,20 @@ export function ActivityRow({
           <Icon name={activity.icon as IconName} size={18} color={activity.color} />
         </View>
 
-        <View className="flex-1 flex-row flex-wrap items-center gap-2">
-          <Text variant="body" color="primary" className="font-medium">
-            {activity.name}
-          </Text>
-          {activity.category === 'custom' && <Badge label="Custom" variant="default" size="sm" />}
-          {activity.isArchived && <Badge label="Archived" variant="warning" size="sm" />}
+        <View className="flex-1 gap-0.5">
+          <View className="flex-row flex-wrap items-center gap-2">
+            <Text variant="body" color="primary" className="font-medium">
+              {activity.name}
+            </Text>
+            {activity.category === 'custom' && <Badge label="Custom" variant="default" size="sm" />}
+            {recurrenceLabel && <Badge label={recurrenceLabel} variant="teal" size="sm" />}
+            {activity.isArchived && <Badge label="Archived" variant="warning" size="sm" />}
+          </View>
+          {activity.recurrenceType !== 'none' && activity.endDate && (
+            <Text variant="caption" color="muted" className="normal-case tracking-normal">
+              Until {formatDateKeyShort(activity.endDate)}
+            </Text>
+          )}
         </View>
       </Pressable>
 

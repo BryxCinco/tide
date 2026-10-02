@@ -1,15 +1,25 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, useWindowDimensions, View } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
 
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { ICON_OPTIONS, PRESET_COLORS } from '../../mocks/mockActivities';
 import { useActivityStore } from '../../store/activityStore';
-import type { Activity } from '../../types/activity';
+import type { Activity, DayCode, RecurrenceType } from '../../types/activity';
+import { DAY_CODE_LABELS, DAY_CODE_ORDER } from '../../utils/activityRecurrence';
 import { cn } from '../../utils/cn';
 import { confirmAsync } from '../../utils/confirm';
+import { formatDateKeyShort, toDateKey } from '../../utils/formatDate';
 import { colors } from '../../utils/theme';
-import { Button, ConfirmationModal, Icon, Input, Modal, Text, type IconName } from '../ui';
+import { Button, CalendarPicker, ConfirmationModal, Icon, Input, Modal, Text, type IconName } from '../ui';
+
+const RECURRENCE_OPTIONS: { value: RecurrenceType; label: string }[] = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'custom', label: 'Custom' },
+];
 
 export interface ActivityFormModalProps {
   visible: boolean;
@@ -32,18 +42,34 @@ export function ActivityFormModal({ visible, onClose, activity, onSaved, showSuc
   const deleteActivity = useActivityStore((s) => s.deleteActivity);
   const setArchived = useActivityStore((s) => s.setArchived);
   const { height } = useWindowDimensions();
+  const themeColors = useThemeColors();
 
   const [name, setName] = useState('');
   const [icon, setIcon] = useState(ICON_OPTIONS[0]);
   const [color, setColor] = useState(PRESET_COLORS[0]);
+  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>('none');
+  const [recurrenceDays, setRecurrenceDays] = useState<DayCode[]>([]);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState<string | null>(null);
+  const [startCalendarVisible, setStartCalendarVisible] = useState(false);
+  const [endCalendarVisible, setEndCalendarVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdActivity, setCreatedActivity] = useState<Activity | null>(null);
+  const todayKey = useMemo(() => toDateKey(new Date()), []);
 
   const resetForm = () => {
     setName(activity?.name ?? '');
     setIcon(activity?.icon ?? ICON_OPTIONS[0]);
     setColor(activity?.color ?? PRESET_COLORS[0]);
+    setRecurrenceType(activity?.recurrenceType ?? 'none');
+    setRecurrenceDays(activity?.recurrenceDays ?? []);
+    setStartDate(activity?.startDate ?? todayKey);
+    setEndDate(activity?.endDate ?? null);
     setError(null);
+  };
+
+  const toggleRecurrenceDay = (day: DayCode) => {
+    setRecurrenceDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
   };
 
   useEffect(() => {
@@ -65,16 +91,18 @@ export function ActivityFormModal({ visible, onClose, activity, onSaved, showSuc
       return;
     }
 
+    const recurrence = { recurrenceType, recurrenceDays: recurrenceType === 'custom' ? recurrenceDays : [], startDate, endDate };
+
     if (activity) {
-      updateActivity(activity.id, { name: trimmed, icon, color });
-      onSaved?.({ ...activity, name: trimmed, icon, color });
+      updateActivity(activity.id, { name: trimmed, icon, color, ...recurrence });
+      onSaved?.({ ...activity, name: trimmed, icon, color, ...recurrence });
       onClose();
       return;
     }
 
     setIsSaving(true);
     try {
-      const created = await addActivity({ name: trimmed, icon, color });
+      const created = await addActivity({ name: trimmed, icon, color, ...recurrence });
       onSaved?.(created);
       if (showSuccessModal) {
         setCreatedActivity(created);
@@ -165,6 +193,108 @@ export function ActivityFormModal({ visible, onClose, activity, onSaved, showSuc
             </View>
           </View>
 
+          <View className="gap-2">
+            <Text variant="label" color="muted">
+              Recurrence
+            </Text>
+            <View className="flex-row gap-2">
+              <Pressable
+                onPress={() => setRecurrenceType('none')}
+                className={cn(
+                  'flex-1 items-center rounded-full border-2 py-2.5',
+                  recurrenceType === 'none' ? 'border-tide-teal bg-tide-teal/10' : 'border-subtle bg-base hover:border-default',
+                )}
+              >
+                <Text variant="body" color={recurrenceType === 'none' ? 'accent' : 'secondary'} className={cn('normal-case tracking-normal', recurrenceType === 'none' && 'font-semibold')}>
+                  One-time
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setRecurrenceType((prev) => (prev === 'none' ? 'daily' : prev))}
+                className={cn(
+                  'flex-1 items-center rounded-full border-2 py-2.5',
+                  recurrenceType !== 'none' ? 'border-tide-teal bg-tide-teal/10' : 'border-subtle bg-base hover:border-default',
+                )}
+              >
+                <Text variant="body" color={recurrenceType !== 'none' ? 'accent' : 'secondary'} className={cn('normal-case tracking-normal', recurrenceType !== 'none' && 'font-semibold')}>
+                  Recurring
+                </Text>
+              </Pressable>
+            </View>
+
+            {recurrenceType !== 'none' && (
+              <>
+                <View className="flex-row flex-wrap gap-2 pt-1">
+                  {RECURRENCE_OPTIONS.map((option) => {
+                    const selected = recurrenceType === option.value;
+                    return (
+                      <Pressable
+                        key={option.value}
+                        onPress={() => setRecurrenceType(option.value)}
+                        className={cn(
+                          'rounded-full border-2 px-4 py-2 transition-transform duration-150 hover:scale-[1.03]',
+                          selected ? 'border-tide-teal bg-tide-teal/10' : 'border-subtle bg-base hover:border-default',
+                        )}
+                      >
+                        <Text variant="body" color={selected ? 'accent' : 'secondary'} className={cn('normal-case tracking-normal', selected && 'font-semibold')}>
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                {recurrenceType === 'custom' && (
+                  <View className="flex-row flex-wrap gap-2 pt-1">
+                    {DAY_CODE_ORDER.map((day) => {
+                      const selected = recurrenceDays.includes(day);
+                      return (
+                        <Pressable
+                          key={day}
+                          onPress={() => toggleRecurrenceDay(day)}
+                          className={cn(
+                            'h-10 w-12 items-center justify-center rounded-xl border-2',
+                            selected ? 'border-tide-teal bg-tide-teal/10' : 'border-subtle bg-base hover:border-default',
+                          )}
+                        >
+                          <Text variant="caption" color={selected ? 'accent' : 'secondary'} className={cn('normal-case tracking-normal', selected && 'font-semibold')}>
+                            {DAY_CODE_LABELS[day]}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
+
+                <View className="flex-row gap-2 pt-1">
+                  <Pressable
+                    onPress={() => setStartCalendarVisible(true)}
+                    className="h-11 flex-1 flex-row items-center gap-2 rounded-xl border border-subtle bg-base px-3.5 hover:border-default"
+                  >
+                    <Icon name="Calendar" size={15} color={themeColors.brand.tideTeal} />
+                    <Text variant="body" color="primary" className="normal-case tracking-normal" numberOfLines={1}>
+                      {formatDateKeyShort(startDate)}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setEndCalendarVisible(true)}
+                    className="h-11 flex-1 flex-row items-center gap-2 rounded-xl border border-subtle bg-base px-3.5 hover:border-default"
+                  >
+                    <Icon name="Calendar" size={15} color={endDate ? themeColors.brand.tideTeal : themeColors.text.disabled} />
+                    <Text variant="body" color={endDate ? 'primary' : 'muted'} className="flex-1 normal-case tracking-normal" numberOfLines={1}>
+                      {endDate ? formatDateKeyShort(endDate) : 'No end date'}
+                    </Text>
+                    {endDate && (
+                      <Pressable onPress={() => setEndDate(null)} hitSlop={8} className="h-5 w-5 items-center justify-center rounded-full hover:bg-elevated">
+                        <Icon name="X" size={12} color={themeColors.text.muted} />
+                      </Pressable>
+                    )}
+                  </Pressable>
+                </View>
+              </>
+            )}
+          </View>
+
           <Button title="Save" variant="primary" size="lg" fullWidth loading={isSaving} onPress={handleSave} />
 
           {isEditing && (
@@ -180,6 +310,43 @@ export function ActivityFormModal({ visible, onClose, activity, onSaved, showSuc
           {canDelete && <Button title="Delete Activity" variant="danger" size="md" fullWidth onPress={handleDelete} />}
         </View>
       </ScrollView>
+
+      <Modal visible={startCalendarVisible} onClose={() => setStartCalendarVisible(false)} title="Start Date" icon="Calendar" size="sm">
+        <View className="items-center">
+          <CalendarPicker
+            value={startDate || undefined}
+            maxDate={endDate || undefined}
+            onChange={(key) => {
+              setStartDate(key);
+              setStartCalendarVisible(false);
+            }}
+          />
+        </View>
+      </Modal>
+
+      <Modal visible={endCalendarVisible} onClose={() => setEndCalendarVisible(false)} title="End Date" icon="Calendar" size="sm">
+        <View className="items-center gap-4">
+          <CalendarPicker
+            value={endDate || undefined}
+            minDate={startDate || undefined}
+            onChange={(key) => {
+              setEndDate(key);
+              setEndCalendarVisible(false);
+            }}
+          />
+          {endDate && (
+            <Button
+              title="Clear end date"
+              variant="ghost"
+              size="sm"
+              onPress={() => {
+                setEndDate(null);
+                setEndCalendarVisible(false);
+              }}
+            />
+          )}
+        </View>
+      </Modal>
 
       <ConfirmationModal
         visible={Boolean(createdActivity)}

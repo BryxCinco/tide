@@ -25,6 +25,7 @@ const WIDGET_LABELS: Record<WidgetId, { label: string; icon: IconName }> = {
   weather: { label: 'Weather', icon: 'Sun' },
   weeklyProgress: { label: 'Weekly Progress', icon: 'PieChart' },
   streak: { label: 'Streak', icon: 'Flame' },
+  todaysRoutine: { label: "Today's Routine", icon: 'Repeat' },
 };
 
 export interface CustomizeDashboardModalProps {

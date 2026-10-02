@@ -24,6 +24,9 @@ const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'calendar', enabled: false, order: 12, size: 'compact' },
   { id: 'weather', enabled: false, order: 13, size: 'compact' },
   { id: 'weeklyProgress', enabled: false, order: 14, size: 'compact' },
+  // Off by default — most accounts haven't set up a recurring activity yet, so this would
+  // just show its empty state until they opt in (same reasoning as insights/habits above).
+  { id: 'todaysRoutine', enabled: false, order: 15 },
 ];
 
 interface DashboardState {

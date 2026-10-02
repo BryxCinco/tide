@@ -1,7 +1,9 @@
+import { useMemo } from 'react';
 import { View } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
 
 import type { Activity } from '../../types/activity';
+import { isActivityScheduledOn } from '../../utils/activityRecurrence';
 import { cn } from '../../utils/cn';
 import { hexToRgba } from '../../utils/color';
 import { Icon, Text, type IconName } from '../ui';
@@ -34,6 +36,77 @@ export function ActivityPicker({
   onDeselect,
   onShuffle,
 }: ActivityPickerProps) {
+  // Only split into "Today"/"All" sections once there's actually at least one recurring
+  // activity scheduled for today — otherwise every account (the vast majority, who've never
+  // touched recurrence) sees the exact same flat grid as before this existed.
+  const todayActivities = useMemo(() => activities.filter((a) => isActivityScheduledOn(a)), [activities]);
+  const otherActivities = useMemo(
+    () => (todayActivities.length > 0 ? activities.filter((a) => !isActivityScheduledOn(a)) : activities),
+    [activities, todayActivities],
+  );
+
+  const renderGrid = (list: Activity[], showAddCustom: boolean) => (
+    <View className="flex-row flex-wrap gap-3">
+      {list.map((activity) => {
+        const isSelected = activity.id === selectedId;
+
+        return (
+          <Pressable
+            key={activity.id}
+            disabled={disabled}
+            onPress={() => (isSelected && onDeselect ? onDeselect() : onSelect(activity))}
+            className={cn(
+              'relative basis-[47%] items-center gap-2 rounded-xl border p-3 md:basis-[30%] lg:basis-[14%]',
+              isSelected ? 'border-tide-teal bg-tide-teal/5' : 'border-subtle bg-base',
+              disabled && !isSelected && 'opacity-50',
+            )}
+          >
+            {isSelected && onDeselect && (
+              <Pressable
+                onPress={onDeselect}
+                hitSlop={8}
+                className="absolute right-1.5 top-1.5 h-5 w-5 items-center justify-center rounded-full bg-tide-teal"
+              >
+                <Icon name="X" size={11} color="#FFFFFF" />
+              </Pressable>
+            )}
+            <View
+              className="h-11 w-11 items-center justify-center rounded-full"
+              style={{ backgroundColor: hexToRgba(activity.color, 0.1) }}
+            >
+              <Icon name={activity.icon as IconName} size={20} color={activity.color} />
+            </View>
+            <Text
+              variant="caption"
+              color={isSelected ? 'accent' : 'secondary'}
+              className="text-center normal-case tracking-normal"
+            >
+              {activity.name}
+            </Text>
+          </Pressable>
+        );
+      })}
+
+      {showAddCustom && onAddCustom && (
+        <Pressable
+          disabled={disabled}
+          onPress={onAddCustom}
+          className={cn(
+            'basis-[47%] items-center gap-2 rounded-xl border border-dashed border-subtle bg-base p-3 md:basis-[30%] lg:basis-[14%]',
+            disabled && 'opacity-50',
+          )}
+        >
+          <View className="h-11 w-11 items-center justify-center rounded-full bg-surface">
+            <Icon name="Plus" size={20} />
+          </View>
+          <Text variant="caption" color="muted" className="text-center normal-case tracking-normal">
+            Custom
+          </Text>
+        </Pressable>
+      )}
+    </View>
+  );
+
   return (
     <View className="gap-3">
       {onShuffle && (
@@ -56,65 +129,25 @@ export function ActivityPicker({
           </Pressable>
         </View>
       )}
-      <View className="flex-row flex-wrap gap-3">
-        {activities.map((activity) => {
-          const isSelected = activity.id === selectedId;
 
-          return (
-            <Pressable
-              key={activity.id}
-              disabled={disabled}
-              onPress={() => (isSelected && onDeselect ? onDeselect() : onSelect(activity))}
-              className={cn(
-                'relative basis-[47%] items-center gap-2 rounded-xl border p-3 md:basis-[30%] lg:basis-[14%]',
-                isSelected ? 'border-tide-teal bg-tide-teal/5' : 'border-subtle bg-base',
-                disabled && !isSelected && 'opacity-50',
-              )}
-            >
-              {isSelected && onDeselect && (
-                <Pressable
-                  onPress={onDeselect}
-                  hitSlop={8}
-                  className="absolute right-1.5 top-1.5 h-5 w-5 items-center justify-center rounded-full bg-tide-teal"
-                >
-                  <Icon name="X" size={11} color="#FFFFFF" />
-                </Pressable>
-              )}
-              <View
-                className="h-11 w-11 items-center justify-center rounded-full"
-                style={{ backgroundColor: hexToRgba(activity.color, 0.1) }}
-              >
-                <Icon name={activity.icon as IconName} size={20} color={activity.color} />
-              </View>
-              <Text
-                variant="caption"
-                color={isSelected ? 'accent' : 'secondary'}
-                className="text-center normal-case tracking-normal"
-              >
-                {activity.name}
-              </Text>
-            </Pressable>
-          );
-        })}
-
-        {onAddCustom && (
-          <Pressable
-            disabled={disabled}
-            onPress={onAddCustom}
-            className={cn(
-              'basis-[47%] items-center gap-2 rounded-xl border border-dashed border-subtle bg-base p-3 md:basis-[30%] lg:basis-[14%]',
-              disabled && 'opacity-50',
-            )}
-          >
-            <View className="h-11 w-11 items-center justify-center rounded-full bg-surface">
-              <Icon name="Plus" size={20} />
-            </View>
-            <Text variant="caption" color="muted" className="text-center normal-case tracking-normal">
-              Custom
+      {todayActivities.length > 0 ? (
+        <>
+          <View className="gap-2">
+            <Text variant="caption" color="muted" className="normal-case tracking-normal">
+              Today's Activities
             </Text>
-          </Pressable>
-        )}
-      </View>
+            {renderGrid(todayActivities, false)}
+          </View>
+          <View className="gap-2">
+            <Text variant="caption" color="muted" className="normal-case tracking-normal">
+              All Activities
+            </Text>
+            {renderGrid(otherActivities, true)}
+          </View>
+        </>
+      ) : (
+        renderGrid(otherActivities, true)
+      )}
     </View>
   );
 }
