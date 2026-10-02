@@ -127,9 +127,17 @@ function weaknessReason(category, signals) {
 /**
  * Builds 3-5 quests for `dateKey`: one from the weakest measurable category, one from
  * today's routine (if any recurring activity is scheduled today), one stretch goal, and 1-2
- * random from whatever categories are left — then inserts them all as is_agentic:true rows.
- * Used by both the `generateDailyQuests` AI tool and POST /api/quests/generate (the "Generate
- * Today's Quests" button) — "auto or manual" per the spec, same underlying function either way.
+ * random from whatever categories are left — then inserts them all as is_agentic:true rows,
+ * and only then clears out the previous non-custom quests for that date (custom ones the user
+ * added themselves are left alone either way). Used by both the `generateDailyQuests` AI tool
+ * and POST /api/quests/generate (the "Generate Today's Quests" button) — "auto or manual" per
+ * the spec, same underlying function either way.
+ *
+ * Insert-then-delete, not delete-then-insert: the old order cleared today's quests FIRST and
+ * only then generated the replacements, so a failure in between (a dropped request, a DB
+ * hiccup) left the user with zero quests for the day and nothing to show for it. Generating
+ * and inserting the new batch first means a failure there just throws with the old quests
+ * still intact — nothing is ever deleted unless the replacement already exists.
  */
 async function generateDailyQuestsForUser(userId, dateKey) {
   const signals = await gatherSignals(userId);
@@ -188,6 +196,21 @@ async function generateDailyQuestsForUser(userId, dateKey) {
 
   const { data, error } = await supabaseAdmin.from('quests').insert(rows).select();
   if (error) throw new Error(error.message);
+
+  // Only reachable once the replacements are safely in the DB — see the function doc above.
+  const newIds = data.map((q) => q.id);
+  const { error: clearError } = await supabaseAdmin
+    .from('quests')
+    .delete()
+    .eq('user_id', userId)
+    .eq('date', dateKey)
+    .eq('is_custom', false)
+    .not('id', 'in', `(${newIds.join(',')})`);
+  // Non-fatal: the user now has today's new quests either way, just possibly alongside a
+  // stale duplicate batch instead of a clean swap — logged for follow-up, not worth failing
+  // the whole generation over since the generation itself already succeeded.
+  if (clearError) console.error('[questGenerator] cleanup of previous quests failed (non-fatal):', clearError.message);
+
   return data;
 }
 

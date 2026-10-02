@@ -1053,9 +1053,8 @@ toolHandlers.suggestTideQuest = async ({ userId, confirm, title, description, ti
 
 toolHandlers.generateDailyQuests = async ({ userId }) => {
   const dateKey = new Date().toISOString().slice(0, 10);
-  const { error: clearError } = await supabaseAdmin.from('quests').delete().eq('user_id', userId).eq('date', dateKey).eq('is_custom', false);
-  if (clearError) throw new Error(clearError.message);
-
+  // generateDailyQuestsForUser inserts the new batch before clearing out the old one — see
+  // its doc comment in questGenerator.js — so there's no separate clear-first step here.
   const quests = await generateDailyQuestsForUser(userId, dateKey);
   return { quests, message: `Generated ${quests.length} quests for today: ${quests.map((q) => `"${q.title}" (+${q.xp} XP)`).join(', ')}.` };
 };

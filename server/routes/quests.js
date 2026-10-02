@@ -85,9 +85,8 @@ router.get('/streak', async (req, res) => {
 router.post('/generate', async (req, res) => {
   const date = req.body.date || todayKey();
   try {
-    const { error: clearError } = await supabaseAdmin.from('quests').delete().eq('user_id', req.user.id).eq('date', date).eq('is_custom', false);
-    if (clearError) return res.status(500).json({ error: clearError.message });
-
+    // generateDailyQuestsForUser inserts the new batch before clearing out the old one — see
+    // its doc comment in questGenerator.js — so there's no separate clear-first step here.
     const quests = await generateDailyQuestsForUser(req.user.id, date);
     res.status(201).json({ quests });
   } catch (err) {
