@@ -6,6 +6,7 @@ import { TextInput } from '../ui/SoundTextInput';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useJournalStore } from '../../store/journalStore';
 import { useThemeStore } from '../../store/themeStore';
+import { showToast } from '../../store/toastStore';
 import type { JournalEntry, Mood } from '../../types/journal';
 import { cn } from '../../utils/cn';
 import { confirmAsync } from '../../utils/confirm';
@@ -58,26 +59,33 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
   // title/content, just extended now that photos are a legitimate way to start an entry.
   const hasContent = () => Boolean(title.trim() || content.trim() || photoUris.length > 0);
 
-  const persist = async () => {
+  // Returns whether the entry actually ended up saved — callers that need to tell the user
+  // the truth (handleSave below) check this instead of assuming success just because the
+  // call didn't throw past this function.
+  const persist = async (): Promise<boolean> => {
     const trimmedTitle = title.trim() || 'Untitled';
-    if (!hasContent()) return;
+    if (!hasContent()) return false;
 
     if (savedId) {
       updateEntry(savedId, { title: trimmedTitle, content, mood, tags, photoUrls: photoUris });
-      return;
+      return true;
     }
 
     // Guards against the autosave timer and a manual Save firing the very first create
     // twice (e.g. Save tapped right as the 3s autosave timer also elapses) — both would
     // otherwise see savedId still unset and race to POST two separate entries.
-    if (isCreatingRef.current) return;
+    if (isCreatingRef.current) return false;
     isCreatingRef.current = true;
     try {
       const created = await addEntry({ title: trimmedTitle, content, mood, tags, photoUrls: photoUris });
       setSavedId(created.id);
+      return true;
     } catch {
-      // Failure is silent here (autosave retries on the next tick); a manual Save's
-      // failure is surfaced via handleSave below instead.
+      // Autosave retries on the next tick either way — the entry is never lost, just not
+      // synced yet — but a manual Save needs to know this happened (see handleSave) instead
+      // of telling the user it saved when the create actually failed (e.g. a dropped
+      // request during a login/logout race, or a real network error).
+      return false;
     } finally {
       isCreatingRef.current = false;
     }
@@ -99,10 +107,18 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
   }, [title, content, mood, tags, photoUris]);
 
   // Unlike autosave (which fires silently every 3s while typing — a modal there would be
-  // constant and unusable), an explicit Save tap is a deliberate action worth confirming.
+  // constant and unusable), an explicit Save tap is a deliberate action worth confirming —
+  // and, if it actually failed, worth saying so instead of showing "Saved!" regardless. That
+  // false-positive was the real bug behind "my new entry doesn't show up anywhere": the
+  // create silently failed (e.g. a dropped request during a login/logout race), but the
+  // user was told it saved and had no reason to think otherwise.
   const handleSave = async () => {
-    await persist();
-    setShowSavedModal(true);
+    const saved = await persist();
+    if (saved) {
+      setShowSavedModal(true);
+    } else {
+      showToast("Couldn't save your entry. Please try again.", 'error');
+    }
   };
 
   const handleDelete = async () => {
