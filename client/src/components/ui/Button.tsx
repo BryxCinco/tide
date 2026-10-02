@@ -33,6 +33,10 @@ export interface ButtonProps {
   iconPosition?: 'left' | 'right';
   /** Stretches the button to fill its container's width. */
   fullWidth?: boolean;
+  /** Set false to suppress the shared tap sound for this specific button — e.g. the final
+   * "Log Out" confirm, which should be a silent action instead of the usual click. Defaults
+   * to true (every other button in the app keeps the sound). */
+  sound?: boolean;
   className?: string;
 }
 
@@ -84,6 +88,7 @@ export function Button({
   icon,
   iconPosition = 'left',
   fullWidth = false,
+  sound = true,
   className,
 }: ButtonProps) {
   const isDisabled = disabled || loading;
@@ -120,7 +125,7 @@ export function Button({
     // Every Button in the app plays this — the one shared tap point that gives the whole
     // UI a consistent "click" the same way a native OS's system button sound would,
     // without needing to wire it into dozens of individual Pressables by hand.
-    soundManager.play('tap');
+    if (sound) soundManager.play('tap');
     onPress?.(event);
   };
 

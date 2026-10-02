@@ -182,6 +182,15 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   loginWithGoogle: async () => {
+    // Only ever reachable today from login.tsx's explicit "Continue with Google" button tap
+    // — this guard just makes that invariant load-bearing instead of implicit, so a stray
+    // call during an auth-state transition (e.g. a leftover handler reference firing a beat
+    // after logout, before isAuthenticated has actually flipped false) can never pop the
+    // Google account picker open on someone who didn't just ask for it.
+    if (get().isAuthenticated) {
+      console.log('[OAuth Debug] authStore.loginWithGoogle() called while already authenticated — ignoring.');
+      return;
+    }
     console.log('[OAuth Debug] authStore.loginWithGoogle() called.');
     set({ isLoading: true, error: null });
     try {
