@@ -208,7 +208,16 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
         title="Entry Saved!"
         message="Your thoughts have been recorded."
         autoDismissMs={3000}
-        primaryAction={{ label: 'View Entry', onPress: () => setShowSavedModal(false) }}
+        primaryAction={{
+          label: 'View Entry',
+          onPress: () => {
+            setShowSavedModal(false);
+            // Was a no-op before (just closed the modal, left the user on the exact same
+            // screen) — looked like the entry never saved at all. `/journal/[id]` renders
+            // through this same JournalEditor, so navigating there is the actual "view".
+            if (savedId && isNew) router.replace(`/journal/${savedId}`);
+          },
+        }}
         secondaryAction={{ label: 'Write Another', onPress: () => router.replace('/journal/new') }}
         tertiaryAction={{ label: 'Done', onPress: onDone }}
       />
