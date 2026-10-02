@@ -26,10 +26,10 @@ export function LogoutModal({ visible, onClose, onConfirm }: LogoutModalProps) {
       size="sm"
       footer={
         <View className="flex-row gap-3">
-          <Button title={t('common.cancel')} variant="secondary" fullWidth onPress={onClose} />
+          <Button title={t('common.cancel')} variant="secondary" className="flex-1" onPress={onClose} />
           {/* Silent — logging out is a plain, no-fanfare action, not something to celebrate
               with the usual tap click. */}
-          <Button title={t('nav.logout')} variant="danger" fullWidth sound={false} onPress={onConfirm} />
+          <Button title={t('nav.logout')} variant="danger" className="flex-1" sound={false} onPress={onConfirm} />
         </View>
       }
     >

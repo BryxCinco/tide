@@ -43,11 +43,11 @@ export function DeleteAccountModal({ visible, onClose, onConfirm, isDeleting = f
       size="sm"
       footer={
         <View className="flex-row gap-3">
-          <Button title={t('common.cancel')} variant="secondary" fullWidth onPress={onClose} disabled={isDeleting} />
+          <Button title={t('common.cancel')} variant="secondary" className="flex-1" onPress={onClose} disabled={isDeleting} />
           <Button
             title={isDeleting ? 'Deleting…' : t('profile.deleteAccount')}
             variant="danger"
-            fullWidth
+            className="flex-1"
             disabled={!canDelete || isDeleting}
             onPress={onConfirm}
           />

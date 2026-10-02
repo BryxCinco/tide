@@ -70,8 +70,8 @@ export function EditProfileModal({ visible, onClose, onChangeAvatar }: EditProfi
       size="md"
       footer={
         <View className="flex-row gap-3">
-          <Button title={t('common.cancel')} variant="secondary" fullWidth onPress={onClose} disabled={isSaving} />
-          <Button title={t('common.save')} variant="primary" fullWidth loading={isSaving} onPress={handleSave} />
+          <Button title={t('common.cancel')} variant="secondary" className="flex-1" onPress={onClose} disabled={isSaving} />
+          <Button title={t('common.save')} variant="primary" className="flex-1" loading={isSaving} onPress={handleSave} />
         </View>
       }
     >

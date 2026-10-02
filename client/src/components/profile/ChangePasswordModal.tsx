@@ -64,8 +64,8 @@ export function ChangePasswordModal({ visible, onClose }: ChangePasswordModalPro
       size="sm"
       footer={
         <View className="flex-row gap-3">
-          <Button title="Cancel" variant="secondary" fullWidth onPress={onClose} disabled={isSaving} />
-          <Button title="Update Password" variant="primary" fullWidth loading={isSaving} onPress={handleSubmit} />
+          <Button title="Cancel" variant="secondary" className="flex-1" onPress={onClose} disabled={isSaving} />
+          <Button title="Update Password" variant="primary" className="flex-1" loading={isSaving} onPress={handleSubmit} />
         </View>
       }
     >

@@ -47,8 +47,8 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
       size="md"
       footer={
         <View className="flex-row gap-3">
-          <Button title="Cancel" variant="secondary" fullWidth onPress={onClose} />
-          <Button title="Submit" variant="primary" fullWidth onPress={handleSubmit} />
+          <Button title="Cancel" variant="secondary" className="flex-1" onPress={onClose} />
+          <Button title="Submit" variant="primary" className="flex-1" onPress={handleSubmit} />
         </View>
       }
     >
