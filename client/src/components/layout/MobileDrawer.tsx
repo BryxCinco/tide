@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, View, useWindowDimensions } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useTranslation } from '../../i18n';
+import { LogoutModal } from '../profile/LogoutModal';
 import { useThemeStore } from '../../store/themeStore';
 import { useUiStore } from '../../store/uiStore';
 import { hexToRgba } from '../../utils/color';
@@ -33,6 +34,7 @@ export function MobileDrawer() {
   const themeColors = useThemeColors();
   const isDark = useThemeStore((s) => s.theme === 'dark');
   const { t } = useTranslation();
+  const [logoutVisible, setLogoutVisible] = useState(false);
 
   const drawerWidth = Math.min(screenWidth * 0.8, MAX_WIDTH);
   const translateX = useSharedValue(-drawerWidth);
@@ -63,9 +65,13 @@ export function MobileDrawer() {
 
   if (!isOpen) return null;
 
-  const handleLogout = () => {
+  // Deliberately doesn't closeDrawer() here — the drawer's own early return above would
+  // unmount this whole tree (confirmation modal included) the instant isOpen flips false, so
+  // closing has to wait until the user actually confirms.
+  const confirmLogout = async () => {
+    setLogoutVisible(false);
     closeDrawer();
-    logout();
+    await logout();
     router.replace('/(auth)/login');
   };
 
@@ -132,7 +138,7 @@ export function MobileDrawer() {
                   <ThemeToggle />
                 </View>
 
-                <Pressable onPress={handleLogout} className="flex-row items-center gap-3 rounded-xl py-2.5 pl-3 pr-4">
+                <Pressable onPress={() => setLogoutVisible(true)} className="flex-row items-center gap-3 rounded-xl py-2.5 pl-3 pr-4">
                   <Icon name="LogOut" size={19} color={themeColors.status.error} />
                   <Text variant="body" className="font-medium" style={{ color: themeColors.status.error }}>
                     {t('nav.logout')}
@@ -143,6 +149,8 @@ export function MobileDrawer() {
           </SafeAreaView>
         </Animated.View>
       </GestureDetector>
+
+      <LogoutModal visible={logoutVisible} onClose={() => setLogoutVisible(false)} onConfirm={confirmLogout} />
     </View>
   );
 }

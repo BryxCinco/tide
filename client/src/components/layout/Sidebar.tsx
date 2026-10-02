@@ -9,6 +9,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useResponsive } from '../../hooks/useResponsive';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useTranslation } from '../../i18n';
+import { LogoutModal } from '../profile/LogoutModal';
 import { useThemeStore } from '../../store/themeStore';
 import { useUiStore } from '../../store/uiStore';
 import { cn } from '../../utils/cn';
@@ -40,6 +41,7 @@ export function Sidebar({ collapsed: forcedCollapsed = false }: SidebarProps) {
   const { isDesktop } = useResponsive();
   const isSidebarCollapsed = useUiStore((s) => s.isSidebarCollapsed);
   const [logoutHovered, setLogoutHovered] = useState(false);
+  const [logoutVisible, setLogoutVisible] = useState(false);
   const { t } = useTranslation();
 
   const collapsed = forcedCollapsed || (isDesktop && isSidebarCollapsed);
@@ -53,8 +55,9 @@ export function Sidebar({ collapsed: forcedCollapsed = false }: SidebarProps) {
   }, [collapsed, width]);
   const widthStyle = useAnimatedStyle(() => ({ width: width.value }));
 
-  const handleLogout = () => {
-    logout();
+  const confirmLogout = async () => {
+    setLogoutVisible(false);
+    await logout();
     router.replace('/(auth)/login');
   };
 
@@ -173,7 +176,7 @@ export function Sidebar({ collapsed: forcedCollapsed = false }: SidebarProps) {
           {collapsed ? (
             <Tooltip label={t('nav.logout')} visible={logoutHovered}>
               <Pressable
-                onPress={handleLogout}
+                onPress={() => setLogoutVisible(true)}
                 onHoverIn={() => setLogoutHovered(true)}
                 onHoverOut={() => setLogoutHovered(false)}
                 className="mt-2 h-11 w-11 items-center justify-center rounded-xl hover:bg-error/10"
@@ -183,7 +186,7 @@ export function Sidebar({ collapsed: forcedCollapsed = false }: SidebarProps) {
             </Tooltip>
           ) : (
             <Pressable
-              onPress={handleLogout}
+              onPress={() => setLogoutVisible(true)}
               className="mt-3 flex-row items-center gap-3 rounded-xl py-2.5 pl-3 pr-4 hover:bg-error/10"
             >
               <Icon name="LogOut" size={19} color={themeColors.status.error} />
@@ -194,6 +197,8 @@ export function Sidebar({ collapsed: forcedCollapsed = false }: SidebarProps) {
           )}
         </View>
       </View>
+
+      <LogoutModal visible={logoutVisible} onClose={() => setLogoutVisible(false)} onConfirm={confirmLogout} />
     </Animated.View>
   );
 }
