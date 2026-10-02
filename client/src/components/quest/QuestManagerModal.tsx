@@ -38,17 +38,21 @@ function QuestDraggableList({
     );
   }
 
+  // See CustomizeDashboardModal's matching WidgetDraggableList comment — `containerStyle`/
+  // `style` bound directly on DraggableFlatList is what actually constrains its scroll
+  // viewport; an external wrapping <View style={{maxHeight}}> doesn't reliably cascade
+  // through its internal GestureDetector/Animated.View/AnimatedFlatList layers on web.
   return (
-    <View style={{ maxHeight: bodyMaxHeight ?? 320 }}>
-      <DraggableFlatList
-        data={quests}
-        keyExtractor={(quest) => quest.id}
-        renderItem={renderItem}
-        onDragEnd={({ data }) => onDragEnd(data)}
-        showsVerticalScrollIndicator={false}
-        activationDistance={4}
-      />
-    </View>
+    <DraggableFlatList
+      data={quests}
+      keyExtractor={(quest) => quest.id}
+      renderItem={renderItem}
+      onDragEnd={({ data }) => onDragEnd(data)}
+      showsVerticalScrollIndicator={false}
+      activationDistance={4}
+      containerStyle={{ maxHeight: bodyMaxHeight ?? 320 }}
+      style={{ maxHeight: bodyMaxHeight ?? 320 }}
+    />
   );
 }
 

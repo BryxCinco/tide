@@ -48,17 +48,24 @@ function WidgetDraggableList({
 }) {
   const bodyMaxHeight = useModalBodyMaxHeight();
 
+  // DraggableFlatList's own scrollable viewport is its INNER AnimatedFlatList, sized by
+  // the `style` prop passed directly to it (spread straight through to that FlatList) — NOT
+  // by wrapping the whole component in an external <View style={{maxHeight}}>. The gesture
+  // wrapper around it (GestureDetector > Animated.View, sized by `containerStyle`) doesn't
+  // reliably forward an ancestor's maxHeight down through those layers on web, which is why
+  // the list rendered its full, unclamped height and never actually became scrollable. Both
+  // props bound to the SAME number so the gesture wrapper and the list agree on their size.
   return (
-    <View style={{ maxHeight: bodyMaxHeight ?? 320 }}>
-      <DraggableFlatList
-        data={ordered}
-        keyExtractor={(widget) => widget.id}
-        renderItem={renderItem}
-        onDragEnd={({ data }) => onDragEnd(data)}
-        showsVerticalScrollIndicator={false}
-        activationDistance={4}
-      />
-    </View>
+    <DraggableFlatList
+      data={ordered}
+      keyExtractor={(widget) => widget.id}
+      renderItem={renderItem}
+      onDragEnd={({ data }) => onDragEnd(data)}
+      showsVerticalScrollIndicator={false}
+      activationDistance={4}
+      containerStyle={{ maxHeight: bodyMaxHeight ?? 320 }}
+      style={{ maxHeight: bodyMaxHeight ?? 320 }}
+    />
   );
 }
 
