@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { useState, type ReactElement } from 'react';
+import { View } from 'react-native';
 import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable-flatlist';
 import { Pressable } from '../ui/SoundPressable';
 
@@ -8,7 +8,7 @@ import { getOrderedWidgets, useDashboardStore } from '../../store/dashboardStore
 import type { WidgetId, WidgetInstance, WidgetSize } from '../../types/dashboard';
 import { cn } from '../../utils/cn';
 import { soundManager } from '../../utils/soundManager';
-import { Button, Icon, Modal, Text, type IconName } from '../ui';
+import { Button, Icon, Modal, Text, useModalBodyMaxHeight, type IconName } from '../ui';
 
 const WIDGET_LABELS: Record<WidgetId, { label: string; icon: IconName }> = {
   hero: { label: "Today's Focus", icon: 'Target' },
@@ -30,6 +30,37 @@ const WIDGET_LABELS: Record<WidgetId, { label: string; icon: IconName }> = {
 };
 
 const WIDGET_TYPES = Object.keys(WIDGET_LABELS) as WidgetId[];
+
+/** The scrollable list itself, split out as its own component purely so it can call
+ * useModalBodyMaxHeight() — that hook only resolves to a real number inside Modal's own
+ * `children` subtree (see ModalLayout's Context.Provider), not in CustomizeDashboardModal's
+ * own top-level scope, which renders ABOVE/around the `<Modal>` that provides it. Falls back
+ * to a generous fixed height on the very first render, before the surrounding Modal has
+ * measured its header/footer. */
+function WidgetDraggableList({
+  ordered,
+  renderItem,
+  onDragEnd,
+}: {
+  ordered: WidgetInstance[];
+  renderItem: (params: RenderItemParams<WidgetInstance>) => ReactElement;
+  onDragEnd: (data: WidgetInstance[]) => void;
+}) {
+  const bodyMaxHeight = useModalBodyMaxHeight();
+
+  return (
+    <View style={{ maxHeight: bodyMaxHeight ?? 320 }}>
+      <DraggableFlatList
+        data={ordered}
+        keyExtractor={(widget) => widget.id}
+        renderItem={renderItem}
+        onDragEnd={({ data }) => onDragEnd(data)}
+        showsVerticalScrollIndicator={false}
+        activationDistance={4}
+      />
+    </View>
+  );
+}
 
 const SIZE_OPTIONS: { value: WidgetSize; label: string }[] = [
   { value: 'sm', label: 'S' },
@@ -61,7 +92,6 @@ export function CustomizeDashboardModal({ visible, onClose }: CustomizeDashboard
   const reorderWidgets = useDashboardStore((s) => s.reorderWidgets);
   const resetPreferences = useDashboardStore((s) => s.resetPreferences);
   const themeColors = useThemeColors();
-  const { height } = useWindowDimensions();
   const [addVisible, setAddVisible] = useState(false);
 
   const ordered = getOrderedWidgets(widgets);
@@ -171,19 +201,11 @@ export function CustomizeDashboardModal({ visible, onClose }: CustomizeDashboard
     >
       {/* DraggableFlatList renders its own internal ScrollView, so the outer Modal's body is
           deliberately non-scrollable (scrollable=false above) — nesting a VirtualizedList
-          inside another ScrollView breaks virtualization and logs an RN warning. This fixed
-          height is what lets the list scroll on its own within the modal's bounds instead of
-          growing past them. */}
-      <View style={{ maxHeight: height * 0.55 }}>
-        <DraggableFlatList
-          data={ordered}
-          keyExtractor={(widget) => widget.id}
-          renderItem={renderItem}
-          onDragEnd={({ data }) => reorderWidgets(data.map((w) => w.id))}
-          showsVerticalScrollIndicator={false}
-          activationDistance={4}
-        />
-      </View>
+          inside another ScrollView breaks virtualization and logs an RN warning.
+          WidgetDraggableList's own maxHeight (from useModalBodyMaxHeight) is what lets the
+          list scroll on its own within the modal's actual bounds instead of growing past
+          them into the footer. */}
+      <WidgetDraggableList ordered={ordered} renderItem={renderItem} onDragEnd={(data) => reorderWidgets(data.map((w) => w.id))} />
 
       <Modal visible={addVisible} onClose={() => setAddVisible(false)} title="Add Widget" icon="Plus" size="sm">
         <View className="gap-1">

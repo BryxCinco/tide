@@ -1,8 +1,23 @@
-import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 import { ScrollView, View, type LayoutChangeEvent } from 'react-native';
 
 import { cn } from '../../utils/cn';
+
+const BODY_PADDING_V = 56; // p-7 top + bottom (28px each)
+
+/** The body's own actual available height in px (already net of header/footer/padding), for
+ * a `scrollable={false}` modal whose body needs to size an inner scrollable region itself
+ * (e.g. a DraggableFlatList, which can't share ModalLayout's own ScrollView). `undefined`
+ * while the surrounding Modal is `size="full"` (no cap to budget from) or before the first
+ * layout pass has measured the header/footer. Prefer this over guessing a fraction of
+ * `useWindowDimensions()` — a guess doesn't know the header/footer's actual height and can
+ * hand a flat list more room than the modal box actually has, which visually overlaps the
+ * footer instead of leaving space for it. */
+const ModalBodyMaxHeightContext = createContext<number | undefined>(undefined);
+
+export function useModalBodyMaxHeight(): number | undefined {
+  return useContext(ModalBodyMaxHeightContext);
+}
 
 export interface ModalLayoutProps {
   /** Fixed at the top — title/icon/close button. Omit entirely for a modal with no header
@@ -59,6 +74,9 @@ export function ModalLayout({ header, body, footer, scrollable = true, isFull = 
   // which already has a definite, full-screen height that ordinary `flex: 1` resolves
   // correctly against (no auto-sizing ambiguity there).
   const bodyMaxHeight = maxHeight == null ? undefined : Math.max(0, maxHeight - headerHeight - footerHeight);
+  // What useModalBodyMaxHeight() hands back — net of the body wrapper's own p-7 padding, so
+  // a caller sizing an inner scroll region to this exact number doesn't still overflow it.
+  const innerBodyMaxHeight = bodyMaxHeight == null ? undefined : Math.max(0, bodyMaxHeight - BODY_PADDING_V);
 
   return (
     <View style={isFull ? { flex: 1 } : undefined}>
@@ -83,11 +101,11 @@ export function ModalLayout({ header, body, footer, scrollable = true, isFull = 
         <View
           className={cn('p-7', isFull && 'flex-1')}
           style={[
-            isFull ? { flex: 1 } : bodyMaxHeight != null ? { maxHeight: bodyMaxHeight } : undefined,
+            isFull ? { flex: 1 } : bodyMaxHeight != null ? { maxHeight: bodyMaxHeight, overflow: 'hidden' } : undefined,
             !footer && { paddingBottom: 28 + bottomInset },
           ]}
         >
-          {body}
+          <ModalBodyMaxHeightContext.Provider value={innerBodyMaxHeight}>{body}</ModalBodyMaxHeightContext.Provider>
         </View>
       )}
 

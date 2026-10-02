@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { useState, type ReactElement } from 'react';
+import { View } from 'react-native';
 import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable-flatlist';
 import { Pressable } from '../ui/SoundPressable';
 
@@ -9,12 +9,47 @@ import { QUEST_CATEGORY_COLOR, QUEST_TIER_META, type Quest } from '../../types/q
 import { cn } from '../../utils/cn';
 import { confirmAsync } from '../../utils/confirm';
 import { soundManager } from '../../utils/soundManager';
-import { Button, Icon, Modal, Text, type IconName } from '../ui';
+import { Button, Icon, Modal, Text, useModalBodyMaxHeight, type IconName } from '../ui';
 import { QuestFormModal } from './QuestFormModal';
 
 export interface QuestManagerModalProps {
   visible: boolean;
   onClose: () => void;
+}
+
+/** Split out purely so it can call useModalBodyMaxHeight() — see CustomizeDashboardModal's
+ * WidgetDraggableList for why that hook only resolves inside Modal's own `children` subtree. */
+function QuestDraggableList({
+  quests,
+  renderItem,
+  onDragEnd,
+}: {
+  quests: Quest[];
+  renderItem: (params: RenderItemParams<Quest>) => ReactElement;
+  onDragEnd: (data: Quest[]) => void;
+}) {
+  const bodyMaxHeight = useModalBodyMaxHeight();
+
+  if (quests.length === 0) {
+    return (
+      <Text variant="body" color="muted" className="py-6 text-center">
+        No quests yet today.
+      </Text>
+    );
+  }
+
+  return (
+    <View style={{ maxHeight: bodyMaxHeight ?? 320 }}>
+      <DraggableFlatList
+        data={quests}
+        keyExtractor={(quest) => quest.id}
+        renderItem={renderItem}
+        onDragEnd={({ data }) => onDragEnd(data)}
+        showsVerticalScrollIndicator={false}
+        activationDistance={4}
+      />
+    </View>
+  );
 }
 
 /** Bulk-management view for today's quests — active and paused alike (QuestCard only
@@ -26,7 +61,6 @@ export function QuestManagerModal({ visible, onClose }: QuestManagerModalProps) 
   const deleteQuest = useQuestStore((s) => s.deleteQuest);
   const reorderQuests = useQuestStore((s) => s.reorderQuests);
   const themeColors = useThemeColors();
-  const { height } = useWindowDimensions();
 
   const [formVisible, setFormVisible] = useState(false);
   const [editingQuest, setEditingQuest] = useState<Quest | undefined>(undefined);
@@ -130,28 +164,17 @@ export function QuestManagerModal({ visible, onClose }: QuestManagerModalProps) 
       >
         {/* DraggableFlatList renders its own internal ScrollView — see CustomizeDashboardModal's
             matching comment for why the outer Modal's body is non-scrollable here. */}
-        <View style={{ maxHeight: height * 0.55 }}>
-          {quests.length === 0 ? (
-            <Text variant="body" color="muted" className="py-6 text-center">
-              No quests yet today.
-            </Text>
-          ) : (
-            <DraggableFlatList
-              data={quests}
-              keyExtractor={(quest) => quest.id}
-              renderItem={renderItem}
-              onDragEnd={({ data }) => {
-                // DraggableFlatList already hands back the final order directly — write it
-                // straight to the store instead of reconstructing it via N pairwise swaps
-                // through reorderQuests (which exists for the Up/Down buttons above, where
-                // only two ids are known at a time).
-                useQuestStore.setState({ todayQuests: data });
-              }}
-              showsVerticalScrollIndicator={false}
-              activationDistance={4}
-            />
-          )}
-        </View>
+        <QuestDraggableList
+          quests={quests}
+          renderItem={renderItem}
+          onDragEnd={(data) => {
+            // DraggableFlatList already hands back the final order directly — write it
+            // straight to the store instead of reconstructing it via N pairwise swaps
+            // through reorderQuests (which exists for the Up/Down buttons above, where
+            // only two ids are known at a time).
+            useQuestStore.setState({ todayQuests: data });
+          }}
+        />
       </Modal>
 
       <QuestFormModal visible={formVisible} onClose={() => setFormVisible(false)} quest={editingQuest} />
