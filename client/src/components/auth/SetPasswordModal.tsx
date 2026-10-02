@@ -57,6 +57,16 @@ export function SetPasswordModal() {
       title="Set a password for faster sign-in"
       icon="Lock"
       size="sm"
+      footer={
+        <View className="gap-3">
+          <Button title="Set Password" variant="primary" size="lg" fullWidth loading={isSaving} onPress={handleSubmit(onSubmit)} />
+          <Pressable onPress={handleSkip} hitSlop={8} className="items-center">
+            <Text variant="caption" color="muted" className="normal-case tracking-normal">
+              Skip for now
+            </Text>
+          </Pressable>
+        </View>
+      }
     >
       <View className="gap-5">
         <Text variant="body" color="secondary">
@@ -101,14 +111,6 @@ export function SetPasswordModal() {
             )}
           />
         </View>
-
-        <Button title="Set Password" variant="primary" size="lg" fullWidth loading={isSaving} onPress={handleSubmit(onSubmit)} />
-
-        <Pressable onPress={handleSkip} hitSlop={8} className="items-center">
-          <Text variant="caption" color="muted" className="normal-case tracking-normal">
-            Skip for now
-          </Text>
-        </Pressable>
       </View>
     </Modal>
   );

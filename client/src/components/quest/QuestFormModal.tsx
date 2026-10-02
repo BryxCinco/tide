@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, useWindowDimensions, View } from 'react-native';
+import { View } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
 
 import { ICON_OPTIONS } from '../../mocks/mockActivities';
@@ -38,7 +38,6 @@ export function QuestFormModal({ visible, onClose, quest }: QuestFormModalProps)
   const addCustomQuest = useQuestStore((s) => s.addCustomQuest);
   const updateQuest = useQuestStore((s) => s.updateQuest);
   const deleteQuest = useQuestStore((s) => s.deleteQuest);
-  const { height } = useWindowDimensions();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -117,9 +116,20 @@ export function QuestFormModal({ visible, onClose, quest }: QuestFormModalProps)
   };
 
   return (
-    <Modal visible={visible} onClose={onClose} title={isEditing ? 'Edit Quest' : 'New Quest'} icon="Sparkles" size="md">
-      <ScrollView style={{ maxHeight: height * 0.6 }} showsVerticalScrollIndicator={false}>
-        <View className="gap-6 pb-1">
+    <Modal
+      visible={visible}
+      onClose={onClose}
+      title={isEditing ? 'Edit Quest' : 'New Quest'}
+      icon="Sparkles"
+      size="md"
+      footer={
+        <View className="gap-2">
+          <Button title="Save" variant="primary" size="lg" fullWidth loading={isSaving} onPress={handleSave} />
+          {isEditing && quest?.isCustom && <Button title="Delete Quest" variant="danger" size="md" fullWidth onPress={handleDelete} />}
+        </View>
+      }
+    >
+      <View className="gap-6">
           <Input
             label="Title"
             placeholder="e.g. Read for 20 minutes"
@@ -276,13 +286,7 @@ export function QuestFormModal({ visible, onClose, quest }: QuestFormModalProps)
             )}
           </View>
 
-          <Button title="Save" variant="primary" size="lg" fullWidth loading={isSaving} onPress={handleSave} />
-
-          {isEditing && quest?.isCustom && (
-            <Button title="Delete Quest" variant="danger" size="md" fullWidth onPress={handleDelete} />
-          )}
-        </View>
-      </ScrollView>
+      </View>
     </Modal>
   );
 }

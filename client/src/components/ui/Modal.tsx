@@ -1,7 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
-import { Modal as RNModal, Platform, View } from 'react-native';
+import { KeyboardAvoidingView, Modal as RNModal, Platform, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Pressable } from './SoundPressable';
 import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 
@@ -13,6 +14,7 @@ import { gradients } from '../../utils/gradients';
 import { modalHover, modalSurface, shadows } from '../../utils/theme';
 import { darkVars, lightVars } from '../../utils/themeVars';
 import { Icon, type IconName } from './Icon';
+import { ModalLayout } from './ModalLayout';
 import { Text } from './Text';
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'full';
@@ -22,6 +24,8 @@ export interface ModalProps {
   visible: boolean;
   onClose: () => void;
   title?: string;
+  /** Small line under the title — e.g. an item's name while editing it. */
+  subtitle?: string;
   /** Small colored icon badge to the left of the title — gives each modal a visual
    * identity at a glance (Linear/Notion-style) instead of every dialog looking identical
    * apart from its text. Optional; omit for a plain text-only header. */
@@ -30,8 +34,20 @@ export interface ModalProps {
    * `danger` (red) is for irreversible actions (Delete Account, sign-out warnings). */
   tone?: ModalTone;
   children: ReactNode;
+  /** Fixed action row pinned below the scrolling body (Save/Cancel, etc.) — stays visible
+   * even when `children` overflows and scrolls. Omit for a modal with no footer actions;
+   * nothing renders in its place, so no dead space is added. */
+  footer?: ReactNode;
   /** Max width when centered (tablet/desktop) / content height on phone. Defaults to `md`. */
   size?: ModalSize;
+  /** Default true: `children` renders inside a scrollable body so content taller than the
+   * modal's max height scrolls instead of overflowing or stretching the modal past the
+   * viewport. Set false when `children` already manages its own internal scroll region
+   * (e.g. a fixed search field above a separately-scrolling result list). */
+  scrollable?: boolean;
+  /** Default true. Set false to hide the header's X button — e.g. a modal that only closes
+   * via its own in-body actions. */
+  showCloseButton?: boolean;
 }
 
 const CENTERED_DURATION = 250;
@@ -43,19 +59,34 @@ const TONE_COLOR: Record<Exclude<ModalTone, 'default'>, string> = {
 };
 
 /**
- * Every modal in the app (14+ call sites — EditProfileModal, DeleteAccountModal,
+ * Every modal in the app (20+ call sites — EditProfileModal, DeleteAccountModal,
  * TaskFormModal, CustomizeDashboardModal, ...) renders through this one component, so
- * upgrading it here upgrades all of them at once rather than needing 14 separate edits.
+ * upgrading it here upgrades all of them at once rather than needing 20 separate edits.
  *
- * Beyond the solid-background fix (see the git history on this file), this version adds
- * the "readable AND interactive" half of that ask: a spring-based entrance instead of a
- * flat ease-out (a slight, natural overshoot reads as alive rather than mechanical), an
- * optional colored icon badge + top accent gradient line for visual identity per modal
- * (tone-able so a destructive modal can read as red instead of teal), and tactile
- * press/hover feedback on the close button.
+ * Structure is a fixed HEADER, a scrollable/flexible BODY, and an optional fixed FOOTER (see
+ * ModalLayout) inside a box capped at 90% of the viewport height — the combination that rules
+ * out the whole "footer button scrolled out of view / modal taller than the screen" class of
+ * bug: header and footer never shrink, the body is the only section that grows, shrinks, and
+ * scrolls. A KeyboardAvoidingView around that box keeps the focused input clear of the
+ * keyboard on phone instead of letting the keyboard cover it. On web, Escape closes the modal
+ * the same as tapping the backdrop.
  */
-export function Modal({ visible, onClose, title, icon, tone = 'accent', children, size = 'md' }: ModalProps) {
+export function Modal({
+  visible,
+  onClose,
+  title,
+  subtitle,
+  icon,
+  tone = 'accent',
+  children,
+  footer,
+  size = 'md',
+  scrollable = true,
+  showCloseButton = true,
+}: ModalProps) {
   const { isPhone, isTablet, isDesktop } = useResponsive();
+  const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
   const isDark = useThemeStore((s) => s.theme === 'dark');
   const [closeHovered, setCloseHovered] = useState(false);
@@ -88,6 +119,16 @@ export function Modal({ visible, onClose, title, icon, tone = 'accent', children
       );
     }
   }, [visible, isPhone, progress]);
+
+  // Escape closes the modal on web, matching a backdrop press — native has no equivalent key.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !visible || typeof window === 'undefined') return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [visible, onClose]);
 
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: Math.min(progress.value, 1),
@@ -125,6 +166,54 @@ export function Modal({ visible, onClose, title, icon, tone = 'accent', children
     full: 'h-full w-full',
   };
 
+  // The box never exceeds 90% of the viewport (less the phone's bottom safe-area, so a
+  // bottom sheet never gets capped right under the home-indicator area) — short content
+  // still hugs its own size exactly (see ModalLayout's doc comment for why), this is only a
+  // ceiling. `full` already fills 100% of the screen, so it doesn't need a separate cap.
+  const maxHeightPx = windowHeight * 0.9 - (isPhone ? insets.bottom : 0);
+
+  const header =
+    title || showCloseButton ? (
+      <View className={cn('flex-row items-center justify-between px-7', title ? 'border-b border-subtle py-6' : 'pt-6')}>
+        {title ? (
+          <View className="flex-1 flex-row items-center gap-3.5 pr-4">
+            {icon && (
+              <View className="h-11 w-11 items-center justify-center rounded-full" style={{ backgroundColor: `${accentColor}1F` }}>
+                <Icon name={icon} size={21} color={accentColor} />
+              </View>
+            )}
+            <View className="flex-1">
+              <Text variant="h2" color="primary" className="text-[22px]">
+                {title}
+              </Text>
+              {subtitle && (
+                <Text variant="caption" color="muted" className="mt-0.5 normal-case tracking-normal" numberOfLines={1}>
+                  {subtitle}
+                </Text>
+              )}
+            </View>
+          </View>
+        ) : (
+          <View className="flex-1" />
+        )}
+        {showCloseButton && (
+          <Pressable
+            onPress={onClose}
+            hitSlop={8}
+            onHoverIn={() => setCloseHovered(true)}
+            onHoverOut={() => setCloseHovered(false)}
+            className="h-9 w-9 items-center justify-center rounded-full"
+            style={({ pressed }) => [
+              { backgroundColor: closeHovered ? 'rgba(20, 184, 166, 0.12)' : isDark ? modalHover.dark : modalHover.light },
+              pressed && { transform: [{ scale: 0.88 }] },
+            ]}
+          >
+            <Icon name="X" size={18} color={closeHovered ? themeColors.brand.tideTeal : themeColors.text.secondary} />
+          </Pressable>
+        )}
+      </View>
+    ) : undefined;
+
   return (
     <RNModal visible={shouldRender} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       {/* React Native Web's <Modal> renders through a portal straight onto `document.body`
@@ -152,75 +241,63 @@ export function Modal({ visible, onClose, title, icon, tone = 'accent', children
           <Pressable style={{ flex: 1 }} onPress={onClose} />
         </Animated.View>
 
-        <Animated.View style={contentStyle} className={isPhone ? 'w-full' : cn('w-full', centeredWidthClasses[size])}>
-          <View
-            className={cn(
-              'overflow-hidden',
-              isPhone ? (isFull ? '' : 'rounded-t-[28px]') : 'rounded-[28px]',
-              isFull && 'h-full w-full',
-            )}
-            style={[
-              {
-                backgroundColor: isDark ? modalSurface.dark : modalSurface.light,
-                borderWidth: 1,
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
-              },
-              shadows.modal,
-            ]}
+        <Animated.View
+          style={[contentStyle, !isFull && { maxHeight: maxHeightPx }]}
+          className={isPhone ? 'w-full' : cn('w-full', centeredWidthClasses[size])}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={isFull ? { flex: 1 } : { flexShrink: 1 }}
           >
-            {/* Signature glow — a thin gradient line, same idea as Card's `accentLine` and
-                the Sidebar's top glow, so every modal carries a touch of the app's teal
-                identity even when its content is plain text/rows. Red for `danger` tone. */}
-            <View className="absolute left-0 right-0 top-0 h-[3px]" pointerEvents="none">
-              <LinearGradient
-                colors={tone === 'danger' ? ['#EF4444', '#F97316'] : [...gradients.primary]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={{ flex: 1 }}
+            <View
+              className={cn(
+                'overflow-hidden',
+                isPhone ? (isFull ? '' : 'rounded-t-[28px]') : 'rounded-[28px]',
+                isFull && 'h-full w-full',
+              )}
+              style={[
+                {
+                  backgroundColor: isDark ? modalSurface.dark : modalSurface.light,
+                  borderWidth: 1,
+                  borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+                },
+                shadows.modal,
+                isFull ? { flex: 1 } : { maxHeight: maxHeightPx, flexShrink: 1 },
+              ]}
+            >
+              {/* Signature glow — a thin gradient line, same idea as Card's `accentLine` and
+                  the Sidebar's top glow, so every modal carries a touch of the app's teal
+                  identity even when its content is plain text/rows. Red for `danger` tone. */}
+              <View className="absolute left-0 right-0 top-0 h-[3px]" pointerEvents="none">
+                <LinearGradient
+                  colors={tone === 'danger' ? ['#EF4444', '#F97316'] : [...gradients.primary]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={{ flex: 1 }}
+                />
+              </View>
+
+              {isPhone && !isFull && (
+                <Pressable
+                  onPress={onClose}
+                  className="items-center pt-3"
+                  accessibilityRole="button"
+                  accessibilityLabel="Close"
+                >
+                  <View className="h-1 w-10 rounded-full" style={{ backgroundColor: themeColors.border.hover }} />
+                </Pressable>
+              )}
+
+              <ModalLayout
+                header={header}
+                body={children}
+                footer={footer}
+                scrollable={scrollable}
+                isFull={isFull}
+                bottomInset={isPhone ? insets.bottom : 0}
               />
             </View>
-
-            {isPhone && !isFull && (
-              <View className="items-center pt-3">
-                <View className="h-1 w-10 rounded-full" style={{ backgroundColor: themeColors.border.hover }} />
-              </View>
-            )}
-
-            <View className={cn('flex-row items-center justify-between px-7', title ? 'border-b border-subtle py-6' : 'pt-6')}>
-              {title ? (
-                <View className="flex-1 flex-row items-center gap-3.5 pr-4">
-                  {icon && (
-                    <View
-                      className="h-11 w-11 items-center justify-center rounded-full"
-                      style={{ backgroundColor: `${accentColor}1F` }}
-                    >
-                      <Icon name={icon} size={21} color={accentColor} />
-                    </View>
-                  )}
-                  <Text variant="h2" color="primary" className="flex-1 text-[22px]">
-                    {title}
-                  </Text>
-                </View>
-              ) : (
-                <View className="flex-1" />
-              )}
-              <Pressable
-                onPress={onClose}
-                hitSlop={8}
-                onHoverIn={() => setCloseHovered(true)}
-                onHoverOut={() => setCloseHovered(false)}
-                className="h-9 w-9 items-center justify-center rounded-full"
-                style={({ pressed }) => [
-                  { backgroundColor: closeHovered ? 'rgba(20, 184, 166, 0.12)' : isDark ? modalHover.dark : modalHover.light },
-                  pressed && { transform: [{ scale: 0.88 }] },
-                ]}
-              >
-                <Icon name="X" size={18} color={closeHovered ? themeColors.brand.tideTeal : themeColors.text.secondary} />
-              </Pressable>
-            </View>
-
-            <View className={cn('p-7', isFull && 'flex-1')}>{children}</View>
-          </View>
+          </KeyboardAvoidingView>
         </Animated.View>
       </View>
     </RNModal>

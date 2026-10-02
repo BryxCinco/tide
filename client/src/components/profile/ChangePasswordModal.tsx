@@ -56,7 +56,19 @@ export function ChangePasswordModal({ visible, onClose }: ChangePasswordModalPro
   };
 
   return (
-    <Modal visible={visible} onClose={onClose} title="Change Password" icon="Lock" size="sm">
+    <Modal
+      visible={visible}
+      onClose={onClose}
+      title="Change Password"
+      icon="Lock"
+      size="sm"
+      footer={
+        <View className="flex-row gap-3">
+          <Button title="Cancel" variant="secondary" fullWidth onPress={onClose} disabled={isSaving} />
+          <Button title="Update Password" variant="primary" fullWidth loading={isSaving} onPress={handleSubmit} />
+        </View>
+      }
+    >
       <View className="gap-4">
         <Input label="Current password" value={current} onChangeText={setCurrent} secureTextEntry />
         <Input
@@ -70,11 +82,6 @@ export function ChangePasswordModal({ visible, onClose }: ChangePasswordModalPro
           error={error ?? undefined}
         />
         <Input label="Confirm new password" value={confirm} onChangeText={setConfirm} secureTextEntry />
-
-        <View className="flex-row gap-3">
-          <Button title="Cancel" variant="secondary" fullWidth onPress={onClose} disabled={isSaving} />
-          <Button title="Update Password" variant="primary" fullWidth loading={isSaving} onPress={handleSubmit} />
-        </View>
       </View>
     </Modal>
   );

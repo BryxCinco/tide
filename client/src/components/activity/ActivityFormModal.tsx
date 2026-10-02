@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, useWindowDimensions, View } from 'react-native';
+import { View } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -41,7 +41,6 @@ export function ActivityFormModal({ visible, onClose, activity, onSaved, showSuc
   const updateActivity = useActivityStore((s) => s.updateActivity);
   const deleteActivity = useActivityStore((s) => s.deleteActivity);
   const setArchived = useActivityStore((s) => s.setArchived);
-  const { height } = useWindowDimensions();
   const themeColors = useThemeColors();
 
   const [name, setName] = useState('');
@@ -131,9 +130,29 @@ export function ActivityFormModal({ visible, onClose, activity, onSaved, showSuc
   };
 
   return (
-    <Modal visible={visible} onClose={onClose} title={isEditing ? 'Edit Activity' : 'New Activity'} icon="Layers" size="md">
-      <ScrollView style={{ maxHeight: height * 0.6 }} showsVerticalScrollIndicator={false}>
-        <View className="gap-6 pb-1">
+    <Modal
+      visible={visible}
+      onClose={onClose}
+      title={isEditing ? 'Edit Activity' : 'New Activity'}
+      icon="Layers"
+      size="md"
+      footer={
+        <View className="gap-2">
+          <Button title="Save" variant="primary" size="lg" fullWidth loading={isSaving} onPress={handleSave} />
+          {isEditing && (
+            <Button
+              title={activity?.isArchived ? 'Unarchive Activity' : 'Archive Activity'}
+              variant="ghost"
+              size="md"
+              fullWidth
+              onPress={handleToggleArchive}
+            />
+          )}
+          {canDelete && <Button title="Delete Activity" variant="danger" size="md" fullWidth onPress={handleDelete} />}
+        </View>
+      }
+    >
+      <View className="gap-6">
           <Input
             label="Name"
             placeholder="e.g. Reading"
@@ -295,21 +314,7 @@ export function ActivityFormModal({ visible, onClose, activity, onSaved, showSuc
             )}
           </View>
 
-          <Button title="Save" variant="primary" size="lg" fullWidth loading={isSaving} onPress={handleSave} />
-
-          {isEditing && (
-            <Button
-              title={activity?.isArchived ? 'Unarchive Activity' : 'Archive Activity'}
-              variant="ghost"
-              size="md"
-              fullWidth
-              onPress={handleToggleArchive}
-            />
-          )}
-
-          {canDelete && <Button title="Delete Activity" variant="danger" size="md" fullWidth onPress={handleDelete} />}
-        </View>
-      </ScrollView>
+      </View>
 
       <Modal visible={startCalendarVisible} onClose={() => setStartCalendarVisible(false)} title="Start Date" icon="Calendar" size="sm">
         <View className="items-center">

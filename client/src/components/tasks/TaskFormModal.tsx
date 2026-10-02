@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, Text as RNText, useWindowDimensions, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
 import { TextInput } from '../ui/SoundTextInput';
 
@@ -76,7 +76,6 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
   const deleteTask = useTaskStore((s) => s.deleteTask);
   const allActivities = useActivityStore((s) => s.activities);
   const activities = useMemo(() => allActivities.filter((a) => !a.isArchived), [allActivities]);
-  const { height } = useWindowDimensions();
   const themeColors = useThemeColors();
   const isDark = useThemeStore((s) => s.theme === 'dark');
 
@@ -167,9 +166,20 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
   };
 
   return (
-    <Modal visible={visible} onClose={onClose} title={isEditing ? 'Edit Task' : 'New Task'} icon="CheckSquare" size="md">
-      <ScrollView style={{ maxHeight: height * 0.65 }} showsVerticalScrollIndicator={false}>
-        <View className="gap-6 pb-1">
+    <Modal
+      visible={visible}
+      onClose={onClose}
+      title={isEditing ? 'Edit Task' : 'New Task'}
+      icon="CheckSquare"
+      size="md"
+      footer={
+        <View className="gap-2">
+          <Button title="Save" variant="primary" size="lg" fullWidth onPress={handleSave} />
+          {isEditing && <Button title="Delete Task" variant="danger" size="md" fullWidth onPress={handleDelete} />}
+        </View>
+      }
+    >
+      <View className="gap-6">
           <View className="gap-2">
             <Text variant="label" color="muted">
               Activity Type
@@ -308,11 +318,7 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
             </View>
           </View>
 
-          <Button title="Save" variant="primary" size="lg" fullWidth onPress={handleSave} />
-
-          {isEditing && <Button title="Delete Task" variant="danger" size="md" fullWidth onPress={handleDelete} />}
-        </View>
-      </ScrollView>
+      </View>
 
       {/* Nested modal — RNModal portals independently, so stacking this on top of the
           already-open task form modal is safe (last-mounted renders on top). Past dates are

@@ -119,7 +119,17 @@ export function QuestManagerModal({ visible, onClose }: QuestManagerModalProps) 
 
   return (
     <>
-      <Modal visible={visible} onClose={onClose} title="Manage Quests" icon="ListChecks" size="md">
+      <Modal
+        visible={visible}
+        onClose={onClose}
+        title="Manage Quests"
+        icon="ListChecks"
+        size="md"
+        scrollable={false}
+        footer={<Button title="+ Add Quest" variant="secondary" size="md" fullWidth onPress={openCreate} />}
+      >
+        {/* DraggableFlatList renders its own internal ScrollView — see CustomizeDashboardModal's
+            matching comment for why the outer Modal's body is non-scrollable here. */}
         <View style={{ maxHeight: height * 0.55 }}>
           {quests.length === 0 ? (
             <Text variant="body" color="muted" className="py-6 text-center">
@@ -142,8 +152,6 @@ export function QuestManagerModal({ visible, onClose }: QuestManagerModalProps) 
             />
           )}
         </View>
-
-        <Button title="+ Add Quest" variant="secondary" size="md" fullWidth onPress={openCreate} className="mt-4" />
       </Modal>
 
       <QuestFormModal visible={formVisible} onClose={() => setFormVisible(false)} quest={editingQuest} />

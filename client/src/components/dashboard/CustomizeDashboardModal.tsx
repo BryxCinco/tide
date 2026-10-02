@@ -155,7 +155,25 @@ export function CustomizeDashboardModal({ visible, onClose }: CustomizeDashboard
   };
 
   return (
-    <Modal visible={visible} onClose={onClose} title="Customize Dashboard" icon="LayoutGrid" size="md">
+    <Modal
+      visible={visible}
+      onClose={onClose}
+      title="Customize Dashboard"
+      icon="LayoutGrid"
+      size="md"
+      scrollable={false}
+      footer={
+        <View className="flex-row gap-2">
+          <Button title="+ Add Widget" variant="secondary" size="sm" onPress={() => setAddVisible(true)} className="flex-1" />
+          <Button title="Reset to Defaults" variant="ghost" size="sm" onPress={resetPreferences} className="flex-1" />
+        </View>
+      }
+    >
+      {/* DraggableFlatList renders its own internal ScrollView, so the outer Modal's body is
+          deliberately non-scrollable (scrollable=false above) — nesting a VirtualizedList
+          inside another ScrollView breaks virtualization and logs an RN warning. This fixed
+          height is what lets the list scroll on its own within the modal's bounds instead of
+          growing past them. */}
       <View style={{ maxHeight: height * 0.55 }}>
         <DraggableFlatList
           data={ordered}
@@ -165,11 +183,6 @@ export function CustomizeDashboardModal({ visible, onClose }: CustomizeDashboard
           showsVerticalScrollIndicator={false}
           activationDistance={4}
         />
-      </View>
-
-      <View className="mt-4 flex-row gap-2">
-        <Button title="+ Add Widget" variant="secondary" size="sm" onPress={() => setAddVisible(true)} className="flex-1" />
-        <Button title="Reset to Defaults" variant="ghost" size="sm" onPress={resetPreferences} className="flex-1" />
       </View>
 
       <Modal visible={addVisible} onClose={() => setAddVisible(false)} title="Add Widget" icon="Plus" size="sm">

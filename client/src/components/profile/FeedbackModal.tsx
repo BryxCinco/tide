@@ -39,7 +39,19 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
   };
 
   return (
-    <Modal visible={visible} onClose={onClose} title="Send Feedback" icon="MessageSquare" size="md">
+    <Modal
+      visible={visible}
+      onClose={onClose}
+      title="Send Feedback"
+      icon="MessageSquare"
+      size="md"
+      footer={
+        <View className="flex-row gap-3">
+          <Button title="Cancel" variant="secondary" fullWidth onPress={onClose} />
+          <Button title="Submit" variant="primary" fullWidth onPress={handleSubmit} />
+        </View>
+      }
+    >
       <View className="gap-5">
         <View className="gap-1">
           <Input
@@ -59,11 +71,6 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
         </View>
 
         <Input label="Email (optional)" placeholder="you@example.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-
-        <View className="flex-row gap-3">
-          <Button title="Cancel" variant="secondary" fullWidth onPress={onClose} />
-          <Button title="Submit" variant="primary" fullWidth onPress={handleSubmit} />
-        </View>
       </View>
     </Modal>
   );

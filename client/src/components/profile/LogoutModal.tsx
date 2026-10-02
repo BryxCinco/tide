@@ -17,16 +17,24 @@ export function LogoutModal({ visible, onClose, onConfirm }: LogoutModalProps) {
   const { t } = useTranslation();
 
   return (
-    <Modal visible={visible} onClose={onClose} title="Log out?" icon="LogOut" tone="danger" size="sm">
-      <View className="gap-5">
-        <Text variant="body" color="secondary" className="normal-case tracking-normal">
-          You'll need to sign in again to get back to your dashboard.
-        </Text>
-
+    <Modal
+      visible={visible}
+      onClose={onClose}
+      title="Log out?"
+      icon="LogOut"
+      tone="danger"
+      size="sm"
+      footer={
         <View className="flex-row gap-3">
           <Button title={t('common.cancel')} variant="secondary" fullWidth onPress={onClose} />
           <Button title={t('nav.logout')} variant="danger" fullWidth onPress={onConfirm} />
         </View>
+      }
+    >
+      <View className="gap-5">
+        <Text variant="body" color="secondary" className="normal-case tracking-normal">
+          You'll need to sign in again to get back to your dashboard.
+        </Text>
       </View>
     </Modal>
   );

@@ -42,7 +42,7 @@ export function LanguageModal({ visible, onClose }: LanguageModalProps) {
   };
 
   return (
-    <Modal visible={visible} onClose={onClose} title="Language" icon="Globe" size="sm">
+    <Modal visible={visible} onClose={onClose} title="Language" icon="Globe" size="sm" scrollable={false}>
       <View className="gap-3">
         <SearchBar value={query} onChangeText={setQuery} placeholder="Search languages..." />
 

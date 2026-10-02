@@ -62,7 +62,19 @@ export function EditProfileModal({ visible, onClose, onChangeAvatar }: EditProfi
   };
 
   return (
-    <Modal visible={visible} onClose={onClose} title="Edit Profile" icon="User" size="md">
+    <Modal
+      visible={visible}
+      onClose={onClose}
+      title="Edit Profile"
+      icon="User"
+      size="md"
+      footer={
+        <View className="flex-row gap-3">
+          <Button title={t('common.cancel')} variant="secondary" fullWidth onPress={onClose} disabled={isSaving} />
+          <Button title={t('common.save')} variant="primary" fullWidth loading={isSaving} onPress={handleSave} />
+        </View>
+      }
+    >
       <View className="gap-5">
         <Pressable onPress={onChangeAvatar} className="items-center gap-2">
           <View className="relative">
@@ -105,11 +117,6 @@ export function EditProfileModal({ visible, onClose, onChangeAvatar }: EditProfi
           <Text variant="caption" color="muted" className="self-end normal-case tracking-normal">
             {bio.length}/{BIO_MAX_LENGTH}
           </Text>
-        </View>
-
-        <View className="flex-row gap-3">
-          <Button title={t('common.cancel')} variant="secondary" fullWidth onPress={onClose} disabled={isSaving} />
-          <Button title={t('common.save')} variant="primary" fullWidth loading={isSaving} onPress={handleSave} />
         </View>
       </View>
     </Modal>

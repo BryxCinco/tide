@@ -34,7 +34,26 @@ export function DeleteAccountModal({ visible, onClose, onConfirm, isDeleting = f
   const canDelete = confirmText.trim() === CONFIRM_WORD;
 
   return (
-    <Modal visible={visible} onClose={onClose} title="Delete Account" icon="UserX" tone="danger" size="sm">
+    <Modal
+      visible={visible}
+      onClose={onClose}
+      title="Delete Account"
+      icon="UserX"
+      tone="danger"
+      size="sm"
+      footer={
+        <View className="flex-row gap-3">
+          <Button title={t('common.cancel')} variant="secondary" fullWidth onPress={onClose} disabled={isDeleting} />
+          <Button
+            title={isDeleting ? 'Deleting…' : t('profile.deleteAccount')}
+            variant="danger"
+            fullWidth
+            disabled={!canDelete || isDeleting}
+            onPress={onConfirm}
+          />
+        </View>
+      }
+    >
       <View className="gap-5">
         <View className="flex-row gap-3 rounded-xl border border-error/20 bg-error/5 p-3">
           <Icon name="TriangleAlert" size={18} color={colors.status.error} />
@@ -52,17 +71,6 @@ export function DeleteAccountModal({ visible, onClose, onConfirm, isDeleting = f
           autoCorrect={false}
           editable={!isDeleting}
         />
-
-        <View className="flex-row gap-3">
-          <Button title={t('common.cancel')} variant="secondary" fullWidth onPress={onClose} disabled={isDeleting} />
-          <Button
-            title={isDeleting ? 'Deleting…' : t('profile.deleteAccount')}
-            variant="danger"
-            fullWidth
-            disabled={!canDelete || isDeleting}
-            onPress={onConfirm}
-          />
-        </View>
       </View>
     </Modal>
   );

@@ -14,6 +14,7 @@ export * from './Icon';
 export * from './Input';
 export * from './Loader';
 export * from './Modal';
+export * from './ModalLayout';
 export * from './OfflineBanner';
 export * from './ProgressBar';
 export * from './ResponsiveContainer';
