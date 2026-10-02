@@ -15,6 +15,26 @@ export const api = axios.create({
 type TokenGetter = () => string | null;
 let getInMemoryToken: TokenGetter = () => null;
 
+// The only two endpoints that are ever legitimately called with no token yet.
+const PUBLIC_AUTH_PATHS = ['/api/auth/login', '/api/auth/signup'];
+
+function isPublicAuthRequest(url?: string): boolean {
+  if (!url) return false;
+  return PUBLIC_AUTH_PATHS.some((path) => url.includes(path));
+}
+
+/** Thrown by the request interceptor below instead of ever sending a request with no
+ * Authorization header (except to the two public auth endpoints). Recognizable by both the
+ * response interceptor and `getApiErrorMessage` so this never surfaces as a real error toast —
+ * it's a timing issue (a fetch raced ahead of login completing, or fired mid-logout after
+ * storage was already cleared), not an auth failure the user did anything wrong to cause. */
+export class SkippedRequestError extends Error {
+  constructor(url?: string) {
+    super(`Request skipped — no auth token yet${url ? ` (${url})` : ''}`);
+    this.name = 'SkippedRequestError';
+  }
+}
+
 /** authStore registers itself here at module load (`() => useAuthStore.getState().token`).
  * Reading the in-memory value first — falling back to the async storage read only when
  * nothing's registered yet — means the very first request fired the instant
@@ -30,8 +50,20 @@ api.interceptors.request.use(async (config) => {
   const token = getInMemoryToken() ?? (await storage.getItem(AUTH_TOKEN_KEY));
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+    return config;
   }
-  return config;
+
+  if (isPublicAuthRequest(config.url)) {
+    return config;
+  }
+
+  // No token yet, and this isn't a public auth endpoint — the caller raced ahead of login
+  // completing, or fired after logout already cleared storage but before the app finished
+  // navigating away. Skip the round trip entirely instead of letting it 401 with "Missing
+  // Authorization Bearer token", a message that has nothing to do with the token being
+  // invalid and shouldn't be shown to the user as if it were.
+  console.log(`[api] Skipping request — no auth token yet: ${config.method?.toUpperCase()} ${config.url}`);
+  return Promise.reject(new SkippedRequestError(config.url));
 });
 
 type UnauthorizedListener = () => void;
@@ -46,18 +78,29 @@ export function onUnauthorized(listener: UnauthorizedListener): void {
 
 api.interceptors.response.use(
   (response) => response,
-  async (error: AxiosError) => {
+  async (error: AxiosError | SkippedRequestError) => {
+    if (error instanceof SkippedRequestError) {
+      // Already logged by the request interceptor — never a real failure, nothing else to do.
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401) {
-      // TEMPORARY — remove once the OAuth redirect-loop bug is confirmed fixed.
-      console.log('[OAuth Debug] 401 response received:', {
-        url: error.config?.url,
-        method: error.config?.method,
-        status: error.response.status,
-        data: error.response.data,
-      });
+      const serverMessage = (error.response.data as { error?: string } | undefined)?.error;
+
+      if (serverMessage === 'Missing Authorization Bearer token') {
+        // The request interceptor's own guard above should make this unreachable in
+        // practice, but defend against it anyway: this means a request somehow still went
+        // out with no Authorization header, which is a timing issue (same as
+        // SkippedRequestError), not proof the token is invalid. Logging the user out over a
+        // race would be wrong — just log it and move on.
+        console.log('[api] Server saw a request with no auth token (timing, not invalid):', error.config?.url);
+        return Promise.reject(error);
+      }
+
+      // A real "Invalid or expired token" — the session itself is no good, so clear it and
+      // sign the user out.
       await storage.removeItem(AUTH_TOKEN_KEY);
       await storage.removeItem(AUTH_USER_KEY);
-      console.log('[OAuth Debug] Cleared storage. Calling onUnauthorized listener — this will set isAuthenticated=false.');
       unauthorizedListener?.();
     } else if (!error.response) {
       // No response at all means the request never reached the server (offline, DNS, server

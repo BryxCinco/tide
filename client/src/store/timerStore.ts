@@ -208,8 +208,9 @@ export const useTimerStore = create<TimerState>()((set, get) => ({
 
     // Guests have no backend account/JWT — todaySessions above is the entire record for
     // them (in-memory only, cleared on reload), so there's nothing to sync and no point
-    // attempting a request that would just 401.
-    if (isGuestMode()) return;
+    // attempting a request that would just 401. Same for a real account with no token yet
+    // (racing login, or mid-logout) — the session is already shown locally above either way.
+    if (isGuestMode() || !hasAuthToken()) return;
 
     // Fire-and-forget persist (the spec's "saveSession"): the session is already shown
     // above from local state, so a slow/failed request doesn't block or undo the UI the
