@@ -5,7 +5,7 @@ import { Pressable } from '../ui/SoundPressable';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { PRESET_COLORS } from '../../mocks/mockActivities';
-import { getApiErrorMessage } from '../../services/api';
+import { reportApiError } from '../../services/api';
 import { showToast } from '../../store/toastStore';
 import { COVER_GRADIENTS, useUserStore } from '../../store/userStore';
 import type { CoverType } from '../../types/user';
@@ -68,7 +68,7 @@ export function CoverPicker({ visible, onClose, currentType, currentValue }: Cov
       onClose();
       showToast('Cover photo updated');
     } catch (err) {
-      showToast(getApiErrorMessage(err, "Couldn't save your cover photo. Please try again."), 'error');
+      reportApiError(err, "Couldn't save your cover photo. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -81,7 +81,7 @@ export function CoverPicker({ visible, onClose, currentType, currentValue }: Cov
       onClose();
       showToast('Cover photo removed');
     } catch (err) {
-      showToast(getApiErrorMessage(err, "Couldn't remove your cover photo. Please try again."), 'error');
+      reportApiError(err, "Couldn't remove your cover photo. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -93,7 +93,7 @@ export function CoverPicker({ visible, onClose, currentType, currentValue }: Cov
       await updateCover(type, value);
       onClose();
     } catch (err) {
-      showToast(getApiErrorMessage(err, "Couldn't save your cover. Please try again."), 'error');
+      reportApiError(err, "Couldn't save your cover. Please try again.");
       setIsSaving(false);
     }
   };

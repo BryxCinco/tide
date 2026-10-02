@@ -1,14 +1,13 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { getApiErrorMessage } from '../services/api';
+import { getApiErrorMessage, reportApiError } from '../services/api';
 import { taskService, type UpdateTaskPayload } from '../services/task.service';
 import type { Task, TaskPriority, TaskStatus } from '../types/task';
 import { hasAuthToken, isGuestMode } from '../utils/authFlags';
 import { toDateKey } from '../utils/formatDate';
 import { storage } from '../utils/storage';
 import { useLevelStore } from './levelStore';
-import { showToast } from './toastStore';
 
 export type TaskFilter = 'all' | 'today' | 'done' | 'overdue';
 export type TaskSort = 'priority' | 'dueDate' | 'created';
@@ -103,7 +102,7 @@ export const useTaskStore = create<TaskState>()(
           (created) => set((state) => ({ tasks: state.tasks.map((t) => (t.id === tempId ? created : t)) })),
           (err) => {
             set((state) => ({ tasks: state.tasks.filter((t) => t.id !== tempId) }));
-            showToast(getApiErrorMessage(err), 'error');
+            reportApiError(err);
           },
         );
 
@@ -129,7 +128,7 @@ export const useTaskStore = create<TaskState>()(
           .then(({ xp }) => useLevelStore.getState().applyXpResult(xp))
           .catch((err) => {
             set({ tasks: previous });
-            showToast(getApiErrorMessage(err), 'error');
+            reportApiError(err);
           });
       },
 
@@ -145,7 +144,7 @@ export const useTaskStore = create<TaskState>()(
         if (isGuestMode()) return;
         taskService.remove(id).catch((err) => {
           set((state) => ({ tasks: previous, withdrawnCount: wasWithdrawn ? state.withdrawnCount - 1 : state.withdrawnCount }));
-          showToast(getApiErrorMessage(err), 'error');
+          reportApiError(err);
         });
       },
 
@@ -167,7 +166,7 @@ export const useTaskStore = create<TaskState>()(
           .then(({ xp }) => useLevelStore.getState().applyXpResult(xp))
           .catch((err) => {
             set({ tasks: previous });
-            showToast(getApiErrorMessage(err), 'error');
+            reportApiError(err);
           });
       },
 

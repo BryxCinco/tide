@@ -136,3 +136,18 @@ export function getApiErrorCode(err: unknown): string | undefined {
   }
   return undefined;
 }
+
+/** `showToast(getApiErrorMessage(err), 'error')`, but silent for a SkippedRequestError — the
+ * one error every catch block across the app's stores/components should route a failed
+ * request's error through instead of calling showToast directly, so "the request never even
+ * went out because there was no token yet" can never itself surface as a user-facing error
+ * toast (it very nearly did: the request interceptor correctly stopped the request, but the
+ * calling code's own unconditional `showToast(getApiErrorMessage(err))` still fired on the
+ * rejection either way). */
+export function reportApiError(err: unknown, fallback?: string): void {
+  if (err instanceof SkippedRequestError) {
+    console.log('[api] Swallowed a SkippedRequestError instead of toasting it:', err.message);
+    return;
+  }
+  showToast(getApiErrorMessage(err, fallback), 'error');
+}

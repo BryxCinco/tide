@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { getApiErrorMessage } from '../services/api';
+import { getApiErrorMessage, reportApiError } from '../services/api';
 import { questService, type QuestStreakInfo, type UpdateQuestPayload } from '../services/quest.service';
 import { streakService } from '../services/streak.service';
 import { QUEST_TIER_META, type Quest, type QuestCategory, type QuestRecurrenceType, type QuestTier } from '../types/quest';
@@ -189,7 +189,7 @@ export const useQuestStore = create<QuestState>()(
           },
           (err) => {
             set({ todayQuests: previous });
-            showToast(getApiErrorMessage(err), 'error');
+            reportApiError(err);
           },
         );
       },
@@ -258,7 +258,7 @@ export const useQuestStore = create<QuestState>()(
         if (isGuestMode()) return;
         questService.update(id, updates).catch((err) => {
           set({ todayQuests: previous });
-          showToast(getApiErrorMessage(err), 'error');
+          reportApiError(err);
         });
       },
 
@@ -271,7 +271,7 @@ export const useQuestStore = create<QuestState>()(
         if (isGuestMode()) return;
         questService.remove(id).catch((err) => {
           set({ todayQuests: previous });
-          showToast(getApiErrorMessage(err), 'error');
+          reportApiError(err);
         });
       },
 

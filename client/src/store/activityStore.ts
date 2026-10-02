@@ -3,12 +3,11 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { createSeedActivities } from '../mocks/mockActivities';
 import { activityService } from '../services/activity.service';
-import { getApiErrorMessage } from '../services/api';
+import { getApiErrorMessage, reportApiError } from '../services/api';
 import type { Activity, DayCode, RecurrenceType } from '../types/activity';
 import { hasAuthToken, isGuestMode } from '../utils/authFlags';
 import { toDateKey } from '../utils/formatDate';
 import { storage } from '../utils/storage';
-import { showToast } from './toastStore';
 
 type RecurrenceInput = {
   recurrenceType?: RecurrenceType;
@@ -126,7 +125,7 @@ export const useActivityStore = create<ActivityState>()(
         if (isGuestMode()) return;
         activityService.update(id, updates).catch((err) => {
           set({ activities: previous });
-          showToast(getApiErrorMessage(err), 'error');
+          reportApiError(err);
         });
       },
 
@@ -139,7 +138,7 @@ export const useActivityStore = create<ActivityState>()(
         if (isGuestMode()) return;
         activityService.remove(id).catch((err) => {
           set({ activities: previous });
-          showToast(getApiErrorMessage(err), 'error');
+          reportApiError(err);
         });
       },
 
@@ -155,7 +154,7 @@ export const useActivityStore = create<ActivityState>()(
         if (isGuestMode()) return;
         activityService.update(id, { isFavorite }).catch((err) => {
           set({ activities: previous });
-          showToast(getApiErrorMessage(err), 'error');
+          reportApiError(err);
         });
       },
 
@@ -167,7 +166,7 @@ export const useActivityStore = create<ActivityState>()(
         if (isGuestMode()) return;
         activityService.update(id, { isArchived: archived }).catch((err) => {
           set({ activities: previous });
-          showToast(getApiErrorMessage(err), 'error');
+          reportApiError(err);
         });
       },
 

@@ -2,12 +2,11 @@ import { Appearance } from 'react-native';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { getApiErrorMessage } from '../services/api';
+import { getApiErrorMessage, reportApiError } from '../services/api';
 import { settingsService } from '../services/settings.service';
 import type { UserSettings } from '../types/settings';
 import { hasAuthToken, isGuestMode } from '../utils/authFlags';
 import { storage } from '../utils/storage';
-import { showToast } from './toastStore';
 import { useThemeStore } from './themeStore';
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -49,7 +48,7 @@ function flushPendingSettings(): void {
   // story for a guest; there's nothing to sync.
   if (isGuestMode()) return;
   settingsService.update(toSend).catch((err) => {
-    showToast(getApiErrorMessage(err), 'error');
+    reportApiError(err);
   });
 }
 
@@ -105,15 +104,19 @@ export const useSettingsStore = create<SettingsState>()(
         pendingTimeout = setTimeout(flushPendingSettings, SETTINGS_DEBOUNCE_MS);
       },
 
+      // Purely local, like every other store's reset() (taskStore, journalStore, ...) —
+      // resetDomainStores() calls this between accounts (login/register/logout) to clear
+      // the PREVIOUS session's cached settings out of this store, not to push defaults to
+      // whichever account's token happens to still be live at that exact moment. It used to
+      // also PATCH DEFAULT_SETTINGS to the server, which on logout could race the token
+      // actually clearing and silently overwrite the just-logged-out account's real saved
+      // settings with defaults — the fetchSettings() on the next login would then show
+      // defaults instead of what the user had actually chosen.
       resetSettings: () => {
         set({ settings: DEFAULT_SETTINGS });
         useThemeStore.getState().setTheme('light');
         pendingUpdate = {};
         if (pendingTimeout) clearTimeout(pendingTimeout);
-        if (isGuestMode()) return;
-        settingsService.update(DEFAULT_SETTINGS).catch((err) => {
-          showToast(getApiErrorMessage(err), 'error');
-        });
       },
 
       clearError: () => set({ error: null }),

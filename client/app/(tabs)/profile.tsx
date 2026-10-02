@@ -24,7 +24,7 @@ import { Button, ErrorState, Icon, ResponsiveContainer, Text, ThemeToggle } from
 import { useAuth } from '@/hooks/useAuth';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { LANGUAGES, useTranslation } from '@/i18n';
-import { getApiErrorMessage } from '@/services/api';
+import { reportApiError } from '@/services/api';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useStreakStore } from '@/store/streakStore';
 import { useThemeStore } from '@/store/themeStore';
@@ -121,7 +121,7 @@ export default function ProfileScreen() {
       // failed, so the account and its data are still intact server-side. Closing the
       // modal or logging out here would make it look like the deletion went through when
       // it didn't.
-      showToast(getApiErrorMessage(err, 'Could not delete your account. Please try again.'), 'error');
+      reportApiError(err, 'Could not delete your account. Please try again.');
     } finally {
       setIsDeletingAccount(false);
     }

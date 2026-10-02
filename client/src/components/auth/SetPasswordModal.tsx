@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Pressable, View } from 'react-native';
 
-import { getApiErrorMessage } from '../../services/api';
+import { reportApiError } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { showToast } from '../../store/toastStore';
 import { setPasswordSchema, type SetPasswordForm } from '../../utils/validation';
@@ -44,7 +44,7 @@ export function SetPasswordModal() {
       reset();
       showToast('Password set!');
     } catch (err) {
-      showToast(getApiErrorMessage(err), 'error');
+      reportApiError(err);
     } finally {
       setIsSaving(false);
     }

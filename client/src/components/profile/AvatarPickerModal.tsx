@@ -4,7 +4,7 @@ import { Pressable } from '../ui/SoundPressable';
 
 import { useAuth } from '../../hooks/useAuth';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { getApiErrorMessage } from '../../services/api';
+import { reportApiError } from '../../services/api';
 import { useUserStore } from '../../store/userStore';
 import { showToast } from '../../store/toastStore';
 import { pickImage, type ImageSource } from '../../utils/imageUpload';
@@ -56,7 +56,7 @@ export function AvatarPickerModal({ visible, onClose }: AvatarPickerModalProps) 
       onClose();
       showToast('Avatar updated');
     } catch (err) {
-      showToast(getApiErrorMessage(err, "Couldn't save your avatar. Please try again."), 'error');
+      reportApiError(err, "Couldn't save your avatar. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -69,7 +69,7 @@ export function AvatarPickerModal({ visible, onClose }: AvatarPickerModalProps) 
       onClose();
       showToast('Avatar removed');
     } catch (err) {
-      showToast(getApiErrorMessage(err, "Couldn't remove your avatar. Please try again."), 'error');
+      reportApiError(err, "Couldn't remove your avatar. Please try again.");
     } finally {
       setIsSaving(false);
     }

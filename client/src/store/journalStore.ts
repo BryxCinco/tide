@@ -1,14 +1,13 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { getApiErrorMessage } from '../services/api';
+import { getApiErrorMessage, reportApiError } from '../services/api';
 import { journalService } from '../services/journal.service';
 import type { JournalEntry, Mood } from '../types/journal';
 import { hasAuthToken, isGuestMode } from '../utils/authFlags';
 import { countWords } from '../utils/formatDate';
 import { storage } from '../utils/storage';
 import { useLevelStore } from './levelStore';
-import { showToast } from './toastStore';
 
 export type JournalFilter = 'all' | 'week' | 'month' | 'favorites';
 
@@ -108,7 +107,7 @@ export const useJournalStore = create<JournalState>()(
         if (isGuestMode()) return;
         journalService.update(id, updates).catch((err) => {
           set({ entries: previous });
-          showToast(getApiErrorMessage(err), 'error');
+          reportApiError(err);
         });
       },
 
@@ -118,7 +117,7 @@ export const useJournalStore = create<JournalState>()(
         if (isGuestMode()) return;
         journalService.remove(id).catch((err) => {
           set({ entries: previous });
-          showToast(getApiErrorMessage(err), 'error');
+          reportApiError(err);
         });
       },
 
@@ -132,7 +131,7 @@ export const useJournalStore = create<JournalState>()(
         if (isGuestMode()) return;
         journalService.update(id, { isFavorite }).catch((err) => {
           set({ entries: previous });
-          showToast(getApiErrorMessage(err), 'error');
+          reportApiError(err);
         });
       },
 

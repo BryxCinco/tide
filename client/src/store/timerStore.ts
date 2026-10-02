@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 import { DEFAULT_FOCUS_ACTIVITY } from '../mocks/mockActivities';
-import { getApiErrorMessage } from '../services/api';
+import { getApiErrorMessage, SkippedRequestError } from '../services/api';
 import { mapApiSession, sessionService } from '../services/session.service';
 import { hasAuthToken, isGuestMode } from '../utils/authFlags';
 import { useActivityStore } from './activityStore';
@@ -228,6 +228,10 @@ export const useTimerStore = create<TimerState>()((set, get) => ({
       })
       .then(({ xp }) => useLevelStore.getState().applyXpResult(xp))
       .catch((err) => {
+        // Already guarded by hasAuthToken() above, but this request is still fire-and-forget
+        // against a store that could change mid-flight — same SkippedRequestError silence as
+        // reportApiError, just with this action's own custom message on a real failure.
+        if (err instanceof SkippedRequestError) return;
         showToast(`Session tracked locally, but didn't sync: ${getApiErrorMessage(err)}`, 'error');
       });
   },
