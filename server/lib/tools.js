@@ -8,6 +8,9 @@ const {
 } = require('./embeddingPipeline');
 const { retrieveStats, retrieveRelevantContext } = require('./ragService');
 const { awardXp, xpForLevel } = require('./xpService');
+const { isActivityScheduledToday } = require('./activityRecurrence');
+const { computeQuestXp, questTierMeta } = require('./questXp');
+const { generateDailyQuestsForUser, getQuestStreakInfo, gatherSignals, weakestMeasurableCategory, weaknessReason, pickTemplate, STRETCH_TEMPLATES } = require('./questGenerator');
 
 const TASK_COMPLETE_XP = { low: 10, medium: 20, high: 30, critical: 50 };
 
@@ -315,21 +318,38 @@ const tools = [
   {
     type: 'function',
     function: {
-      name: 'suggestSpecialQuest',
+      name: 'suggestTideQuest',
       description:
-        'Analyze the user\'s weakest area (journaling gap, session gap, task completion rate, streak) and suggest ONE custom quest to address it, with XP and a reason. Two-step like deleteTask: first call with confirm omitted/false just returns the suggestion — relay it and ask "want me to add this quest?". Only on a clear yes, call again with confirm:true AND the exact title/description/xp/icon/category from the first call, to actually create it.',
+        'Analyze the user\'s last 7 days (journaling gap, session gap, task completion rate, today\'s routine) and suggest 1-3 Tide\'s Quest options to address the weakest one, each with a category, tier (1=Common..5=Legendary), auto-computed XP, and a reason. Two-step like deleteTask: first call with confirm omitted/false just returns the suggestions — relay them and ask which (if any) to add. Only on a clear yes, call again with confirm:true AND the exact title/description/tier/icon/category for the one chosen, to actually create it.',
       parameters: {
         type: 'object',
         properties: {
           confirm: { type: 'boolean', description: 'Must be true to actually create the quest. Leave false/omitted on the first call.' },
-          title: { type: 'string', description: 'Only on confirm:true — the exact title from the suggestion.' },
-          description: { type: 'string', description: 'Only on confirm:true — the exact description from the suggestion.' },
-          xp: { type: 'number', description: 'Only on confirm:true — the exact xp amount from the suggestion.' },
-          icon: { type: 'string', description: 'Only on confirm:true — the exact icon name from the suggestion.' },
-          category: { type: 'string', description: 'Only on confirm:true — the exact category from the suggestion.' },
+          title: { type: 'string', description: 'Only on confirm:true — the exact title from the chosen suggestion.' },
+          description: { type: 'string', description: 'Only on confirm:true — the exact description from the chosen suggestion.' },
+          tier: { type: 'number', description: 'Only on confirm:true — the exact tier (1-5) from the chosen suggestion.' },
+          icon: { type: 'string', description: 'Only on confirm:true — the exact icon name from the chosen suggestion.' },
+          category: { type: 'string', description: 'Only on confirm:true — the exact category from the chosen suggestion.' },
         },
         required: [],
       },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'generateDailyQuests',
+      description:
+        "Generates 3-5 fresh Tide's Quest entries for today — one from the user's weakest tracked area, one from today's routine (if any recurring activity is scheduled), one stretch goal, and 1-2 random picks from other categories — and replaces any non-custom quests already set for today (quests the user added themselves are left alone). Use when the user asks to regenerate/refresh/reroll today's quests, or has none yet today.",
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'getQuestStreak',
+      description: "Returns the user's current and longest quest-completion streak and their weekly quest completion rate, for motivating them ('2 days from your next milestone!').",
+      parameters: { type: 'object', properties: {}, required: [] },
     },
   },
   {
@@ -888,30 +908,6 @@ toolHandlers.getStreakInfo = async ({ userId }) => {
   };
 };
 
-// Mirrors client/src/utils/activityRecurrence.ts's isActivityScheduledOn — hand-duplicated
-// the same way xp.ts/xpService.js already are (client/server are separate projects).
-const RECURRENCE_DAY_CODES = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-function isActivityScheduledToday(activity) {
-  if (!activity.recurrence_type || activity.recurrence_type === 'none') return false;
-  const today = new Date();
-  const todayKey = today.toISOString().slice(0, 10);
-  if (activity.start_date && todayKey < activity.start_date) return false;
-  if (activity.end_date && todayKey > activity.end_date) return false;
-
-  switch (activity.recurrence_type) {
-    case 'daily':
-      return true;
-    case 'weekly':
-      return new Date(activity.start_date).getDay() === today.getDay();
-    case 'monthly':
-      return new Date(activity.start_date).getDate() === today.getDate();
-    case 'custom':
-      return (activity.recurrence_days || []).includes(RECURRENCE_DAY_CODES[today.getDay()]);
-    default:
-      return false;
-  }
-}
-
 toolHandlers.suggestActivity = async ({ userId, count }) => {
   const [{ data: activities, error: actError }, { data: logs, error: logError }] = await Promise.all([
     supabaseAdmin.from('activities').select('id, name, is_archived, recurrence_type, recurrence_days, start_date, end_date').eq('user_id', userId),
@@ -969,10 +965,13 @@ toolHandlers.suggestActivity = async ({ userId, count }) => {
 // analyzes and suggests, touching nothing. The second call (confirm:true) actually inserts —
 // and since tool-call/tool-result messages don't persist across separate HTTP requests (see
 // deleteTask's own comment on this), the model has to echo back the exact title/description/
-// xp/icon from the first call rather than this handler remembering what it suggested.
-const SPECIAL_QUEST_CATEGORIES = ['focus', 'journal', 'tasks', 'wellness', 'growth'];
+// tier/icon/category from the first call rather than this handler remembering what it
+// suggested. Reuses questGenerator.js's signal-gathering/templates rather than a third copy
+// of the same logic (generateDailyQuestsForUser and the old suggestSpecialQuest both used to
+// compute these independently).
+const TIDE_QUEST_CATEGORIES = ['focus', 'journal', 'tasks', 'wellness', 'growth', 'social'];
 
-toolHandlers.suggestSpecialQuest = async ({ userId, confirm, title, description, xp, icon, category }) => {
+toolHandlers.suggestTideQuest = async ({ userId, confirm, title, description, tier, icon, category }) => {
   // See deleteTask's identical comment — the model's raw JSON arg isn't guaranteed to be an
   // actual boolean.
   const isConfirmed = confirm === true || confirm === 'true';
@@ -981,104 +980,91 @@ toolHandlers.suggestSpecialQuest = async ({ userId, confirm, title, description,
       return { error: 'missing quest details', message: "I need the quest's details to add it — ask me to suggest one again first." };
     }
 
+    const resolvedTier = Number.isInteger(tier) && tier >= 1 && tier <= 5 ? tier : 1;
+    // Must be one of the client's fixed QuestCategory values (see client/src/types/quest.ts)
+    // — an unrecognized category breaks the quest card's color/label lookup there, so an
+    // unexpected value falls back to 'growth' rather than passing through whatever the
+    // model sent.
+    const resolvedCategory = TIDE_QUEST_CATEGORIES.includes(category) ? category : 'growth';
+    const xp = computeQuestXp(resolvedTier, 1.0, 0, false);
+
     const { data, error } = await supabaseAdmin
       .from('quests')
       .insert({
         user_id: userId,
         title,
         description: description || null,
-        xp: xp || 25,
+        xp,
+        tier: resolvedTier,
         icon: icon || 'Sparkles',
-        // Must be one of the client's fixed QuestCategory values (see
-        // client/src/types/quest.ts) — an unrecognized category breaks the quest card's
-        // color/label lookup there, so an unexpected value falls back to 'growth' rather
-        // than passing through whatever the model sent.
-        category: SPECIAL_QUEST_CATEGORIES.includes(category) ? category : 'growth',
+        category: resolvedCategory,
         date: new Date().toISOString().slice(0, 10),
         is_custom: true,
         is_active: true,
+        is_agentic: true,
+        generation_reason: description || null,
       })
       .select()
       .single();
 
     if (error) throw new Error(error.message);
-    return { added: true, quest: data, message: `Added "${data.title}" to today's quests (+${data.xp} XP).` };
+    return { added: true, quest: data, message: `Added "${data.title}" to today's quests (+${data.xp} XP, ${questTierMeta(resolvedTier).name}).` };
   }
 
-  const [journalRes, sessionRes, tasksRes, streakRes] = await Promise.all([
-    supabaseAdmin.from('journal_entries').select('created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(1),
-    supabaseAdmin.from('time_logs').select('ended_at').eq('user_id', userId).order('ended_at', { ascending: false }).limit(1),
-    supabaseAdmin.from('tasks').select('status').eq('user_id', userId),
-    supabaseAdmin.from('streaks').select('current_streak').eq('user_id', userId).single(),
-  ]);
+  const signals = await gatherSignals(userId);
+  const weakCategory = weakestMeasurableCategory(signals);
+  const suggestions = [];
 
-  if (journalRes.error) throw new Error(journalRes.error.message);
-  if (sessionRes.error) throw new Error(sessionRes.error.message);
-  if (tasksRes.error) throw new Error(tasksRes.error.message);
-  // PGRST116 = no streaks row yet — default to 0 rather than erroring.
-  if (streakRes.error && streakRes.error.code !== 'PGRST116') throw new Error(streakRes.error.message);
+  const weakTemplate = pickTemplate(weakCategory);
+  suggestions.push({
+    ...weakTemplate,
+    category: weakCategory,
+    xp: computeQuestXp(weakTemplate.tier, 1.0, signals.currentStreak, false),
+    reason: weaknessReason(weakCategory, signals),
+  });
 
-  const daysSince = (iso) => (iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : null);
-  const daysSinceJournal = daysSince(journalRes.data?.[0]?.created_at);
-  const daysSinceSession = daysSince(sessionRes.data?.[0]?.ended_at);
-  const tasks = tasksRes.data || [];
-  const completionRate = tasks.length ? tasks.filter((t) => t.status === 'done').length / tasks.length : null;
-  const currentStreak = streakRes.data?.current_streak ?? 0;
+  // The routine suggestion below is always category 'focus' when it applies — excluded here
+  // too so the stretch pick can't duplicate it.
+  const hasRoutineToday = signals.todaysActivities.length > 0;
+  const stretchOptions = STRETCH_TEMPLATES.filter((s) => s.category !== weakCategory && !(hasRoutineToday && s.category === 'focus'));
+  const stretch = stretchOptions[Math.floor(Math.random() * stretchOptions.length)] || STRETCH_TEMPLATES[0];
+  suggestions.push({ ...stretch, xp: computeQuestXp(stretch.tier, 1.0, signals.currentStreak, false), reason: 'A bigger challenge to push yourself today.' });
 
-  // Checked weakest-signal-first: a journaling gap matters more than a slightly stale
-  // session, which matters more than a so-so completion rate — each branch only fires once
-  // the ones before it don't apply, so the user gets ONE suggestion, not four.
-  let suggestion;
-  if (daysSinceJournal === null || daysSinceJournal >= 3) {
-    suggestion = {
-      title: 'Write 3 journal entries this week',
-      description: 'Reflect on your week, even briefly — a few lines count.',
-      xp: 150,
-      icon: 'BookOpen',
-      category: 'journal',
-      reason: daysSinceJournal === null ? "You haven't written a journal entry yet." : `You haven't journaled in ${daysSinceJournal} days.`,
-    };
-  } else if (daysSinceSession === null || daysSinceSession >= 2) {
-    suggestion = {
-      title: 'Complete 2 focus sessions today',
-      description: 'Any activity counts — just start the timer.',
-      xp: 100,
-      icon: 'Timer',
+  if (hasRoutineToday) {
+    const activity = signals.todaysActivities[Math.floor(Math.random() * signals.todaysActivities.length)];
+    suggestions.push({
+      title: `Do ${activity.name}`,
+      description: `${activity.name} is on your routine for today`,
+      tier: 1,
+      icon: activity.icon || 'Repeat',
       category: 'focus',
-      reason: daysSinceSession === null ? "You haven't logged a focus session yet." : `You haven't tracked a session in ${daysSinceSession} days.`,
-    };
-  } else if (completionRate !== null && completionRate < 0.5) {
-    suggestion = {
-      title: 'Complete 3 tasks this week',
-      description: 'Clear out a few of your open tasks.',
-      xp: 120,
-      icon: 'CheckSquare',
-      category: 'tasks',
-      reason: `Only ${Math.round(completionRate * 100)}% of your tasks are completed right now.`,
-    };
-  } else if (currentStreak === 0) {
-    suggestion = {
-      title: "Complete today's quests to start a streak",
-      description: 'Finish every quest today to get your streak going.',
-      xp: 50,
-      icon: 'Flame',
-      category: 'growth',
-      reason: "You don't have an active streak yet.",
-    };
-  } else {
-    suggestion = {
-      title: 'Keep the momentum going',
-      description: "Complete today's quests to extend your streak.",
-      xp: 75,
-      icon: 'Flame',
-      category: 'growth',
-      reason: `You're on a ${currentStreak}-day streak — nice work.`,
-    };
+      xp: computeQuestXp(1, 1.0, signals.currentStreak, false),
+      reason: "It's part of your recurring routine today.",
+    });
   }
 
   return {
-    ...suggestion,
-    message: `Suggested quest: "${suggestion.title}" (+${suggestion.xp} XP) — ${suggestion.reason} Ask the user if they'd like to add it; only on a clear yes, call this tool again with confirm:true and this exact title/description/xp/icon/category.`,
+    suggestions,
+    message:
+      suggestions.map((s) => `"${s.title}" (+${s.xp} XP, ${questTierMeta(s.tier).name}) — ${s.reason}`).join(' / ') +
+      " Ask the user which one (if any) they'd like to add; only on a clear yes, call this tool again with confirm:true and the exact title/description/tier/icon/category for the one they picked.",
+  };
+};
+
+toolHandlers.generateDailyQuests = async ({ userId }) => {
+  const dateKey = new Date().toISOString().slice(0, 10);
+  const { error: clearError } = await supabaseAdmin.from('quests').delete().eq('user_id', userId).eq('date', dateKey).eq('is_custom', false);
+  if (clearError) throw new Error(clearError.message);
+
+  const quests = await generateDailyQuestsForUser(userId, dateKey);
+  return { quests, message: `Generated ${quests.length} quests for today: ${quests.map((q) => `"${q.title}" (+${q.xp} XP)`).join(', ')}.` };
+};
+
+toolHandlers.getQuestStreak = async ({ userId }) => {
+  const info = await getQuestStreakInfo(userId);
+  return {
+    ...info,
+    message: `Current streak: ${info.currentStreak} day${info.currentStreak === 1 ? '' : 's'}. Longest: ${info.longestStreak}. Weekly quest completion rate: ${info.weeklyCompletionRate}%.`,
   };
 };
 

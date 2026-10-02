@@ -2,6 +2,8 @@ const express = require('express');
 const { supabaseAdmin } = require('../lib/supabaseClient');
 const { requireAuth } = require('../middleware/auth');
 const { awardXp } = require('../lib/xpService');
+const { computeQuestXp, applyCompletionBonus } = require('../lib/questXp');
+const { generateDailyQuestsForUser, getQuestStreakInfo } = require('../lib/questGenerator');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -65,6 +67,34 @@ async function bumpStreakIfDayComplete(userId, dateKey) {
   return updated;
 }
 
+// GET /api/quests/streak — current/longest quest streak + a weekly completion rate.
+// Registered before the /:id-shaped routes below so "streak" is never matched as an id.
+router.get('/streak', async (req, res) => {
+  try {
+    res.json(await getQuestStreakInfo(req.user.id));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/quests/generate — the "Generate Today's Quests" button. Same underlying
+// generator the generateDailyQuests AI tool uses (server/lib/questGenerator.js) — "auto or
+// manual" per the spec, one function either way. Replaces whatever non-custom quests already
+// exist for today (custom ones the user added themselves are left alone) rather than piling
+// up a second batch alongside them.
+router.post('/generate', async (req, res) => {
+  const date = req.body.date || todayKey();
+  try {
+    const { error: clearError } = await supabaseAdmin.from('quests').delete().eq('user_id', req.user.id).eq('date', date).eq('is_custom', false);
+    if (clearError) return res.status(500).json({ error: clearError.message });
+
+    const quests = await generateDailyQuestsForUser(req.user.id, date);
+    res.status(201).json({ quests });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/quests?date=YYYY-MM-DD — defaults to today.
 router.get('/', async (req, res) => {
   const date = req.query.date || todayKey();
@@ -88,15 +118,25 @@ router.post('/', async (req, res) => {
     description,
     icon,
     category,
+    tier,
+    difficulty,
     xp,
     date,
     is_recurring: isRecurring,
     recurrence_type: recurrenceType,
     is_active: isActive,
     is_custom: isCustom,
+    is_agentic: isAgentic,
+    generation_reason: generationReason,
   } = req.body;
 
   if (!title) return res.status(400).json({ error: 'title is required' });
+
+  // xp is auto-computed from tier+difficulty (the spec's whole point — no more hand-typed
+  // XP numbers) unless an explicit value is passed, kept only for the daily-generator's own
+  // insert path which already computes and sends its own final xp per pick.
+  const resolvedTier = tier || 1;
+  const resolvedXp = xp !== undefined ? xp : computeQuestXp(resolvedTier, difficulty ?? 1.0, 0, false);
 
   const { data, error } = await supabaseAdmin
     .from('quests')
@@ -106,12 +146,15 @@ router.post('/', async (req, res) => {
       description,
       icon,
       category,
-      xp,
+      tier: resolvedTier,
+      xp: resolvedXp,
       date: date || todayKey(),
       is_recurring: Boolean(isRecurring),
       recurrence_type: isRecurring ? recurrenceType : null,
       is_active: isActive === undefined ? true : Boolean(isActive),
       is_custom: Boolean(isCustom),
+      is_agentic: Boolean(isAgentic),
+      generation_reason: generationReason ?? null,
     })
     .select()
     .single();
@@ -131,6 +174,7 @@ router.patch('/:id', async (req, res) => {
   if ('description' in req.body) update.description = req.body.description;
   if ('icon' in req.body) update.icon = req.body.icon;
   if ('category' in req.body) update.category = req.body.category;
+  if ('tier' in req.body) update.tier = req.body.tier;
   if ('xp' in req.body) update.xp = req.body.xp;
   if ('is_active' in req.body) update.is_active = Boolean(req.body.is_active);
   if ('is_recurring' in req.body) {
@@ -163,15 +207,38 @@ router.patch('/:id', async (req, res) => {
   if (!quest) return res.status(404).json({ error: 'Quest not found' });
 
   const justCompleted = togglingCompletion && update.is_completed && !wasCompleted;
-  const streak = justCompleted ? await bumpStreakIfDayComplete(req.user.id, quest.date) : null;
-  const xp = justCompleted
-    ? await awardXp(req.user.id, quest.xp || 25, 'quest completed').catch((err) => {
-        console.error('[quests] XP award failed:', err.message);
-        return null;
-      })
-    : null;
 
-  res.json({ quest, streak, xp });
+  let finalQuest = quest;
+  let xp = null;
+  let streak = null;
+
+  if (justCompleted) {
+    // Pre-bump streak length — "+10% per consecutive day" means days already banked going
+    // into today's completion, not the count after this one increments it.
+    const { data: streakRow } = await supabaseAdmin.from('streaks').select('current_streak').eq('user_id', req.user.id).maybeSingle();
+    const streakDays = streakRow?.current_streak ?? 0;
+
+    const { data: todaysCompleted } = await supabaseAdmin
+      .from('quests')
+      .select('category')
+      .eq('user_id', req.user.id)
+      .eq('date', quest.date)
+      .eq('is_completed', true);
+    const diversityBonus = new Set((todaysCompleted || []).map((q) => q.category)).size >= 3;
+
+    const awardedXp = applyCompletionBonus(quest.xp || 15, streakDays, diversityBonus);
+
+    const { data: updatedQuest } = await supabaseAdmin.from('quests').update({ xp: awardedXp }).eq('id', quest.id).select().single();
+    finalQuest = updatedQuest || quest;
+
+    streak = await bumpStreakIfDayComplete(req.user.id, quest.date);
+    xp = await awardXp(req.user.id, awardedXp, 'quest completed').catch((err) => {
+      console.error('[quests] XP award failed:', err.message);
+      return null;
+    });
+  }
+
+  res.json({ quest: finalQuest, streak, xp });
 });
 
 // DELETE /api/quests/:id — custom (user-created) quests only; system-generated ones can be
