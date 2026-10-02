@@ -11,7 +11,7 @@ const MOTIVATION_BY_STREAK = (streak: number): string => {
   return "Legendary streak — don't stop now!";
 };
 
-/** Restates DailyQuestCard's streak counter (questStore.ts) as its own glanceable tile —
+/** Restates QuestCard's streak counter (questStore.ts) as its own glanceable tile —
  * same source of truth, so the two numbers can never disagree. */
 export function StreakWidget() {
   const streak = useQuestStore((s) => s.streak);

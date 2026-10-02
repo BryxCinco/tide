@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { DailyQuestCard } from '@/components/dashboard';
+import { QuestCard } from '@/components/dashboard';
 import { AppLayout } from '@/components/layout';
 import { TaskCard, TaskFilters, TaskFormModal, TaskInfoModal } from '@/components/tasks';
 import { BackButton, Button, EmptyState, ErrorState, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
@@ -83,7 +83,7 @@ export default function TasksScreen() {
               <Button title="New" variant="primary" size="sm" icon="Plus" onPress={openCreate} />
             </View>
 
-            <DailyQuestCard />
+            <QuestCard />
 
             <TaskFilters filter={filter} sort={sort} onFilterChange={setFilter} onSortChange={setSort} />
 

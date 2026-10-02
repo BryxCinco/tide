@@ -5,7 +5,7 @@ import { Pressable } from '../ui/SoundPressable';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useQuestStore } from '../../store/questStore';
-import { QUEST_CATEGORY_COLOR, type Quest } from '../../types/quest';
+import { QUEST_CATEGORY_COLOR, QUEST_TIER_META, type Quest } from '../../types/quest';
 import { cn } from '../../utils/cn';
 import { confirmAsync } from '../../utils/confirm';
 import { soundManager } from '../../utils/soundManager';
@@ -17,7 +17,7 @@ export interface QuestManagerModalProps {
   onClose: () => void;
 }
 
-/** Bulk-management view for today's quests — active and paused alike (DailyQuestCard only
+/** Bulk-management view for today's quests — active and paused alike (QuestCard only
  * ever shows active ones). Reorder/pause/delete all apply immediately; Edit opens
  * QuestFormModal on top of this one. */
 export function QuestManagerModal({ visible, onClose }: QuestManagerModalProps) {
@@ -82,7 +82,8 @@ export function QuestManagerModal({ visible, onClose }: QuestManagerModalProps) 
               {quest.title}
             </Text>
             <Text variant="caption" color="muted" className="normal-case tracking-normal">
-              +{quest.xp} XP{quest.isRecurring ? ` · ${quest.recurrenceType}` : ''}
+              +{quest.xp} XP · {QUEST_TIER_META[quest.tier].name}
+              {quest.isRecurring ? ` · ${quest.recurrenceType}` : ''}
               {quest.isCustom ? ' · Custom' : ''}
             </Text>
           </View>

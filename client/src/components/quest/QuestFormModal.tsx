@@ -4,9 +4,10 @@ import { Pressable } from '../ui/SoundPressable';
 
 import { ICON_OPTIONS } from '../../mocks/mockActivities';
 import { useQuestStore } from '../../store/questStore';
-import { QUEST_CATEGORY_COLOR, QUEST_CATEGORY_LABEL, type Quest, type QuestCategory, type QuestRecurrenceType } from '../../types/quest';
+import { QUEST_CATEGORY_COLOR, QUEST_CATEGORY_LABEL, QUEST_TIER_META, type Quest, type QuestCategory, type QuestRecurrenceType, type QuestTier } from '../../types/quest';
 import { cn } from '../../utils/cn';
 import { confirmAsync } from '../../utils/confirm';
+import { computeQuestXp, DIFFICULTY_MODIFIER, type QuestDifficulty } from '../../utils/questXp';
 import { colors } from '../../utils/theme';
 import { Button, Icon, Input, Modal, Text, type IconName } from '../ui';
 
@@ -18,15 +19,21 @@ export interface QuestFormModalProps {
 }
 
 const CATEGORIES = Object.keys(QUEST_CATEGORY_COLOR) as QuestCategory[];
+const TIERS = Object.keys(QUEST_TIER_META).map(Number) as QuestTier[];
+const DIFFICULTIES: { value: QuestDifficulty; label: string }[] = [
+  { value: 'easy', label: 'Easy' },
+  { value: 'normal', label: 'Normal' },
+  { value: 'hard', label: 'Hard' },
+];
 const RECURRENCE_OPTIONS: { value: QuestRecurrenceType; label: string }[] = [
   { value: 'daily', label: 'Daily' },
   { value: 'weekly', label: 'Weekly' },
   { value: 'custom', label: 'Custom' },
 ];
-const DEFAULT_XP = 15;
 
-/** Create/edit form for a custom quest — reachable from the Daily Quest card's "+ Add
- * Quest" button and from QuestManagerModal's per-row Edit icon. */
+/** Create/edit form for a custom quest — reachable from the Quest card's "+ Add Quest"
+ * button and from QuestManagerModal's per-row Edit icon. XP is always auto-computed from
+ * tier + difficulty (Tide's Quest's whole point) — never hand-typed. */
 export function QuestFormModal({ visible, onClose, quest }: QuestFormModalProps) {
   const addCustomQuest = useQuestStore((s) => s.addCustomQuest);
   const updateQuest = useQuestStore((s) => s.updateQuest);
@@ -37,13 +44,15 @@ export function QuestFormModal({ visible, onClose, quest }: QuestFormModalProps)
   const [description, setDescription] = useState('');
   const [icon, setIcon] = useState(ICON_OPTIONS[0]);
   const [category, setCategory] = useState<QuestCategory>('growth');
-  const [xp, setXp] = useState(String(DEFAULT_XP));
+  const [tier, setTier] = useState<QuestTier>(1);
+  const [difficulty, setDifficulty] = useState<QuestDifficulty>('normal');
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceType, setRecurrenceType] = useState<QuestRecurrenceType>('daily');
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const isEditing = Boolean(quest);
+  const previewXp = computeQuestXp(tier, DIFFICULTY_MODIFIER[difficulty]);
 
   useEffect(() => {
     if (!visible) return;
@@ -51,7 +60,8 @@ export function QuestFormModal({ visible, onClose, quest }: QuestFormModalProps)
     setDescription(quest?.description ?? '');
     setIcon(quest?.icon ?? ICON_OPTIONS[0]);
     setCategory(quest?.category ?? 'growth');
-    setXp(String(quest?.xp ?? DEFAULT_XP));
+    setTier(quest?.tier ?? 1);
+    setDifficulty('normal');
     setIsRecurring(quest?.isRecurring ?? false);
     setRecurrenceType(quest?.recurrenceType ?? 'daily');
     setError(null);
@@ -63,7 +73,6 @@ export function QuestFormModal({ visible, onClose, quest }: QuestFormModalProps)
       setError('Give this quest a title.');
       return;
     }
-    const parsedXp = Math.max(0, Math.round(Number(xp)) || 0);
 
     if (isEditing && quest) {
       updateQuest(quest.id, {
@@ -71,7 +80,7 @@ export function QuestFormModal({ visible, onClose, quest }: QuestFormModalProps)
         description: description.trim(),
         icon,
         category,
-        xp: parsedXp,
+        tier,
         isRecurring,
         recurrenceType: isRecurring ? recurrenceType : null,
       });
@@ -86,7 +95,8 @@ export function QuestFormModal({ visible, onClose, quest }: QuestFormModalProps)
         description: description.trim(),
         icon,
         category,
-        xp: parsedXp,
+        tier,
+        difficulty: DIFFICULTY_MODIFIER[difficulty],
         isRecurring,
         recurrenceType: isRecurring ? recurrenceType : null,
       });
@@ -128,7 +138,57 @@ export function QuestFormModal({ visible, onClose, quest }: QuestFormModalProps)
             onChangeText={setDescription}
           />
 
-          <Input label="XP reward" placeholder="15" keyboardType="numeric" value={xp} onChangeText={setXp} />
+          <View className="gap-2">
+            <View className="flex-row items-center justify-between">
+              <Text variant="label" color="muted">
+                Tier
+              </Text>
+              <Text variant="caption" color="accent" className="normal-case tracking-normal">
+                +{previewXp} XP
+              </Text>
+            </View>
+            <View className="flex-row flex-wrap gap-2">
+              {TIERS.map((t) => {
+                const meta = QUEST_TIER_META[t];
+                const isSelected = t === tier;
+                return (
+                  <Pressable
+                    key={t}
+                    onPress={() => setTier(t)}
+                    className={cn('flex-row items-center gap-1.5 rounded-full border px-3 py-1.5', isSelected ? 'border-transparent' : 'border-subtle bg-surface')}
+                    style={isSelected ? { backgroundColor: `${meta.color}22`, borderColor: meta.color } : undefined}
+                  >
+                    <View className="h-2 w-2 rounded-full" style={{ backgroundColor: meta.color }} />
+                    <Text variant="caption" color={isSelected ? 'primary' : 'muted'} className="normal-case tracking-normal">
+                      {meta.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          <View className="gap-2">
+            <Text variant="label" color="muted">
+              Difficulty
+            </Text>
+            <View className="flex-row gap-2">
+              {DIFFICULTIES.map((option) => {
+                const isSelected = option.value === difficulty;
+                return (
+                  <Pressable
+                    key={option.value}
+                    onPress={() => setDifficulty(option.value)}
+                    className={cn('flex-1 items-center rounded-lg border py-2', isSelected ? 'border-tide-teal bg-tide-teal/10' : 'border-subtle bg-base')}
+                  >
+                    <Text variant="caption" color={isSelected ? 'accent' : 'muted'} className="normal-case tracking-normal">
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
 
           <View className="gap-2">
             <Text variant="label" color="muted">

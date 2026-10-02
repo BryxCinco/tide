@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ChatbotFAB,
   CustomizeDashboardModal,
-  DailyQuestCard,
+  QuestCard,
   FocusFlow,
   HabitTracker,
   HeroCard,
@@ -60,7 +60,7 @@ export default function DashboardScreen() {
   const totalXp = useLevelStore((s) => s.totalXp);
   const fetchLevel = useLevelStore((s) => s.fetchLevel);
 
-  // DailyQuestCard fetches today's quests itself on its own mount (it's reused on both the
+  // QuestCard fetches today's quests itself on its own mount (it's reused on both the
   // Dashboard and Tasks screen) — calling fetchTodayQuests again here would just be a
   // redundant duplicate request, so it's deliberately left out of this effect.
   useEffect(() => {
@@ -220,7 +220,7 @@ export default function DashboardScreen() {
             />
           )}
 
-          <DailyQuestCard />
+          <QuestCard />
 
           <WidgetGrid widgets={visibleWidgets} renderWidget={renderWidget} />
 

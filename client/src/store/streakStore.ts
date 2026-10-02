@@ -18,7 +18,7 @@ interface StreakState {
  * Read-only mirror of the `streaks` row — it only ever changes server-side, as a side
  * effect of completing a day's quests (see quests.js's bumpStreakIfDayComplete), so there's
  * no local mutation here, just fetch. questStore keeps its own lighter `streak: number`
- * for its three existing consumers (DailyQuestCard, StreakWidget, StatsRow); this store is
+ * for its three existing consumers (QuestCard, StreakWidget, StatsRow); this store is
  * for anything that wants the fuller picture (longestStreak, lastActivityDate) without
  * pulling in questStore's whole quest-list machinery.
  */

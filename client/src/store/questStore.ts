@@ -2,12 +2,13 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { getApiErrorMessage } from '../services/api';
-import { questService, type UpdateQuestPayload } from '../services/quest.service';
+import { questService, type QuestStreakInfo, type UpdateQuestPayload } from '../services/quest.service';
 import { streakService } from '../services/streak.service';
-import type { Quest, QuestCategory, QuestRecurrenceType } from '../types/quest';
+import { QUEST_TIER_META, type Quest, type QuestCategory, type QuestRecurrenceType, type QuestTier } from '../types/quest';
 import { hasAuthToken, isGuestMode } from '../utils/authFlags';
 import { toDateKey } from '../utils/formatDate';
 import { generateDailyQuests } from '../utils/questGenerator';
+import { computeQuestXp } from '../utils/questXp';
 import { storage } from '../utils/storage';
 import { useLevelStore } from './levelStore';
 import { showToast } from './toastStore';
@@ -17,7 +18,9 @@ export interface CustomQuestInput {
   description: string;
   icon: string;
   category: QuestCategory;
-  xp: number;
+  tier: QuestTier;
+  /** 0.8-1.2, defaults to 1.0 — see utils/questXp.ts. */
+  difficulty?: number;
   isRecurring: boolean;
   recurrenceType: QuestRecurrenceType | null;
 }
@@ -29,15 +32,23 @@ interface QuestState {
    * only for display/debugging. */
   date: string;
   /** Mirrors streaks.current_streak — kept here (not just in the new streakStore) so the
-   * three existing consumers (DailyQuestCard, StreakWidget, StatsRow) don't need touching.
+   * three existing consumers (QuestCard, StreakWidget, StatsRow) don't need touching.
    * streakStore is the richer source (also has longestStreak) for anything new. */
   streak: number;
+  /** Richer quest-specific streak info (weekly completion rate) — fetched alongside
+   * todayQuests, not persisted (cheap to refetch, and staler than todayQuests matters less). */
+  questStreak: QuestStreakInfo | null;
   isLoading: boolean;
   error: string | null;
 
-  /** Call on mount wherever quests are shown (DailyQuestCard) — fetches today's quest set,
+  /** Call on mount wherever quests are shown (QuestCard) — fetches today's quest set,
    * generating + persisting one server-side on the very first check-in of the day. */
   fetchTodayQuests: () => Promise<void>;
+  fetchQuestStreak: () => Promise<void>;
+  /** "Generate Today's Quests" — replaces today's non-custom quests with a fresh batch from
+   * the server's pattern-aware generator. No-op for guests (falls back to the same local
+   * random pool fetchTodayQuests already uses for them). */
+  generateQuests: () => Promise<void>;
   toggleQuest: (id: string) => void;
   /** Real async (unlike updateQuest/deleteQuest below) — QuestFormModal awaits this to know
    * whether the create actually succeeded before closing itself. */
@@ -69,6 +80,7 @@ export const useQuestStore = create<QuestState>()(
       todayQuests: [],
       date: '',
       streak: 0,
+      questStreak: null,
       isLoading: false,
       error: null,
 
@@ -93,23 +105,10 @@ export const useQuestStore = create<QuestState>()(
           let quests = await questService.list(todayKey);
 
           if (quests.length === 0) {
-            // First check-in today — generate the same random set questGenerator.ts always
-            // produced locally, but persist each one server-side this time, explicitly
-            // marked is_custom: false so they can be paused but not deleted.
-            const generated = generateDailyQuests(todayKey);
-            quests = await Promise.all(
-              generated.map((q) =>
-                questService.create({
-                  title: q.title,
-                  description: q.description,
-                  icon: q.icon,
-                  category: q.category,
-                  xp: q.xp,
-                  date: todayKey,
-                  isCustom: false,
-                }),
-              ),
-            );
+            // First check-in today — ask the server's pattern-aware generator for a real
+            // batch (weakest tracked area, today's routine, a stretch goal, a couple random
+            // picks) instead of the old flat-random local pool, which is now guest-mode-only.
+            quests = await questService.generate(todayKey);
           }
 
           const streak = await streakService.get().catch(() => null);
@@ -119,6 +118,37 @@ export const useQuestStore = create<QuestState>()(
             streak: streak?.currentStreak ?? get().streak,
             isLoading: false,
           });
+          get().fetchQuestStreak();
+        } catch (err) {
+          set({ error: getApiErrorMessage(err), isLoading: false });
+        }
+      },
+
+      fetchQuestStreak: async () => {
+        if (isGuestMode() || !hasAuthToken()) return;
+        try {
+          const questStreak = await questService.getStreak();
+          set({ questStreak });
+        } catch {
+          // Non-critical — the card just won't show the weekly-rate detail this load.
+        }
+      },
+
+      generateQuests: async () => {
+        const todayKey = get().date || toDateKey(new Date());
+
+        if (isGuestMode() || !hasAuthToken()) {
+          set({ todayQuests: generateDailyQuests(todayKey), date: todayKey });
+          return;
+        }
+
+        set({ isLoading: true, error: null });
+        try {
+          const generated = await questService.generate(todayKey);
+          // Custom (user-added) quests for today are left alone server-side — keep them
+          // locally too instead of dropping them from view.
+          const customQuests = get().todayQuests.filter((q) => q.isCustom && q.date === todayKey);
+          set({ todayQuests: [...customQuests, ...generated], date: todayKey, isLoading: false });
         } catch (err) {
           set({ error: getApiErrorMessage(err), isLoading: false });
         }
@@ -141,13 +171,21 @@ export const useQuestStore = create<QuestState>()(
         if (isGuestMode()) return;
 
         questService.complete(id, isCompleted).then(
-          ({ streak, xp }) => {
+          ({ quest: updatedQuest, streak, xp }) => {
+            // The server recomputes xp at completion time (streak + category-diversity
+            // bonuses) — sync that back instead of trusting the optimistic value above.
+            set((state) => ({ todayQuests: state.todayQuests.map((q) => (q.id === id ? { ...q, xp: updatedQuest.xp } : q)) }));
             // Only present when this completion finished off every quest for the day — see
             // the comment on quest.service.ts's complete(). Un-completing never arrives with
             // a streak update (the server doesn't revoke an already-credited day), so the
             // locally displayed streak can stay stale until the next fetchTodayQuests().
             if (streak) set({ streak: streak.currentStreak });
-            useLevelStore.getState().applyXpResult(xp);
+            if (xp) {
+              useLevelStore.setState({ level: xp.level, totalXp: xp.totalXp });
+              const tierName = QUEST_TIER_META[updatedQuest.tier].name;
+              showToast(xp.leveledUp ? `🎉 Level ${xp.level}!` : `+${xp.xpGained} XP! (${tierName} Quest)`, 'success');
+            }
+            if (isCompleted) get().fetchQuestStreak();
           },
           (err) => {
             set({ todayQuests: previous });
@@ -166,13 +204,16 @@ export const useQuestStore = create<QuestState>()(
             description: input.description,
             icon: input.icon,
             category: input.category,
-            xp: input.xp,
+            tier: input.tier,
+            xp: computeQuestXp(input.tier, input.difficulty ?? 1.0),
             isCompleted: false,
             date: todayKey,
             isCustom: true,
             isActive: true,
             isRecurring: input.isRecurring,
             recurrenceType: input.recurrenceType,
+            isAgentic: false,
+            generationReason: null,
           };
           set((state) => ({ todayQuests: [...state.todayQuests, quest] }));
           return quest;
@@ -183,7 +224,8 @@ export const useQuestStore = create<QuestState>()(
           description: input.description,
           icon: input.icon,
           category: input.category,
-          xp: input.xp,
+          tier: input.tier,
+          difficulty: input.difficulty,
           date: todayKey,
           isRecurring: input.isRecurring,
           recurrenceType: input.recurrenceType,
@@ -205,7 +247,7 @@ export const useQuestStore = create<QuestState>()(
                   ...(updates.description !== undefined && { description: updates.description }),
                   ...(updates.icon !== undefined && { icon: updates.icon }),
                   ...(updates.category !== undefined && { category: updates.category }),
-                  ...(updates.xp !== undefined && { xp: updates.xp }),
+                  ...(updates.tier !== undefined && { tier: updates.tier, xp: computeQuestXp(updates.tier) }),
                   ...(updates.isActive !== undefined && { isActive: updates.isActive }),
                   ...(updates.isRecurring !== undefined && { isRecurring: updates.isRecurring }),
                   ...(updates.recurrenceType !== undefined && { recurrenceType: updates.recurrenceType }),
@@ -246,7 +288,7 @@ export const useQuestStore = create<QuestState>()(
       },
 
       clearError: () => set({ error: null }),
-      reset: () => set({ todayQuests: [], date: '', streak: 0, isLoading: false, error: null }),
+      reset: () => set({ todayQuests: [], date: '', streak: 0, questStreak: null, isLoading: false, error: null }),
     }),
     {
       name: 'tide_quests',

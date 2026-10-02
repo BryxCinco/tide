@@ -124,7 +124,7 @@ export default function InsightsScreen() {
   useEffect(() => {
     refetchAll();
     // Fetches all four on mount only — TaskStats/ProductivityScore below read straight
-    // from their stores rather than re-fetching themselves, unlike DailyQuestCard.
+    // from their stores rather than re-fetching themselves, unlike QuestCard.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

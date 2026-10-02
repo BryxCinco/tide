@@ -1,4 +1,4 @@
-import type { Quest, QuestCategory, QuestRecurrenceType } from '../types/quest';
+import type { Quest, QuestCategory, QuestRecurrenceType, QuestTier } from '../types/quest';
 import type { Streak } from '../types/streak';
 import type { XpResult } from '../types/xp';
 import { api } from './api';
@@ -10,6 +10,7 @@ export interface ApiQuest {
   description: string | null;
   icon: string | null;
   category: string | null;
+  tier: number | null;
   xp: number;
   is_completed: boolean;
   completed_at: string | null;
@@ -18,7 +19,15 @@ export interface ApiQuest {
   recurrence_type: string | null;
   is_active: boolean;
   is_custom: boolean;
+  is_agentic: boolean | null;
+  generation_reason: string | null;
   created_at: string;
+}
+
+export interface QuestStreakInfo {
+  currentStreak: number;
+  longestStreak: number;
+  weeklyCompletionRate: number;
 }
 
 export interface ApiStreak {
@@ -34,7 +43,9 @@ export interface CreateQuestPayload {
   description: string;
   icon: string;
   category: QuestCategory;
-  xp: number;
+  tier: QuestTier;
+  /** 0.8-1.2 — xp is auto-computed server-side from tier + this, never hand-typed. */
+  difficulty?: number;
   date: string;
   isRecurring?: boolean;
   recurrenceType?: QuestRecurrenceType | null;
@@ -49,7 +60,7 @@ export interface UpdateQuestPayload {
   description?: string;
   icon?: string;
   category?: QuestCategory;
-  xp?: number;
+  tier?: QuestTier;
   isActive?: boolean;
   isRecurring?: boolean;
   recurrenceType?: QuestRecurrenceType | null;
@@ -62,6 +73,7 @@ export function mapApiQuest(row: ApiQuest): Quest {
     description: row.description ?? '',
     icon: row.icon ?? 'Star',
     category: (row.category as QuestCategory | null) ?? 'growth',
+    tier: ((row.tier as QuestTier | null) ?? 1) as QuestTier,
     xp: row.xp,
     isCompleted: row.is_completed,
     completedAt: row.completed_at ?? undefined,
@@ -70,6 +82,8 @@ export function mapApiQuest(row: ApiQuest): Quest {
     isActive: row.is_active,
     isRecurring: row.is_recurring,
     recurrenceType: (row.recurrence_type as QuestRecurrenceType | null) ?? null,
+    isAgentic: row.is_agentic ?? false,
+    generationReason: row.generation_reason,
   };
 }
 
@@ -93,7 +107,8 @@ export const questService = {
       description: payload.description,
       icon: payload.icon,
       category: payload.category,
-      xp: payload.xp,
+      tier: payload.tier,
+      difficulty: payload.difficulty,
       date: payload.date,
       is_recurring: payload.isRecurring,
       recurrence_type: payload.recurrenceType,
@@ -103,15 +118,16 @@ export const questService = {
     return mapApiQuest(data.quest);
   },
 
-  /** Full edit — title/description/icon/category/xp/active/recurring. Does not touch
-   * is_completed (use complete() for that) or date/is_custom, which aren't user-editable. */
+  /** Full edit — title/description/icon/category/tier/active/recurring. Does not touch
+   * is_completed (use complete() for that), xp (auto-computed from tier), or date/is_custom,
+   * which aren't user-editable. */
   async update(id: string, payload: UpdateQuestPayload): Promise<Quest> {
     const { data } = await api.patch<{ quest: ApiQuest }>(`/api/quests/${id}`, {
       title: payload.title,
       description: payload.description,
       icon: payload.icon,
       category: payload.category,
-      xp: payload.xp,
+      tier: payload.tier,
       is_active: payload.isActive,
       is_recurring: payload.isRecurring,
       recurrence_type: payload.recurrenceType,
@@ -123,6 +139,18 @@ export const questService = {
    * those with update({isActive: false}) instead. */
   async remove(id: string): Promise<void> {
     await api.delete(`/api/quests/${id}`);
+  },
+
+  /** "Generate Today's Quests" — replaces today's non-custom quests with a fresh,
+   * pattern-aware batch (same generator the AI's generateDailyQuests tool uses). */
+  async generate(date?: string): Promise<Quest[]> {
+    const { data } = await api.post<{ quests: ApiQuest[] }>('/api/quests/generate', date ? { date } : {});
+    return data.quests.map(mapApiQuest);
+  },
+
+  async getStreak(): Promise<QuestStreakInfo> {
+    const { data } = await api.get<QuestStreakInfo>('/api/quests/streak');
+    return data;
   },
 
   /**
