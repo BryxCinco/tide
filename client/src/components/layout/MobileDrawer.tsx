@@ -16,6 +16,7 @@ import { hexToRgba } from '../../utils/color';
 import { getSidebarNavPalette } from '../../utils/sidebarNavTheme';
 import { Avatar, Icon, Text, ThemeToggle } from '../ui';
 import { NAV_ITEMS, NavItem } from './NavItem';
+import { SidebarLogo } from './SidebarLogo';
 
 const MAX_WIDTH = 320;
 const CLOSE_DURATION = 200;
@@ -93,8 +94,16 @@ export function MobileDrawer() {
         >
           <SafeAreaView className="flex-1" edges={['top', 'left', 'bottom']}>
             <View className="flex-1 flex-col">
-              {/* FIXED TOP */}
+              {/* FIXED TOP — brand mark, then profile. No collapsed state here (unlike
+                  Sidebar.tsx) since the drawer is always its full width. */}
               <View className="shrink-0 px-3 pt-6">
+                <View className="px-1 pb-4">
+                  <SidebarLogo width={120} />
+                  <Text variant="caption" color="muted" className="mt-1 normal-case tracking-normal">
+                    Productivity Coach
+                  </Text>
+                </View>
+
                 <Pressable
                   onPress={() => {
                     closeDrawer();
