@@ -48,6 +48,7 @@ export function TimeChart({ data, height = 130 }: TimeChartProps) {
             isHovered={hoveredIndex === index}
             onHoverIn={() => setHoveredIndex(index)}
             onHoverOut={() => setHoveredIndex(null)}
+            onPress={() => setHoveredIndex((current) => (current === index ? null : index))}
           />
         ))}
       </View>
@@ -71,9 +72,12 @@ interface BarProps {
   isHovered: boolean;
   onHoverIn: () => void;
   onHoverOut: () => void;
+  /** Tap-to-toggle fallback for touch devices, which have no hover state at all — without
+   * this, the exact per-bar duration (shown in the tooltip below) was unreachable on mobile. */
+  onPress: () => void;
 }
 
-function Bar({ entry, maxSeconds, containerHeight, isHovered, onHoverIn, onHoverOut }: BarProps) {
+function Bar({ entry, maxSeconds, containerHeight, isHovered, onHoverIn, onHoverOut, onPress }: BarProps) {
   const themeColors = useThemeColors();
   const targetHeight = Math.max((entry.seconds / maxSeconds) * containerHeight, entry.seconds > 0 ? 6 : 2);
   const heightValue = useSharedValue(0);
@@ -88,6 +92,7 @@ function Bar({ entry, maxSeconds, containerHeight, isHovered, onHoverIn, onHover
     <Pressable
       onHoverIn={onHoverIn}
       onHoverOut={onHoverOut}
+      onPress={onPress}
       className="flex-1 items-center justify-end"
       style={{ height: containerHeight }}
     >

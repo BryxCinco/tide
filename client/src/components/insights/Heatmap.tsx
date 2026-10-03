@@ -71,6 +71,7 @@ export function Heatmap({ days }: HeatmapProps) {
                   key={day.date}
                   onHoverIn={() => setHoveredDate(day.date)}
                   onHoverOut={() => setHoveredDate(null)}
+                  onPress={() => setHoveredDate((current) => (current === day.date ? null : day.date))}
                   className="items-center justify-center"
                   style={{
                     flex: 1,

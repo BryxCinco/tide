@@ -92,7 +92,7 @@ export function CalendarPicker({ value, onChange, minDate, maxDate }: CalendarPi
     dateKey !== value && Boolean((minDate && dateKey < minDate) || (maxDate && dateKey > maxDate));
 
   return (
-    <View style={{ width: 296 }}>
+    <View style={{ width: '100%', maxWidth: 296 }}>
       <View className="mb-3 flex-row items-center justify-between">
         <Pressable
           onPress={() => goToMonth(-1)}

@@ -3,11 +3,13 @@ import {
   Modal as RNModal,
   Platform,
   ScrollView,
+  useWindowDimensions,
   View,
   type NativeSyntheticEvent,
   type TextInput as RNTextInputHandle,
   type TextInputKeyPressEventData,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Pressable } from '../ui/SoundPressable';
 import { TextInput } from '../ui/SoundTextInput';
 import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -62,12 +64,25 @@ function SearchCloseButton({
  * dark semi-transparent overlay plus a web-only `backdropFilter` (silently ignored
  * wherever the platform doesn't support it) approximates it without adding a dependency.
  */
+const HEADER_HEIGHT = 68;
+
 export function SearchModal({ visible, onClose }: SearchModalProps) {
   const { isPhone } = useResponsive();
   const themeColors = useThemeColors();
   const isDark = useThemeStore((s) => s.theme === 'dark');
   const inputRef = useRef<RNTextInputHandle>(null);
   const progress = useSharedValue(0);
+  const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  // Mirrors the wrapper View's own pt-20 (phone) / pt-32 (desktop) top offset below (80px /
+  // 128px at the default 4px scale) — without a cap derived from it, the fixed 480px list plus
+  // the 68px header could exceed what's actually left on a short or landscape phone screen,
+  // pushing the bottom results off-screen with no scroll able to reach them (same class of bug
+  // Modal.tsx's own windowHeight * 0.9 cap exists to prevent).
+  const topOffset = isPhone ? 80 : 128;
+  const panelMaxHeight = Math.max(200, windowHeight - topOffset - insets.bottom - 24);
+  const listMaxHeight = Math.max(120, panelMaxHeight - HEADER_HEIGHT);
 
   const { query, setQuery, activeIndex, groups, select, handleKey, reset } = useSearchController(onClose);
 
@@ -143,11 +158,12 @@ export function SearchModal({ visible, onClose }: SearchModalProps) {
                 backgroundColor: isDark ? modalSurface.dark : modalSurface.light,
                 borderWidth: 1,
                 borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+                maxHeight: panelMaxHeight,
               },
               shadows.modal,
             ]}
           >
-            <View className="flex-row items-center gap-3.5 border-b border-subtle px-6" style={{ height: 68 }}>
+            <View className="flex-row items-center gap-3.5 border-b border-subtle px-6" style={{ height: HEADER_HEIGHT }}>
               <View className="h-9 w-9 items-center justify-center rounded-full bg-tide-teal/[0.12]">
                 <Icon name="Search" size={18} color={themeColors.brand.tideTeal} />
               </View>
@@ -164,7 +180,7 @@ export function SearchModal({ visible, onClose }: SearchModalProps) {
             </View>
 
             {hasEnoughQuery ? (
-              <ScrollView style={{ maxHeight: 480 }} keyboardShouldPersistTaps="handled">
+              <ScrollView style={{ maxHeight: listMaxHeight }} keyboardShouldPersistTaps="handled">
                 <SearchSuggestions groups={groups} activeIndex={activeIndex} onSelect={select} />
               </ScrollView>
             ) : (
