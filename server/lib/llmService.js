@@ -5,6 +5,26 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
+// Retried once on exactly the errors a short wait can actually fix — a rate limit (429, this
+// account's free-tier TPM cap) or a transient server-side hiccup (500/502/503). Everything
+// else (400 bad request, 401 auth, a genuine model/content problem) retrying wouldn't change,
+// so those still throw straight through on the first attempt. Fixed 900ms delay rather than
+// parsing Groq's `retry-after` header — simpler, and the free tier's TPM window resets fast
+// enough that a precise backoff isn't worth the extra fragility here.
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503]);
+const RETRY_DELAY_MS = 900;
+
+async function createCompletion(params) {
+  try {
+    return await groq.chat.completions.create(params);
+  } catch (err) {
+    if (!RETRYABLE_STATUS.has(err?.status)) throw err;
+    console.log(`[llmService] Groq call failed (${err.status}), retrying once in ${RETRY_DELAY_MS}ms:`, err.message);
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+    return groq.chat.completions.create(params);
+  }
+}
+
 // Model: 'llama-3.3-70b-versatile' no longer exists on this account's Groq catalog (verified
 // live via groq.models.list() — the classic Llama chat models are gone entirely; only
 // allam-2-7b, canopylabs/orpheus-*, whisper-*, and openai/gpt-oss-* remain). Of what's left,
@@ -150,7 +170,7 @@ async function generateResponse({ userQuery, context, stats, history = [], timez
   // Add current query
   messages.push({ role: 'user', content: userQuery });
 
-  const completion = await groq.chat.completions.create({
+  const completion = await createCompletion({
     model: MODEL,
     messages,
     temperature: 0.7,
@@ -181,7 +201,7 @@ async function* generateResponseStream({ userQuery, context, stats, history = []
 
   messages.push({ role: 'user', content: userQuery });
 
-  const stream = await groq.chat.completions.create({
+  const stream = await createCompletion({
     model: MODEL,
     messages,
     temperature: 0.7,
@@ -229,7 +249,7 @@ async function generateWithTools({ userId, userQuery, context, stats, history = 
   // tool, get a result, answer), so 3 is headroom for a multi-step request, not a budget
   // meant to be exhausted; if it is, something's looping and the fallback message below fires.
   while (rounds < 3) {
-    const response = await groq.chat.completions.create({
+    const response = await createCompletion({
       model: MODEL,
       messages,
       tools,
@@ -268,7 +288,15 @@ async function generateWithTools({ userId, userQuery, context, stats, history = 
         try {
           result = await handler({ userId, ...args });
         } catch (err) {
-          result = { error: err.message };
+          // err.message here used to go straight into the 'tool' message below — which the
+          // model reads and will happily narrate back to the user verbatim in its reply. For
+          // most handler failures that's just an unhelpful Supabase/validation message, but a
+          // Groq-side failure inside a tool's own logic (rare, but tools.js's weather fetch
+          // and a couple others call out) could leak the exact raw "rate limit"/"tokens"
+          // wording this function's own retry logic exists to keep away from the user. Log
+          // the real reason server-side; the model only ever sees a safe, generic one.
+          console.error(`[llmService] Tool "${fnName}" failed:`, err.message);
+          result = { error: `The ${fnName} action couldn't be completed right now. Let the user know and suggest trying again shortly — don't repeat this raw message.` };
         }
       }
 
@@ -314,7 +342,7 @@ Rules:
  * plus an overdue-tasks summary), never client-supplied mock numbers — the whole point of
  * JSON-mode + this prompt's "never invent data" rule is suggestions the user can trust. */
 async function generateInsightSuggestions({ stats }) {
-  const completion = await groq.chat.completions.create({
+  const completion = await createCompletion({
     model: MODEL,
     messages: [
       { role: 'system', content: INSIGHTS_SYSTEM_PROMPT },

@@ -72,7 +72,14 @@ export const useChatStore = create<ChatState>()(
           const response = await chatService.sendMessage(trimmed, historyBeforeThisMessage);
           await revealMessage(set, response.message);
         } catch (err) {
-          const message = err instanceof Error ? err.message : 'Failed to send message';
+          // chatService/the server already translate Groq/network failures into one of a
+          // small set of friendly messages (see server/routes/chat.js's friendlyChatError) —
+          // err.message is expected to already be safe to show. This still logs the raw error
+          // separately rather than trusting that blindly, so an unexpected shape (a genuinely
+          // raw technical message slipping through) is visible here for debugging without
+          // ever being more exposed to the user than the toast already is.
+          console.log('[chatStore] sendMessage failed:', err);
+          const message = err instanceof Error && err.message ? err.message : 'Something went wrong. Please try again.';
           set({ isTyping: false, isStreaming: false, error: message });
           showToast(message, 'error');
         }

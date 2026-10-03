@@ -7,6 +7,22 @@ const { toolHandlers } = require('../lib/tools');
 const router = express.Router();
 router.use(requireAuth);
 
+// Turns a Groq/llmService failure into exactly one of a few hand-written, friendly messages
+// — never `err.message` itself, which for a Groq APIError is literally things like "Rate
+// limit reached for model `qwen/...` on tokens per minute (TPM): Limit 6000, Used 5890,
+// Requested 450. Please try again in 3.4s." (the "token token" wall of text this whole fix is
+// for). The real message still goes to console.error below for debugging; the client only
+// ever sees one of these three.
+function friendlyChatError(err) {
+  if (err?.status === 429) {
+    return { status: 429, error: "TIDE Coach is getting a lot of requests right now. Please wait a moment and try again." };
+  }
+  if (err?.status === 400) {
+    return { status: 400, error: "That message (or the conversation so far) is a bit too long for me to process. Try shortening it or starting a new chat." };
+  }
+  return { status: 500, error: 'Failed to generate a response. Please try again.' };
+}
+
 // A pasted essay would otherwise eat most of the model's context window on one message and
 // (on this account's Groq tier) risks tipping a request over the tokens-per-minute limit by
 // itself — see llmService.js's MODEL comment for how tight that budget already runs with the
@@ -67,10 +83,8 @@ router.post('/', async (req, res) => {
     });
   } catch (err) {
     console.error('[chat] error:', err.message);
-    res.status(500).json({
-      error: 'Failed to generate response',
-      detail: err.message,
-    });
+    const { status, error } = friendlyChatError(err);
+    res.status(status).json({ error });
   }
 });
 
@@ -117,13 +131,14 @@ router.post('/stream', async (req, res) => {
       }
       res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
     } catch (streamErr) {
-      res.write(`data: ${JSON.stringify({ type: 'error', error: streamErr.message })}\n\n`);
+      console.error('[chat/stream] error:', streamErr.message);
+      res.write(`data: ${JSON.stringify({ type: 'error', error: friendlyChatError(streamErr).error })}\n\n`);
     }
 
     res.end();
   } catch (err) {
     console.error('[chat/stream] error:', err.message);
-    res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'error', error: friendlyChatError(err).error })}\n\n`);
     res.end();
   }
 });
@@ -152,7 +167,8 @@ router.post('/insights', async (req, res) => {
     res.json({ suggestions, usage });
   } catch (err) {
     console.error('[chat/insights] error:', err.message);
-    res.status(500).json({ error: 'Failed to generate suggestions', detail: err.message });
+    const { status, error } = friendlyChatError(err);
+    res.status(status).json({ error });
   }
 });
 
