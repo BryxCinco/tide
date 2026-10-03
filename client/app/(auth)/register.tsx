@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AuthLogo } from '@/components/auth';
 import { BackButton, Button, Divider, Icon, Input, Text } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/utils/cn';
@@ -71,6 +72,7 @@ export default function RegisterScreen() {
           <BackButton className="mb-6" />
 
           <View className="w-full self-center" style={{ maxWidth: 400 }}>
+            <AuthLogo width={120} style={{ marginBottom: 20 }} />
             <Text variant="h1" color="primary" className="mb-1">
               Create Account
             </Text>

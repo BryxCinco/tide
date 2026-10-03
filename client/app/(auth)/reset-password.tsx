@@ -5,6 +5,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AuthLogo } from '@/components/auth';
 import { Button, Icon, Input, Text } from '@/components/ui';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { confirmPasswordReset } from '@/services/passwordReset.service';
@@ -53,6 +54,7 @@ export default function ResetPasswordScreen() {
     return (
       <SafeAreaView className="flex-1 bg-base">
         <View className="flex-1 items-center justify-center gap-4 px-8">
+          <AuthLogo width={120} />
           <Icon
             name={isDone ? 'CircleCheck' : 'CircleAlert'}
             size={40}
@@ -77,6 +79,7 @@ export default function ResetPasswordScreen() {
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerClassName="flex-grow justify-center px-4 py-12 md:px-6 lg:px-8" keyboardShouldPersistTaps="handled">
           <View className="w-full self-center" style={{ maxWidth: 400 }}>
+            <AuthLogo width={120} style={{ marginBottom: 20 }} />
             <Text variant="h2" color="primary" className="mb-1">
               Set a new password
             </Text>

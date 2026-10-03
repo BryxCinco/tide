@@ -5,6 +5,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AuthLogo } from '@/components/auth';
 import { BackButton, Button, Icon, Input, Text } from '@/components/ui';
 import { requestPasswordReset } from '@/services/passwordReset.service';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -43,6 +44,7 @@ export default function ForgotPasswordScreen() {
           <BackButton className="mb-6" />
 
           <View className="w-full self-center" style={{ maxWidth: 400 }}>
+            <AuthLogo width={120} style={{ marginBottom: 20 }} />
             {sentTo ? (
               <View className="items-center gap-4 py-8">
                 <Icon name="MailCheck" size={40} color={themeColors.brand.tideTeal} />

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AuthLogo } from '@/components/auth';
 import { Button, Divider, Input, Text } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { getApiErrorCode, getApiErrorMessage } from '@/services/api';
@@ -87,10 +88,8 @@ export default function LoginScreen() {
         >
           <View className="w-full self-center" style={{ maxWidth: 400 }}>
             <View className="mb-10 items-center">
-              <Text variant="display" color="primary">
-                TIDE
-              </Text>
-              <Text variant="body" color="muted" className="mt-1 text-center">
+              <AuthLogo width={180} />
+              <Text variant="body" color="muted" className="mt-2 text-center">
                 Your Personal Productivity Coach
               </Text>
             </View>
