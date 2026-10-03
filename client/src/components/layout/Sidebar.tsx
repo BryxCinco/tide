@@ -17,6 +17,7 @@ import { hexToRgba } from '../../utils/color';
 import { getSidebarNavPalette } from '../../utils/sidebarNavTheme';
 import { Avatar, Icon, Text, ThemeToggle, Tooltip } from '../ui';
 import { NAV_ITEMS, NavItem } from './NavItem';
+import { SidebarLogo } from './SidebarLogo';
 
 export interface SidebarProps {
   /** Forced by breakpoint (tablet rail) — always icons-only, no manual toggle. Desktop's
@@ -76,7 +77,7 @@ export function Sidebar({ collapsed: forcedCollapsed = false }: SidebarProps) {
       className="h-full"
     >
       <View className="flex-1 flex-col">
-        {/* FIXED TOP — brand mark, profile. Generous top padding so "TIDE" has room to
+        {/* FIXED TOP — brand mark, profile. Generous top padding so the logo has room to
             breathe instead of crowding the sidebar's top edge. */}
         <View className="shrink-0 pt-10">
           <View className="absolute inset-x-0 top-0 h-40" pointerEvents="none">
@@ -90,15 +91,11 @@ export function Sidebar({ collapsed: forcedCollapsed = false }: SidebarProps) {
 
           <View className={cn('px-3', collapsed && 'items-center')}>
             {collapsed ? (
-              <Text variant="h3" color="primary" className="tracking-wide">
-                T
-              </Text>
+              <SidebarLogo collapsed />
             ) : (
               <View className="px-1">
-                <Text variant="h3" color="primary" className="mb-1 text-2xl font-bold tracking-wide">
-                  TIDE
-                </Text>
-                <Text variant="caption" color="muted" className="normal-case tracking-normal">
+                <SidebarLogo width={120} />
+                <Text variant="caption" color="muted" className="mt-1 normal-case tracking-normal">
                   Productivity Coach
                 </Text>
               </View>
