@@ -5,24 +5,29 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
-// Retried once on exactly the errors a short wait can actually fix — a rate limit (429, this
+// Retried on exactly the errors a short wait can actually fix — a rate limit (429, this
 // account's free-tier TPM cap) or a transient server-side hiccup (500/502/503). Everything
 // else (400 bad request, 401 auth, a genuine model/content problem) retrying wouldn't change,
-// so those still throw straight through on the first attempt. Fixed 900ms delay rather than
-// parsing Groq's `retry-after` header — simpler, and the free tier's TPM window resets fast
-// enough that a precise backoff isn't worth the extra fragility here.
+// so those still throw straight through on the first attempt. Two attempts with doubling
+// delays (900ms, 1800ms) rather than parsing Groq's `retry-after` header — simpler, and gives
+// a 429 two chances to land inside the free tier's TPM window resetting instead of just one.
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503]);
-const RETRY_DELAY_MS = 900;
+const RETRY_DELAYS_MS = [900, 1800];
 
 async function createCompletion(params) {
-  try {
-    return await groq.chat.completions.create(params);
-  } catch (err) {
-    if (!RETRYABLE_STATUS.has(err?.status)) throw err;
-    console.log(`[llmService] Groq call failed (${err.status}), retrying once in ${RETRY_DELAY_MS}ms:`, err.message);
-    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
-    return groq.chat.completions.create(params);
+  let lastErr;
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      return await groq.chat.completions.create(params);
+    } catch (err) {
+      lastErr = err;
+      if (!RETRYABLE_STATUS.has(err?.status) || attempt === RETRY_DELAYS_MS.length) throw err;
+      const delay = RETRY_DELAYS_MS[attempt];
+      console.log(`[llmService] Groq call failed (${err.status}), retrying in ${delay}ms (attempt ${attempt + 1}/${RETRY_DELAYS_MS.length}):`, err.message);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
   }
+  throw lastErr;
 }
 
 // Model: 'llama-3.3-70b-versatile' no longer exists on this account's Groq catalog (verified
