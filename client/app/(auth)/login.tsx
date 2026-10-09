@@ -190,15 +190,15 @@ export default function LoginScreen() {
             />
 
             <Button
-              title="Continue as Guest"
+              title="Try Demo"
               variant="ghost"
               fullWidth
-              icon="UserCircle"
+              icon="Sparkles"
               onPress={handleGuestLogin}
               className="mt-3"
             />
             <Text variant="caption" color="muted" className="mt-2 text-center normal-case tracking-normal">
-              Your data will be saved on this device only
+              Explore TIDE with sample data—no sign-up needed
             </Text>
 
             <View className="mb-8 mt-8 flex-row justify-center gap-1">

@@ -75,7 +75,7 @@ export default function LinkAccountScreen() {
 
             <Card variant="outlined" className="mb-6 border-accent bg-tide-teal/5">
               <Text variant="body" color="secondary">
-                Your guest data will be transferred to your new account.
+                Your demo data will be transferred to your new account.
               </Text>
             </Card>
 

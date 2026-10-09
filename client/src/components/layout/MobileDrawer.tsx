@@ -114,10 +114,10 @@ export function MobileDrawer() {
                   <Avatar name={user?.name} source={user?.avatar} size="lg" ring ringColor="teal" />
                   <View className="flex-1">
                     <Text variant="h3" color="primary" numberOfLines={1}>
-                      {user?.name ?? 'Guest'}
+                      {user?.name ?? 'Demo User'}
                     </Text>
                     <Text variant="caption" color="muted" className="normal-case tracking-normal" numberOfLines={1}>
-                      {user?.email ?? 'Browsing as guest'}
+                      {user?.email ?? 'Browsing in demo mode'}
                     </Text>
                   </View>
                 </Pressable>

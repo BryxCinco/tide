@@ -17,7 +17,7 @@ const SECTIONS: LegalSection[] = [
       'Account information: your name, email address, and an optional profile photo and bio, provided when you register or edit your profile.',
       'Content you create: timer sessions, activities, tasks, and journal entries you add while using the app.',
       'Preferences: theme, language, notification, and other settings you choose in Profile & Settings.',
-      'Guest sessions do not require an email address — a temporary local profile is used instead.',
+      'Demo sessions do not require an email address — a temporary local profile is used instead.',
     ],
   },
   {

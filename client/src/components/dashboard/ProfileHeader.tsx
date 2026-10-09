@@ -73,7 +73,7 @@ export function ProfileHeader() {
         <View className="mt-2 gap-0.5 pb-2">
           <View className="flex-row items-center gap-2">
             <Text variant="h2" color="primary">
-              {user?.name ?? 'Guest'}
+              {user?.name ?? 'Demo User'}
             </Text>
             {/* Replaces the old full-width "You're using TIDE as a guest..." banner that
                 used to sit above the whole dashboard — it reset back to visible on every
@@ -84,13 +84,13 @@ export function ProfileHeader() {
             {isGuest && (
               <View className="rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5">
                 <Text variant="caption" className="text-tide-teal normal-case tracking-normal">
-                  Guest
+                  Demo
                 </Text>
               </View>
             )}
           </View>
           <Text variant="caption" color="muted" className="normal-case tracking-normal">
-            {user?.bio ?? user?.email ?? 'Browsing as guest'}
+            {user?.bio ?? user?.email ?? 'Browsing in demo mode'}
           </Text>
           <View className="flex-row flex-wrap items-center">
             <Button

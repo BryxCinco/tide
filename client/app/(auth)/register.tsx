@@ -214,14 +214,14 @@ export default function RegisterScreen() {
             <Divider spacing="lg" />
 
             <Button
-              title="Continue as Guest"
+              title="Try Demo"
               variant="ghost"
               fullWidth
-              icon="UserCircle"
+              icon="Sparkles"
               onPress={handleGuestLogin}
             />
             <Text variant="caption" color="muted" className="mt-2 text-center normal-case tracking-normal">
-              Try TIDE without an account
+              Explore TIDE with sample data—no sign-up needed
             </Text>
 
             <View className="mb-8 mt-8 flex-row justify-center gap-1">

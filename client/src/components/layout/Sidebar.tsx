@@ -129,10 +129,10 @@ export function Sidebar({ collapsed: forcedCollapsed = false }: SidebarProps) {
             {!collapsed && (
               <View className="flex-1">
                 <Text variant="body" color="primary" className="font-semibold" numberOfLines={1}>
-                  {user?.name ?? 'Guest'}
+                  {user?.name ?? 'Demo User'}
                 </Text>
                 <Text variant="caption" color="muted" className="normal-case tracking-normal" numberOfLines={1}>
-                  {user?.email ?? 'Browsing as guest'}
+                  {user?.email ?? 'Browsing in demo mode'}
                 </Text>
               </View>
             )}

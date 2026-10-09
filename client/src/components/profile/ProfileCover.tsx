@@ -71,10 +71,10 @@ export function ProfileCover({ onAvatarPress }: ProfileCoverProps) {
 
         <View className="mt-3 gap-0.5 pb-1">
           <Text variant="h2" color="primary">
-            {user?.name ?? 'Guest'}
+            {user?.name ?? 'Demo User'}
           </Text>
           <Text variant="body" color="muted" className="normal-case tracking-normal">
-            {isGuest ? 'Guest session' : user?.email}
+            {isGuest ? 'Demo session' : user?.email}
           </Text>
           {user?.bio && (
             <Text variant="body" color="secondary" numberOfLines={2} className="mt-1 max-w-md normal-case tracking-normal">

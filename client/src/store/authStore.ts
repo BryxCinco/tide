@@ -276,7 +276,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
       const user: User = {
         id: `guest_${Date.now()}`,
-        name: 'Guest',
+        name: 'Demo User',
         email: '',
         createdAt: new Date().toISOString(),
         isGuest: true,

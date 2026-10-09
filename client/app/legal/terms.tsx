@@ -6,7 +6,7 @@ const SECTIONS: LegalSection[] = [
     icon: 'CheckCircle2',
     heading: 'Acceptance of Terms',
     paragraphs: [
-      'By creating an account, using a guest session, or otherwise accessing Tide, you agree to these Terms of Service. If you do not agree, please do not use the app.',
+      'By creating an account, using demo mode, or otherwise accessing Tide, you agree to these Terms of Service. If you do not agree, please do not use the app.',
     ],
   },
   {
@@ -22,7 +22,7 @@ const SECTIONS: LegalSection[] = [
     heading: 'User Accounts',
     paragraphs: [
       'You are responsible for maintaining the confidentiality of your account and for all activity under it.',
-      'Guest sessions store data locally on your device only and are not tied to an email address. Linking a guest session to a real account transfers that local data to the new account.',
+      'Demo sessions store data locally on your device only and are not tied to an email address. Linking a demo session to a real account transfers that local data to the new account.',
     ],
   },
   {
