@@ -3,7 +3,7 @@ import { Image } from 'react-native';
 // Fixed aspect ratios for these bundled, never-changing assets — see AuthLogo.tsx's matching
 // comment for why this is hardcoded rather than measured via Image.getSize().
 const MARK_ASPECT = 950 / 958; // assets/logo-mark.png
-const WORDMARK_ASPECT = 961 / 400; // assets/logo-wordmark.png
+const WORDMARK_ASPECT = 899 / 338; // assets/logo-wordmark.png
 
 export interface SidebarLogoProps {
   /** Rail mode (Sidebar's icon-only collapsed state, 72px wide) — too narrow for the

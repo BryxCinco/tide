@@ -1,8 +1,8 @@
 import { Image, type ImageStyle, type StyleProp } from 'react-native';
 
-// Source art is 961x400 (assets/logo-wordmark.png) — used directly rather than computed from
+// Source art is 899x338 (assets/logo-wordmark.png) — used directly rather than computed from
 // an Image.getSize() round trip, since this ratio is fixed for a bundled, never-changing asset.
-const ASPECT_RATIO = 961 / 400;
+const ASPECT_RATIO = 899 / 338;
 
 export interface AuthLogoProps {
   /** Rendered width in px — height follows the source image's own aspect ratio, so this is
