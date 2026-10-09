@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "client",
+    "name": "Tide",
     "slug": "client",
     "scheme": "tide",
     "version": "1.0.0",
@@ -28,7 +28,8 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "output": "static"
     },
     "plugins": [
       "expo-router",
