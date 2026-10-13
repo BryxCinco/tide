@@ -3,7 +3,7 @@ import { RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActivityFormModal, ActivityInfoModal, ActivityRow } from '@/components/activity';
-import { AppLayout } from '@/components/layout';
+import { AppLayout, MobileMenuButton } from '@/components/layout';
 import { BackButton, Button, EmptyState, ErrorState, Input, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
 import { useActivityStore } from '@/store/activityStore';
 import type { Activity } from '@/types/activity';
@@ -102,7 +102,7 @@ export default function ActivitiesScreen() {
   };
 
   return (
-    <AppLayout mobileMenuPosition="right">
+    <AppLayout showMobileMenuButton={false}>
       <SafeAreaView className="flex-1 bg-base">
         <ScrollView
           className="flex-1"
@@ -115,6 +115,7 @@ export default function ActivitiesScreen() {
               <Text variant="h2" color="primary" className="flex-1">
                 Activities
               </Text>
+              <MobileMenuButton />
               <Button title="New" variant="primary" size="sm" icon="Plus" onPress={openCreate} />
             </View>
 

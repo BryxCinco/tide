@@ -71,7 +71,7 @@ export function ActivityRow({
         </View>
       </Pressable>
 
-      <View className="flex-row items-center">
+      <View className="flex-row items-center gap-1">
         <Pressable
           onPress={onMoveUp}
           disabled={!canMoveUp}
