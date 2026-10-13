@@ -107,7 +107,11 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
         />
 
         {secureTextEntry ? (
-          <Pressable onPress={() => setIsSecureVisible((v) => !v)} hitSlop={8}>
+          <Pressable
+            onPress={() => setIsSecureVisible((v) => !v)}
+            hitSlop={8}
+            className="-mr-2 h-10 w-10 items-center justify-center"
+          >
             <Icon name={isSecureVisible ? 'EyeOff' : 'Eye'} size={18} />
           </Pressable>
         ) : (

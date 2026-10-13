@@ -71,7 +71,12 @@ export function ChatConversation({
         pointerEvents="none"
       />
 
-      <ScrollView ref={scrollRef} className="flex-1" contentContainerClassName="gap-3 py-4">
+      <ScrollView
+        ref={scrollRef}
+        className="flex-1"
+        contentContainerClassName="gap-3 py-4"
+        keyboardShouldPersistTaps="handled"
+      >
         {messages.length === 0 && !isTyping && (
           <View className="items-center gap-6 px-8 py-10">
             <View className="items-center">

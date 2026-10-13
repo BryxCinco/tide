@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { TextInput } from '../ui/SoundTextInput';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -147,74 +147,79 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
         <Button title="Save" variant="primary" size="sm" onPress={handleSave} />
       </View>
 
-      <ScrollView
-        className="thin-scrollbar flex-1"
-        contentContainerClassName="gap-5 pb-12"
-        keyboardShouldPersistTaps="handled"
-      >
-        <View className="gap-1">
-          <View className="flex-row items-center justify-between">
-            <Text variant="h2" color="primary">
-              {formatMonthDayYear(createdAt)}
-            </Text>
-            {saveState !== 'idle' && (
-              <Text
-                variant="caption"
-                color={saveState === 'saving' ? 'muted' : 'accent'}
-                className="normal-case tracking-normal"
-              >
-                {saveState === 'saving' ? 'Saving…' : 'Saved'}
+      {/* Was missing entirely — on iOS, focusing the multiline Entry field (near the bottom
+          of this scroll, min-h-[240px]) could leave it covered by the keyboard with nothing
+          pushing the content up to compensate. */}
+      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          className="thin-scrollbar flex-1"
+          contentContainerClassName="gap-5 pb-12"
+          keyboardShouldPersistTaps="handled"
+        >
+          <View className="gap-1">
+            <View className="flex-row items-center justify-between">
+              <Text variant="h2" color="primary">
+                {formatMonthDayYear(createdAt)}
               </Text>
-            )}
+              {saveState !== 'idle' && (
+                <Text
+                  variant="caption"
+                  color={saveState === 'saving' ? 'muted' : 'accent'}
+                  className="normal-case tracking-normal"
+                >
+                  {saveState === 'saving' ? 'Saving…' : 'Saved'}
+                </Text>
+              )}
+            </View>
+            <Text variant="caption" color="muted" className="normal-case tracking-normal">
+              {formatWeekday(createdAt)} · {formatTime(createdAt)}
+            </Text>
           </View>
+
+          <TextInput
+            value={title}
+            onChangeText={setTitle}
+            placeholder="Entry title"
+            placeholderTextColor={themeColors.text.disabled}
+            className="font-sans text-h1 font-bold text-primary"
+          />
+
+          <MoodSelector value={mood} onChange={setMood} />
+
+          <InterestTags value={tags} onChange={setTags} />
+
+          <JournalPhotoPicker photoUris={photoUris} onChange={setPhotoUris} />
+
+          <View className="gap-2">
+            <Text variant="label" color="muted">
+              Entry
+            </Text>
+            <View
+              className={cn('rounded-2xl border bg-elevated p-5', isContentFocused ? 'border-tide-teal' : 'border-default')}
+              style={isContentFocused ? (isDark ? shadows.focusRingDark : shadows.focusRing) : undefined}
+            >
+              <TextInput
+                value={content}
+                onChangeText={setContent}
+                placeholder="Write about your day..."
+                placeholderTextColor={themeColors.text.disabled}
+                multiline
+                textAlignVertical="top"
+                onFocus={() => setIsContentFocused(true)}
+                onBlur={() => setIsContentFocused(false)}
+                className="thin-scrollbar min-h-[240px] font-sans text-secondary"
+                style={{ fontSize: 16, lineHeight: 27 }}
+              />
+            </View>
+          </View>
+
           <Text variant="caption" color="muted" className="normal-case tracking-normal">
-            {formatWeekday(createdAt)} · {formatTime(createdAt)}
+            {countWords(content)} words
           </Text>
-        </View>
 
-        <TextInput
-          value={title}
-          onChangeText={setTitle}
-          placeholder="Entry title"
-          placeholderTextColor={themeColors.text.disabled}
-          className="font-sans text-h1 font-bold text-primary"
-        />
-
-        <MoodSelector value={mood} onChange={setMood} />
-
-        <InterestTags value={tags} onChange={setTags} />
-
-        <JournalPhotoPicker photoUris={photoUris} onChange={setPhotoUris} />
-
-        <View className="gap-2">
-          <Text variant="label" color="muted">
-            Entry
-          </Text>
-          <View
-            className={cn('rounded-2xl border bg-elevated p-5', isContentFocused ? 'border-tide-teal' : 'border-default')}
-            style={isContentFocused ? (isDark ? shadows.focusRingDark : shadows.focusRing) : undefined}
-          >
-            <TextInput
-              value={content}
-              onChangeText={setContent}
-              placeholder="Write about your day..."
-              placeholderTextColor={themeColors.text.disabled}
-              multiline
-              textAlignVertical="top"
-              onFocus={() => setIsContentFocused(true)}
-              onBlur={() => setIsContentFocused(false)}
-              className="thin-scrollbar min-h-[240px] font-sans text-secondary"
-              style={{ fontSize: 16, lineHeight: 27 }}
-            />
-          </View>
-        </View>
-
-        <Text variant="caption" color="muted" className="normal-case tracking-normal">
-          {countWords(content)} words
-        </Text>
-
-        {savedId && <Button title="Delete Entry" variant="danger" size="md" fullWidth onPress={handleDelete} />}
-      </ScrollView>
+          {savedId && <Button title="Delete Entry" variant="danger" size="md" fullWidth onPress={handleDelete} />}
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <ConfirmationModal
         visible={showSavedModal}

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Image, Text as RNText, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -67,6 +68,11 @@ function getInitials(name?: string): string {
 /** Circular user avatar with image/initials fallback, status dot, and optional highlight ring. */
 export function Avatar({ source, name, size = 'md', status, ring = false, ringColor = 'purple', className, style }: AvatarProps) {
   const themeColors = useThemeColors();
+  // Resets whenever `source` itself changes (e.g. the user picks a new avatar after a
+  // previous one failed) — without keying off source, a once-failed image would stay stuck
+  // showing initials even after being replaced with a working URL.
+  const [failedSource, setFailedSource] = useState<string | undefined>(undefined);
+  const showImage = Boolean(source) && source !== failedSource;
   const statusColors: Record<AvatarStatus, string> = {
     online: themeColors.status.success,
     offline: themeColors.text.disabled,
@@ -82,8 +88,13 @@ export function Avatar({ source, name, size = 'md', status, ring = false, ringCo
           ring && ringColorClasses[ringColor],
         )}
       >
-        {source ? (
-          <Image source={{ uri: source }} className="h-full w-full" resizeMode="cover" />
+        {showImage ? (
+          <Image
+            source={{ uri: source }}
+            className="h-full w-full"
+            resizeMode="cover"
+            onError={() => setFailedSource(source)}
+          />
         ) : (
           <RNText className={cn('font-semibold text-inverse', initialsTextClasses[size])}>
             {getInitials(name)}

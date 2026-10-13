@@ -47,6 +47,15 @@ export function MobileDrawer() {
   }, [isOpen, drawerWidth, translateX]);
 
   const panGesture = Gesture.Pan()
+    // Without these, this Pan gesture and the nav-items ScrollView below compete for every
+    // touch that starts anywhere over the list — an unconstrained Pan claims the gesture
+    // arbitration as readily for a vertical scroll attempt as for an actual swipe-to-close,
+    // making the list feel like it randomly refuses to scroll. activeOffsetX(-10) only lets
+    // this activate once the touch has moved 10px leftward (closing direction; rightward is
+    // clamped to 0 below anyway); failOffsetY bails out to the ScrollView's native scroll the
+    // moment 15px of vertical movement happens first.
+    .activeOffsetX(-10)
+    .failOffsetY([-15, 15])
     .onUpdate((event) => {
       // Only allow dragging left (toward closed) — the drawer is already fully open at 0.
       translateX.value = Math.min(0, event.translationX);
@@ -109,7 +118,7 @@ export function MobileDrawer() {
                     closeDrawer();
                     router.push('/(tabs)/profile');
                   }}
-                  className="flex-row items-center gap-3 rounded-xl px-1 py-2 hover:bg-elevated"
+                  className="mt-8 flex-row items-center gap-3 rounded-xl px-1 py-2 hover:bg-elevated"
                 >
                   <Avatar name={user?.name} source={user?.avatar} size="lg" ring ringColor="teal" />
                   <View className="flex-1">

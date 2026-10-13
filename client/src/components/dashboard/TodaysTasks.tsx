@@ -62,7 +62,7 @@ export function TodaysTasks({ onAddTask }: TodaysTasksProps) {
               <View key={task.id} className="flex-row items-center gap-3">
                 <Pressable
                   onPress={() => toggleTaskStatus(task.id)}
-                  hitSlop={6}
+                  hitSlop={10}
                   className="h-5 w-5 rounded-full border border-subtle bg-base"
                 />
                 <Text variant="body" color="primary" className="flex-1 font-medium">

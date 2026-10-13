@@ -44,7 +44,7 @@ export function TaskCard({ task, activityName, onToggle, onView, onEdit, onDelet
     >
       <Pressable
         onPress={onToggle}
-        hitSlop={6}
+        hitSlop={10}
         className={cn(
           'mt-0.5 h-5 w-5 items-center justify-center rounded-full border',
           isDone ? 'border-tide-teal bg-tide-teal' : 'border-subtle bg-base',

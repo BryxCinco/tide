@@ -119,7 +119,14 @@ export default function ChatScreen() {
   const inputRef = useRef<RNTextInputHandle>(null);
 
   useEffect(() => {
-    const focusTimeout = setTimeout(() => inputRef.current?.focus(), 50);
+    // 50ms used to be enough to just get the TextInput mounted, but on iOS it can also beat
+    // KeyboardAvoidingView's own onLayout measurement of its frame — if the keyboard opens
+    // (from this focus) before that frame is captured, KAV computes 0px of compensating
+    // padding and the composer renders hidden under the keyboard instead of above it. 400ms
+    // gives the screen's own mount/layout pass (plus any navigation transition) room to
+    // settle first — not a hard guarantee, but far outside the near-certain-to-lose-the-race
+    // window 50ms was.
+    const focusTimeout = setTimeout(() => inputRef.current?.focus(), 400);
     return () => clearTimeout(focusTimeout);
   }, []);
 

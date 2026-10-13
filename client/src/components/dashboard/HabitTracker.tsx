@@ -71,6 +71,7 @@ export function HabitTracker() {
                 <Pressable
                   key={i}
                   onPress={() => toggleDay(habit.id, i)}
+                  hitSlop={4}
                   className="flex-1 items-center justify-center rounded-md border"
                   style={{
                     aspectRatio: 1,

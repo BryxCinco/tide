@@ -86,13 +86,13 @@ export function ActivityDonut({ slices, size = 140 }: ActivityDonutProps) {
       <View className="w-full gap-2 md:w-auto md:flex-1">
         {slices.map((slice) => (
           <View key={slice.id} className="flex-row items-center justify-between gap-3">
-            <View className="flex-row items-center gap-2">
-              <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: slice.color }} />
-              <Text variant="body" color="secondary">
+            <View className="flex-1 flex-row items-center gap-2" style={{ minWidth: 0 }}>
+              <View className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} />
+              <Text variant="body" color="secondary" numberOfLines={1} className="shrink">
                 {slice.label}
               </Text>
             </View>
-            <Text variant="caption" color="muted" className="normal-case tracking-normal">
+            <Text variant="caption" color="muted" className="shrink-0 normal-case tracking-normal">
               {formatDuration(slice.seconds)}
             </Text>
           </View>
