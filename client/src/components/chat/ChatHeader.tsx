@@ -53,10 +53,11 @@ export function ChatHeader({ isTyping, hasMessages, onClear }: ChatHeaderProps) 
 
   return (
     <View className="flex-row items-center gap-3 border-b border-subtle bg-base px-4 py-3 md:px-6">
-      {/* Same swap as Tasks/Activities: phone uses the drawer-access hamburger, desktop/
-          tablet keep BackButton (no floating-menu concept there, Sidebar is always visible). */}
-      {!isPhone && <BackButton />}
+      {/* Same left-slot swap as Tasks/Activities: phone uses the drawer-access hamburger,
+          desktop/tablet keep BackButton (no floating-menu concept there, Sidebar is
+          always visible). */}
       <MobileMenuButton />
+      {!isPhone && <BackButton />}
 
       {/* minWidth: 0 overrides flexbox's default "never shrink below content's intrinsic
           width" — without it, the subtitle row below (a long static string + status dot,

@@ -71,9 +71,11 @@ export default function TasksScreen() {
         >
           <ResponsiveContainer className="gap-6">
             <View className="flex-row items-center gap-3">
-              {/* Phone gets the same drawer-access pattern as every other primary screen
-                  (MobileMenuButton, next to "New"); desktop/tablet keep BackButton since
-                  there's no floating-menu concept there and Sidebar is always visible. */}
+              {/* Left slot, same as every other primary screen on phone (hamburger always
+                  lives at the row's start, not next to a right-side action button) —
+                  desktop/tablet keep BackButton since there's no floating-menu concept
+                  there and Sidebar is always visible. */}
+              <MobileMenuButton />
               {!isPhone && <BackButton />}
               <View className="flex-1 flex-row items-center gap-2">
                 <Text variant="h2" color="primary">
@@ -85,7 +87,6 @@ export default function TasksScreen() {
                   </Text>
                 )}
               </View>
-              <MobileMenuButton />
               <Button title="New" variant="primary" size="sm" icon="Plus" onPress={openCreate} />
             </View>
 
