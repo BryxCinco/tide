@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { ChatConversation, ChatHeader, DEFAULT_QUICK_SUGGESTIONS } from '@/components/chat';
-import { AppLayout } from '@/components/layout';
+import { AppLayout, MobileTabBar } from '@/components/layout';
 import { Icon, Skeleton } from '@/components/ui';
 import { Pressable } from '@/components/ui/SoundPressable';
 import { TextInput } from '@/components/ui/SoundTextInput';
@@ -164,7 +164,9 @@ export default function ChatScreen() {
 
   return (
     <AppLayout showMobileMenuButton={false}>
-      <SafeAreaView className="flex-1 bg-base" edges={['top', 'bottom']}>
+      {/* bottom excluded — MobileTabBar (below) owns the bottom safe-area inset itself,
+          so the two don't double up on phone. */}
+      <SafeAreaView className="flex-1 bg-base" edges={['top']}>
         <ChatHeader isTyping={isTyping} hasMessages={messages.length > 0} onClear={clearChat} />
 
         <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -214,6 +216,8 @@ export default function ChatScreen() {
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
+
+      <MobileTabBar />
     </AppLayout>
   );
 }

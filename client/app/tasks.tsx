@@ -3,7 +3,7 @@ import { RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { QuestCard } from '@/components/dashboard';
-import { AppLayout, MobileMenuButton } from '@/components/layout';
+import { AppLayout, MobileMenuButton, MobileTabBar } from '@/components/layout';
 import { TaskCard, TaskFilters, TaskFormModal, TaskInfoModal } from '@/components/tasks';
 import { BackButton, Button, EmptyState, ErrorState, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -63,7 +63,9 @@ export default function TasksScreen() {
 
   return (
     <AppLayout showMobileMenuButton={false}>
-      <SafeAreaView className="flex-1 bg-base">
+      {/* bottom excluded — MobileTabBar (below) owns the bottom safe-area inset itself,
+          so the two don't double up on phone. */}
+      <SafeAreaView className="flex-1 bg-base" edges={['top', 'left', 'right']}>
         <ScrollView
           className="flex-1"
           contentContainerClassName="pb-24 pt-4 md:pt-6 lg:pt-8"
@@ -150,6 +152,8 @@ export default function TasksScreen() {
           }}
         />
       </SafeAreaView>
+
+      <MobileTabBar />
     </AppLayout>
   );
 }

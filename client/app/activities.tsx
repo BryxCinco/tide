@@ -3,7 +3,7 @@ import { RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActivityFormModal, ActivityInfoModal, ActivityRow } from '@/components/activity';
-import { AppLayout, MobileMenuButton } from '@/components/layout';
+import { AppLayout, MobileMenuButton, MobileTabBar } from '@/components/layout';
 import { BackButton, Button, EmptyState, ErrorState, Input, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useActivityStore } from '@/store/activityStore';
@@ -105,7 +105,9 @@ export default function ActivitiesScreen() {
 
   return (
     <AppLayout showMobileMenuButton={false}>
-      <SafeAreaView className="flex-1 bg-base">
+      {/* bottom excluded — MobileTabBar (below) owns the bottom safe-area inset itself,
+          so the two don't double up on phone. */}
+      <SafeAreaView className="flex-1 bg-base" edges={['top', 'left', 'right']}>
         <ScrollView
           className="flex-1"
           contentContainerClassName="pb-24 pt-4 md:pt-6 lg:pt-8"
@@ -212,6 +214,8 @@ export default function ActivitiesScreen() {
           }}
         />
       </SafeAreaView>
+
+      <MobileTabBar />
     </AppLayout>
   );
 }
