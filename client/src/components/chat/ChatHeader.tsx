@@ -52,12 +52,23 @@ export function ChatHeader({ isTyping, hasMessages, onClear }: ChatHeaderProps) 
     <View className="flex-row items-center gap-3 border-b border-subtle bg-base px-4 py-3 md:px-6">
       <BackButton />
 
-      <View className="flex-1">
-        <Text variant="h3" color="primary">
+      {/* minWidth: 0 overrides flexbox's default "never shrink below content's intrinsic
+          width" — without it, the subtitle row below (a long static string + status dot,
+          neither of which wrap) forces this whole column past its fair share of the header,
+          pushing the title/BackButton/clear-chat button past the screen edge instead of just
+          this column truncating its own text (same bug class as AppLayout.tsx's own
+          minWidth: 0 comment). */}
+      <View className="flex-1" style={{ minWidth: 0 }}>
+        <Text variant="h3" color="primary" numberOfLines={1}>
           AI Coach
         </Text>
         <View className="flex-row items-center gap-2">
-          <Text variant="caption" color="muted" className="normal-case tracking-normal">
+          <Text
+            variant="caption"
+            color="muted"
+            numberOfLines={1}
+            className="shrink normal-case tracking-normal"
+          >
             Your personal productivity assistant
           </Text>
           <Text variant="caption" color="muted">
