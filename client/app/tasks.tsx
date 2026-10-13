@@ -6,6 +6,7 @@ import { QuestCard } from '@/components/dashboard';
 import { AppLayout, MobileMenuButton } from '@/components/layout';
 import { TaskCard, TaskFilters, TaskFormModal, TaskInfoModal } from '@/components/tasks';
 import { BackButton, Button, EmptyState, ErrorState, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
+import { useResponsive } from '@/hooks/useResponsive';
 import { useActivityStore } from '@/store/activityStore';
 import { getVisibleTasks, isTaskOverdue, useTaskStore } from '@/store/taskStore';
 import type { Task } from '@/types/task';
@@ -24,6 +25,7 @@ export default function TasksScreen() {
   const deleteTask = useTaskStore((s) => s.deleteTask);
 
   const activities = useActivityStore((s) => s.activities);
+  const { isPhone } = useResponsive();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined);
@@ -69,7 +71,10 @@ export default function TasksScreen() {
         >
           <ResponsiveContainer className="gap-6">
             <View className="flex-row items-center gap-3">
-              <BackButton />
+              {/* Phone gets the same drawer-access pattern as every other primary screen
+                  (MobileMenuButton, next to "New"); desktop/tablet keep BackButton since
+                  there's no floating-menu concept there and Sidebar is always visible. */}
+              {!isPhone && <BackButton />}
               <View className="flex-1 flex-row items-center gap-2">
                 <Text variant="h2" color="primary">
                   Tasks

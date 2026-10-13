@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityFormModal, ActivityInfoModal, ActivityRow } from '@/components/activity';
 import { AppLayout, MobileMenuButton } from '@/components/layout';
 import { BackButton, Button, EmptyState, ErrorState, Input, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
+import { useResponsive } from '@/hooks/useResponsive';
 import { useActivityStore } from '@/store/activityStore';
 import type { Activity } from '@/types/activity';
 
@@ -58,6 +59,7 @@ export default function ActivitiesScreen() {
   const reorderActivity = useActivityStore((s) => s.reorderActivity);
   const deleteActivity = useActivityStore((s) => s.deleteActivity);
   const setArchived = useActivityStore((s) => s.setArchived);
+  const { isPhone } = useResponsive();
 
   const [search, setSearch] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
@@ -111,7 +113,10 @@ export default function ActivitiesScreen() {
         >
           <ResponsiveContainer className="gap-6">
             <View className="flex-row items-center gap-3">
-              <BackButton />
+              {/* Phone gets the same drawer-access pattern as every other primary screen
+                  (MobileMenuButton, next to "New"); desktop/tablet keep BackButton since
+                  there's no floating-menu concept there and Sidebar is always visible. */}
+              {!isPhone && <BackButton />}
               <Text variant="h2" color="primary" className="flex-1">
                 Activities
               </Text>

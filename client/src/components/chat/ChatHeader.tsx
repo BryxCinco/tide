@@ -2,7 +2,9 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
+import { useResponsive } from '../../hooks/useResponsive';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { MobileMenuButton } from '../layout/MobileMenuButton';
 import { BackButton, Icon, Text } from '../ui';
 import { Pressable } from '../ui/SoundPressable';
 
@@ -43,14 +45,18 @@ function StatusDot({ isTyping }: { isTyping: boolean }) {
   );
 }
 
-/** Fixed top bar for the full-page AI Coach (Fix 5) — back button, title/subtitle, a live
- * status line, and a clear-chat action, all pinned above the scrollable conversation. */
+/** Fixed top bar for the full-page AI Coach (Fix 5) — back/menu button, title/subtitle, a
+ * live status line, and a clear-chat action, all pinned above the scrollable conversation. */
 export function ChatHeader({ isTyping, hasMessages, onClear }: ChatHeaderProps) {
   const themeColors = useThemeColors();
+  const { isPhone } = useResponsive();
 
   return (
     <View className="flex-row items-center gap-3 border-b border-subtle bg-base px-4 py-3 md:px-6">
-      <BackButton />
+      {/* Same swap as Tasks/Activities: phone uses the drawer-access hamburger, desktop/
+          tablet keep BackButton (no floating-menu concept there, Sidebar is always visible). */}
+      {!isPhone && <BackButton />}
+      <MobileMenuButton />
 
       {/* minWidth: 0 overrides flexbox's default "never shrink below content's intrinsic
           width" — without it, the subtitle row below (a long static string + status dot,
