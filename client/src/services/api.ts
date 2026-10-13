@@ -102,10 +102,14 @@ api.interceptors.response.use(
       await storage.removeItem(AUTH_TOKEN_KEY);
       await storage.removeItem(AUTH_USER_KEY);
       unauthorizedListener?.();
-    } else if (!error.response) {
+    } else if (!error.response && error.code !== 'ECONNABORTED') {
       // No response at all means the request never reached the server (offline, DNS, server
       // down) — a 400/404/500 with a body is left for the calling store to handle inline,
-      // same as every other expected failure (bad login, validation, etc).
+      // same as every other expected failure (bad login, validation, etc). A timeout
+      // (ECONNABORTED) also has no `.response`, but it isn't a connectivity problem — the
+      // request DID go out, the server just didn't answer in time — so it's excluded here
+      // and left to the calling code's own getApiErrorMessage(), which gives it its own
+      // accurate message instead of this misleading "check your connection".
       showToast('Network error — check your connection.', 'error');
     }
     return Promise.reject(error);
