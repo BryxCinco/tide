@@ -28,6 +28,13 @@ function toApiHistory(history: ChatMessage[]) {
   return history.map((m) => ({ role: m.role, content: m.content }));
 }
 
+// api.ts's shared 15s default is tuned for ordinary CRUD calls — too tight for an LLM round
+// trip, which can genuinely take longer than that once tool-calling (up to 3 rounds, each its
+// own Groq request) and llmService.js's own retry-on-429 (up to 2 extra attempts) are in play.
+// Overridden per-request here rather than raising the global default, so a hung/broken request
+// to a normal endpoint still fails fast instead of hanging for a full minute.
+const CHAT_TIMEOUT_MS = 60000;
+
 /** The device's real IANA zone (e.g. "Asia/Manila", "America/New_York") — sent with every
  * request so "what time is it"/"what's the date today" answer correctly for THIS user
  * instead of the server's own timezone or a hardcoded default (see llmService.js's
@@ -47,11 +54,15 @@ export const chatService = {
    * (see chatStore.ts's `revealMessage`) — see that file's comment for why. */
   async sendMessage(message: string, history: ChatMessage[]): Promise<ChatResponse> {
     try {
-      const { data } = await api.post<ChatResponse>('/api/chat', {
-        message,
-        history: toApiHistory(history),
-        timezone: getDeviceTimezone(),
-      });
+      const { data } = await api.post<ChatResponse>(
+        '/api/chat',
+        {
+          message,
+          history: toApiHistory(history),
+          timezone: getDeviceTimezone(),
+        },
+        { timeout: CHAT_TIMEOUT_MS },
+      );
       return data;
     } catch (err) {
       throw new Error(getApiErrorMessage(err));
@@ -64,7 +75,11 @@ export const chatService = {
    * the Insights screen's own Activity Breakdown chart is still mock data. */
   async getInsightSuggestions(): Promise<InsightSuggestion[]> {
     try {
-      const { data } = await api.post<{ suggestions: InsightSuggestion[] }>('/api/chat/insights');
+      const { data } = await api.post<{ suggestions: InsightSuggestion[] }>(
+        '/api/chat/insights',
+        undefined,
+        { timeout: CHAT_TIMEOUT_MS },
+      );
       return data.suggestions;
     } catch (err) {
       throw new Error(getApiErrorMessage(err));

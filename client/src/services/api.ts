@@ -120,6 +120,10 @@ export function getApiErrorMessage(err: unknown, fallback = 'Something went wron
     const data = err.response?.data as { error?: string } | undefined;
     if (data?.error) return data.error;
     if (err.message === 'Network Error') return 'Network error — check your connection.';
+    // A timed-out request has no `.response` and axios's own `.message` is the raw
+    // "timeout of 15000ms exceeded" string — without this check that number leaks straight
+    // into a user-facing toast instead of a message that actually means something to them.
+    if (err.code === 'ECONNABORTED') return "That's taking longer than expected. Please try again.";
   }
   return err instanceof Error ? err.message : fallback;
 }
