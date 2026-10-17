@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActivityFormModal, ActivityInfoModal, ActivityRow } from '@/components/activity';
 import { AppLayout, MobileMenuButton, MobileTabBar } from '@/components/layout';
-import { BackButton, Button, EmptyState, ErrorState, Input, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
+import { BackButton, Button, EmptyState, ErrorState, Icon, Input, ResponsiveContainer, SkeletonRow, Text, type IconName } from '@/components/ui';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { useActivityStore } from '@/store/activityStore';
 import type { Activity } from '@/types/activity';
 
 interface GroupProps {
   title: string;
+  icon: IconName;
   items: Activity[];
   onInfo: (activity: Activity) => void;
   onEdit: (activity: Activity) => void;
@@ -20,19 +23,24 @@ interface GroupProps {
   onToggleHide: (id: string, archived: boolean) => void;
 }
 
-function ActivityGroup({ title, items, onInfo, onEdit, onToggleFavorite, onReorder, onDelete, onToggleHide }: GroupProps) {
+function ActivityGroup({ title, icon, items, onInfo, onEdit, onToggleFavorite, onReorder, onDelete, onToggleHide }: GroupProps) {
+  const themeColors = useThemeColors();
   if (items.length === 0) return null;
 
   return (
     <View className="gap-3">
-      <Text variant="label" color="muted">
-        {title}
-      </Text>
+      <View className="flex-row items-center gap-1.5">
+        <Icon name={icon} size={14} color={themeColors.text.muted} />
+        <Text variant="label" color="muted">
+          {title}
+        </Text>
+      </View>
       <View className="gap-2">
         {items.map((activity, index) => (
           <ActivityRow
             key={activity.id}
             activity={activity}
+            index={index}
             onInfo={() => onInfo(activity)}
             onEdit={() => onEdit(activity)}
             onToggleFavorite={() => onToggleFavorite(activity.id)}
@@ -114,20 +122,27 @@ export default function ActivitiesScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           <ResponsiveContainer className="gap-6">
-            <View className="flex-row items-center gap-3">
+            <Animated.View entering={FadeInDown.duration(380)} className="flex-row items-center gap-3">
               {/* Left slot, same as every other primary screen on phone (hamburger always
                   lives at the row's start, not next to a right-side action button) —
                   desktop/tablet keep BackButton since there's no floating-menu concept
                   there and Sidebar is always visible. */}
               <MobileMenuButton />
               {!isPhone && <BackButton />}
-              <Text variant="h2" color="primary" className="flex-1">
-                Activities
-              </Text>
+              <View className="flex-1">
+                <Text variant="h2" color="primary">
+                  Activities
+                </Text>
+                <Text variant="caption" color="muted" className="normal-case tracking-normal">
+                  {activities.length} {activities.length === 1 ? 'activity' : 'activities'}
+                </Text>
+              </View>
               <Button title="New" variant="primary" size="sm" icon="Plus" onPress={openCreate} />
-            </View>
+            </Animated.View>
 
-            <Input placeholder="Search activities" icon="Search" value={search} onChangeText={setSearch} />
+            <Animated.View entering={FadeInDown.delay(40).duration(380)}>
+              <Input placeholder="Search activities" icon="Search" value={search} onChangeText={setSearch} />
+            </Animated.View>
 
             {error && activities.length === 0 ? (
               <ErrorState
@@ -155,6 +170,7 @@ export default function ActivitiesScreen() {
               <View className="gap-6">
                 <ActivityGroup
                   title="Favorites"
+                  icon="Star"
                   items={favorites}
                   onInfo={openInfo}
                   onEdit={openEdit}
@@ -165,6 +181,7 @@ export default function ActivitiesScreen() {
                 />
                 <ActivityGroup
                   title="Custom"
+                  icon="Sparkles"
                   items={custom}
                   onInfo={openInfo}
                   onEdit={openEdit}
@@ -175,6 +192,7 @@ export default function ActivitiesScreen() {
                 />
                 <ActivityGroup
                   title="Pre-defined"
+                  icon="Layers"
                   items={predefined}
                   onInfo={openInfo}
                   onEdit={openEdit}
@@ -185,6 +203,7 @@ export default function ActivitiesScreen() {
                 />
                 <ActivityGroup
                   title="Archived"
+                  icon="Archive"
                   items={archived}
                   onInfo={openInfo}
                   onEdit={openEdit}

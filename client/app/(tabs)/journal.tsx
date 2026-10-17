@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyJournal, JournalCard, JournalFilters, SearchBar } from '@/components/journal';
@@ -68,21 +69,28 @@ export default function JournalScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         <ResponsiveContainer className="gap-5">
-          <View className="flex-row items-center gap-3">
+          <Animated.View entering={FadeInDown.duration(380)} className="flex-row items-center gap-3">
             <BackButton onPress={() => router.push('/')} />
-            <Text variant="h2" color="primary" className="flex-1">
-              Journal
-            </Text>
-          </View>
+            <View className="flex-1">
+              <Text variant="h2" color="primary">
+                Journal
+              </Text>
+              <Text variant="caption" color="muted" className="normal-case tracking-normal">
+                {allEntries.length} {allEntries.length === 1 ? 'entry' : 'entries'}
+              </Text>
+            </View>
+          </Animated.View>
 
-          <SearchBar value={searchDraft} onChangeText={setSearchDraft} />
+          <Animated.View entering={FadeInDown.delay(40).duration(380)} className="gap-5">
+            <SearchBar value={searchDraft} onChangeText={setSearchDraft} />
 
-          <JournalFilters
-            filter={filter}
-            moodFilter={moodFilter}
-            onFilterChange={setFilter}
-            onMoodFilterChange={setMoodFilter}
-          />
+            <JournalFilters
+              filter={filter}
+              moodFilter={moodFilter}
+              onFilterChange={setFilter}
+              onMoodFilterChange={setMoodFilter}
+            />
+          </Animated.View>
 
           {error && allEntries.length === 0 ? (
             <ErrorState
@@ -104,10 +112,11 @@ export default function JournalScreen() {
             <EmptyJournal hasActiveFilters={hasActiveFilters} onNewEntry={openNewEntry} />
           ) : (
             <View className="flex-row flex-wrap gap-3">
-              {visibleEntries.map((entry) => (
+              {visibleEntries.map((entry, index) => (
                 <View key={entry.id} className={basisClass}>
                   <JournalCard
                     entry={entry}
+                    index={index}
                     onPress={() => openEntry(entry.id)}
                     onToggleFavorite={() => toggleFavorite(entry.id)}
                     onDelete={() => deleteEntry(entry.id)}

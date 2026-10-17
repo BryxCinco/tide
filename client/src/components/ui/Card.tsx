@@ -22,6 +22,11 @@ export interface CardProps {
   onPress?: (event: GestureResponderEvent) => void;
   /** Renders a thin teal -> ocean-blue gradient line along the top edge, for hero-style cards. */
   accentLine?: boolean;
+  /** Overrides `accentLine`'s line with a solid color instead of the default gradient — e.g.
+   * a mood or category color, so a list of cards can carry a per-item accent while still
+   * using the exact same "thin line flush against the top edge, clipped to the rounded
+   * corners" treatment as the gradient version. Implies `accentLine` even if not set. */
+  accentColor?: string;
   className?: string;
 }
 
@@ -55,6 +60,7 @@ export function Card({
   padding = 'md',
   onPress,
   accentLine = false,
+  accentColor,
   className,
 }: CardProps) {
   const isInteractive = Boolean(onPress);
@@ -90,16 +96,19 @@ export function Card({
         </View>
       )}
 
-      {accentLine && (
-        <View className="absolute left-0 right-0 top-0 h-0.5" pointerEvents="none">
-          <LinearGradient
-            colors={[...gradients.primary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={{ flex: 1 }}
-          />
-        </View>
-      )}
+      {(accentLine || accentColor) &&
+        (accentColor ? (
+          <View className="absolute left-0 right-0 top-0 h-0.5" style={{ backgroundColor: accentColor }} pointerEvents="none" />
+        ) : (
+          <View className="absolute left-0 right-0 top-0 h-0.5" pointerEvents="none">
+            <LinearGradient
+              colors={[...gradients.primary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ flex: 1 }}
+            />
+          </View>
+        ))}
 
       <View className={paddingClasses[padding]}>{children}</View>
     </>

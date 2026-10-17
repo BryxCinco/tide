@@ -1,4 +1,5 @@
 import { View } from 'react-native';
+import Animated, { FadeInRight } from 'react-native-reanimated';
 import { Pressable } from '../ui/SoundPressable';
 
 import type { Activity } from '../../types/activity';
@@ -28,7 +29,12 @@ export interface ActivityRowProps {
    * only kept out of the active pickers. Toggles isArchived; already-archived rows call
    * this to un-hide instead. */
   onToggleHide: () => void;
+  /** Position within its group — staggers the row's entrance left-to-right-ish (same idea
+   * as JournalCard/WidgetGrid), capped so a long list doesn't end in a slow crawl. */
+  index?: number;
 }
+
+const STAGGER_MS = 35;
 
 export function ActivityRow({
   activity,
@@ -41,12 +47,20 @@ export function ActivityRow({
   canMoveDown,
   onDelete,
   onToggleHide,
+  index = 0,
 }: ActivityRowProps) {
   const isCustom = activity.category === 'custom';
   const recurrenceLabel = recurrenceBadgeLabel(activity);
   return (
-    <View className="flex-row items-center gap-3 rounded-xl border border-subtle bg-base p-3">
-      <Pressable onPress={onInfo} className="flex-1 flex-row items-center gap-3">
+    <Animated.View
+      entering={FadeInRight.delay(Math.min(index, 10) * STAGGER_MS).duration(300)}
+      className="flex-row items-center gap-3 overflow-hidden rounded-xl border border-subtle bg-base hover:border-tide-teal/30 hover:shadow-sm"
+    >
+      {/* Category-colored edge — the same per-item accent language JournalCard now uses,
+          so a glance down the list reads activity identity by color before the text. */}
+      <View className="w-1 self-stretch" style={{ backgroundColor: activity.color }} />
+
+      <Pressable onPress={onInfo} className="flex-1 flex-row items-center gap-3 py-3 pl-3 pr-1">
         <View
           className="h-10 w-10 items-center justify-center rounded-full"
           style={{ backgroundColor: hexToRgba(activity.color, 0.1) }}
@@ -71,7 +85,7 @@ export function ActivityRow({
         </View>
       </Pressable>
 
-      <View className="flex-row items-center gap-1">
+      <View className="flex-row items-center gap-1 pr-2">
         <Pressable
           onPress={onMoveUp}
           disabled={!canMoveUp}
@@ -109,6 +123,6 @@ export function ActivityRow({
           !activity.isArchived && <VisibleDeleteButton variant="hide" onConfirm={onToggleHide} />
         )}
       </View>
-    </View>
+    </Animated.View>
   );
 }
