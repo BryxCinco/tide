@@ -3,7 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { chatService } from '../services/chat.service';
 import { showToast } from './toastStore';
-import type { ChatMessage } from '../types/chat';
+import type { ChatAction, ChatMessage } from '../types/chat';
 import { storage } from '../utils/storage';
 
 interface ChatState {
@@ -70,7 +70,7 @@ export const useChatStore = create<ChatState>()(
 
         try {
           const response = await chatService.sendMessage(trimmed, historyBeforeThisMessage);
-          await revealMessage(set, response.message);
+          await revealMessage(set, response.message, response.actions);
         } catch (err) {
           // chatService/the server already translate Groq/network failures into one of a
           // small set of friendly messages (see server/routes/chat.js's friendlyChatError) —
@@ -105,8 +105,14 @@ export const useChatStore = create<ChatState>()(
 
 /** Adds the assistant's message once, then grows its `content` a few words at a time so it
  * reads as a live reply instead of appearing all at once — see REVEAL_MS_PER_WORD's comment
- * for why this isn't real network streaming. */
-async function revealMessage(set: (partial: Partial<ChatState> | ((state: ChatState) => Partial<ChatState>)) => void, fullText: string): Promise<void> {
+ * for why this isn't real network streaming. `actions` (the "View in Tasks"-style chips) are
+ * attached only once the text has fully revealed, so they don't appear below a bubble that's
+ * still visibly mid-type. */
+async function revealMessage(
+  set: (partial: Partial<ChatState> | ((state: ChatState) => Partial<ChatState>)) => void,
+  fullText: string,
+  actions?: ChatAction[],
+): Promise<void> {
   const aiMessageId = `msg_${Date.now()}_ai`;
   const words = fullText.split(' ');
 
@@ -125,5 +131,11 @@ async function revealMessage(set: (partial: Partial<ChatState> | ((state: ChatSt
     await wait(REVEAL_MS_PER_WORD);
   }
 
-  set({ isStreaming: false });
+  set((state) => ({
+    isStreaming: false,
+    messages:
+      actions && actions.length > 0
+        ? state.messages.map((m) => (m.id === aiMessageId ? { ...m, actions } : m))
+        : state.messages,
+  }));
 }

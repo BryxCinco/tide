@@ -1,6 +1,6 @@
 import { api, AUTH_TOKEN_KEY, getApiErrorMessage } from './api';
 import { storage } from '../utils/storage';
-import type { ChatMessage } from '../types/chat';
+import type { ChatAction, ChatMessage } from '../types/chat';
 
 export interface ChatUsage {
   prompt_tokens: number;
@@ -13,6 +13,7 @@ export interface ChatResponse {
   usage: ChatUsage | null;
   contextUsed: number;
   toolsUsed?: string[];
+  actions?: ChatAction[];
   durationMs: number;
 }
 

@@ -23,6 +23,57 @@ function friendlyChatError(err) {
   return { status: 500, error: 'Failed to generate a response. Please try again.' };
 }
 
+// Maps an executed tool call to a short "go look at it" action chip in the chat UI — a
+// route, an icon, and (for tools whose result can represent an intermediate, nothing-
+// actually-happened-yet step like "couldn't find that task" or "needs confirmation") a
+// check for whether this particular result is a real, completed action. Tools left out
+// entirely (getWeather, getLeaderboard, suggestTasks' plain suggestion list) have nowhere
+// obviously useful to send the user, so they just don't get a chip.
+const TOOL_ACTIONS = {
+  createTask: { label: 'View in Tasks', route: '/tasks', icon: 'ListChecks' },
+  completeTask: { label: 'View in Tasks', route: '/tasks', icon: 'ListChecks', isDone: (r) => r.matched !== false },
+  listTasks: { label: 'View in Tasks', route: '/tasks', icon: 'ListChecks' },
+  listMissedTasks: { label: 'View in Tasks', route: '/tasks', icon: 'AlertTriangle' },
+  updateTask: { label: 'View in Tasks', route: '/tasks', icon: 'ListChecks', isDone: (r) => r.matched !== false },
+  deleteTask: { label: 'View in Tasks', route: '/tasks', icon: 'ListChecks', isDone: (r) => r.deleted === true },
+  rescheduleTask: { label: 'View in Tasks', route: '/tasks', icon: 'ListChecks', isDone: (r) => r.matched !== false && !r.needsConfirmation },
+
+  logMood: { label: 'View Mood Trend', route: '/(tabs)/insights', icon: 'Smile' },
+  getMoodHistory: { label: 'View Mood Trend', route: '/(tabs)/insights', icon: 'Smile' },
+
+  startTimer: { label: 'Open Timer', route: '/timer', icon: 'Timer' },
+  getTodayStats: { label: 'View Insights', route: '/(tabs)/insights', icon: 'BarChart3' },
+  getWeeklySummary: { label: 'View Insights', route: '/(tabs)/insights', icon: 'BarChart3' },
+  getActivityStats: { label: 'View Activities', route: '/activities', icon: 'Layers' },
+  getStreakInfo: { label: 'View Insights', route: '/(tabs)/insights', icon: 'Flame' },
+  getQuestStreak: { label: 'View Insights', route: '/(tabs)/insights', icon: 'Flame' },
+  getLevelInfo: { label: 'View Profile', route: '/(tabs)/profile', icon: 'Trophy' },
+
+  suggestActivity: { label: 'View Activities', route: '/activities', icon: 'Layers' },
+  suggestTideQuest: { label: 'View Quests', route: '/', icon: 'Sparkles', isDone: (r) => r.added === true },
+  generateDailyQuests: { label: 'View Quests', route: '/', icon: 'Sparkles' },
+
+  addJournalEntry: { label: 'View in Journal', route: '/(tabs)/journal', icon: 'BookOpen' },
+  searchJournals: { label: 'View in Journal', route: '/(tabs)/journal', icon: 'BookOpen', isDone: (r) => (r.count || 0) > 0 },
+  reflectOnJournal: { label: 'View in Journal', route: '/(tabs)/journal', icon: 'BookOpen' },
+};
+
+// At most one chip per target screen — several tool calls landing on the same route in one
+// turn (e.g. createTask then completeTask) shouldn't produce duplicate "View in Tasks"
+// buttons — and at most 2 chips total so a multi-tool turn doesn't wall the reply in chips.
+function buildChatActions(toolResults) {
+  const actions = [];
+  const seenRoutes = new Set();
+  for (const { name, result } of toolResults) {
+    const config = TOOL_ACTIONS[name];
+    if (!config || (config.isDone && !config.isDone(result))) continue;
+    if (seenRoutes.has(config.route)) continue;
+    seenRoutes.add(config.route);
+    actions.push({ label: config.label, route: config.route, icon: config.icon, summary: result.message });
+  }
+  return actions.slice(0, 2);
+}
+
 // A pasted essay would otherwise eat most of the model's context window on one message and
 // (on this account's Groq tier) risks tipping a request over the tokens-per-minute limit by
 // itself — see llmService.js's MODEL comment for how tight that budget already runs with the
@@ -79,6 +130,7 @@ router.post('/', async (req, res) => {
       usage: response.usage,
       contextUsed: context.length,
       toolsUsed: response.toolsUsed,
+      actions: buildChatActions(response.toolResults || []),
       durationMs: duration,
     });
   } catch (err) {

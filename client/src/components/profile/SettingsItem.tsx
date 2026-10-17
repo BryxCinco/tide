@@ -38,8 +38,8 @@ export function SettingsItem({ icon, label, description, danger = false, disable
         disabled && 'opacity-60',
       )}
     >
-      <View className={cn('h-9 w-9 items-center justify-center rounded-full', danger ? 'bg-error/10' : 'bg-hover')}>
-        <Icon name={icon} size={17} color={danger ? themeColors.status.error : themeColors.text.muted} />
+      <View className={cn('h-9 w-9 items-center justify-center rounded-full', danger ? 'bg-error/10' : 'bg-tide-teal/10')}>
+        <Icon name={icon} size={17} color={danger ? themeColors.status.error : themeColors.brand.tideTeal} />
       </View>
 
       <View className="flex-1 gap-0.5">

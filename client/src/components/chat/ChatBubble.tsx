@@ -1,19 +1,56 @@
+import { router } from 'expo-router';
 import { useEffect } from 'react';
 import { View } from 'react-native';
 import Animated, {
   Easing,
+  FadeIn,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
   withTiming,
   type EntryExitAnimationFunction,
 } from 'react-native-reanimated';
+import { Pressable } from '../ui/SoundPressable';
 
-import type { ChatMessage } from '../../types/chat';
+import { useThemeColors } from '../../hooks/useThemeColors';
+import type { ChatAction, ChatMessage } from '../../types/chat';
+import { hexToRgba } from '../../utils/color';
 import { cn } from '../../utils/cn';
 import { colors } from '../../utils/theme';
-import { Text } from '../ui';
+import { Icon, Text, type IconName } from '../ui';
 import { AIAvatar } from './AIAvatar';
+
+/** The "View in Tasks"-style chip(s) a reply can carry when the AI actually did something —
+ * a one-line summary of what happened plus a button straight to the relevant screen, so the
+ * user doesn't have to go find it themselves. */
+function ChatActionCard({ action }: { action: ChatAction }) {
+  const themeColors = useThemeColors();
+
+  return (
+    <Pressable
+      onPress={() => router.push(action.route as never)}
+      className="mt-1.5 flex-row items-center gap-2.5 self-stretch rounded-xl border border-subtle bg-base px-3 py-2.5 hover:border-tide-teal/40"
+    >
+      <View
+        className="h-8 w-8 items-center justify-center rounded-full"
+        style={{ backgroundColor: hexToRgba(themeColors.brand.tideTeal, 0.12) }}
+      >
+        <Icon name={(action.icon as IconName) ?? 'Sparkles'} size={15} color={themeColors.brand.tideTeal} />
+      </View>
+      <View className="flex-1">
+        {action.summary && (
+          <Text variant="caption" color="muted" className="normal-case tracking-normal" numberOfLines={2}>
+            {action.summary}
+          </Text>
+        )}
+        <Text variant="body" className="font-semibold text-tide-teal" numberOfLines={1}>
+          {action.label}
+        </Text>
+      </View>
+      <Icon name="ChevronRight" size={16} color={themeColors.brand.tideTeal} />
+    </Pressable>
+  );
+}
 
 export interface ChatBubbleProps {
   message: ChatMessage;
@@ -69,16 +106,24 @@ export function ChatBubble({ message, isStreamingCursor, isNewMessage }: ChatBub
       className={cn('flex-row items-end gap-2 px-4', isUser ? 'justify-end' : 'justify-start')}
     >
       {!isUser && <AIAvatar size={28} pulse={false} spinOnMount={isNewMessage} />}
-      <View
-        className={cn(
-          'max-w-[78%] flex-row flex-wrap items-end rounded-2xl px-4 py-2.5 md:max-w-[65%]',
-          isUser ? 'rounded-br-sm bg-tide-teal' : 'rounded-bl-sm bg-elevated',
-        )}
-      >
-        <Text variant="body" color={isUser ? 'inverse' : 'primary'} selectable>
-          {message.content}
-        </Text>
-        {isStreamingCursor && <StreamingCursor />}
+      <View className={cn('max-w-[78%] md:max-w-[65%]', isUser ? 'items-end' : 'items-start')}>
+        <View
+          className={cn(
+            'flex-row flex-wrap items-end rounded-2xl px-4 py-2.5',
+            isUser ? 'rounded-br-sm bg-tide-teal' : 'rounded-bl-sm bg-elevated',
+          )}
+        >
+          <Text variant="body" color={isUser ? 'inverse' : 'primary'} selectable>
+            {message.content}
+          </Text>
+          {isStreamingCursor && <StreamingCursor />}
+        </View>
+
+        {message.actions?.map((action, index) => (
+          <Animated.View key={`${action.route}-${index}`} entering={FadeIn.delay(100 + index * 80).duration(300)}>
+            <ChatActionCard action={action} />
+          </Animated.View>
+        ))}
       </View>
     </Animated.View>
   );

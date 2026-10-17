@@ -248,6 +248,10 @@ async function generateWithTools({ userId, userQuery, context, stats, history = 
   messages.push({ role: 'user', content: userQuery });
 
   const toolsUsed = [];
+  // One entry per executed tool call that didn't error — chat.js turns these into the
+  // chat UI's "action" chips (a short summary + a button to the relevant screen), using
+  // each handler's own existing `result.message` rather than re-deriving one here.
+  const toolResults = [];
   let rounds = 0;
 
   // Capped at 3 rounds of tool calls — a well-behaved conversation resolves in 1 (call a
@@ -265,13 +269,13 @@ async function generateWithTools({ userId, userQuery, context, stats, history = 
 
     const message = response.choices[0]?.message;
     if (!message) {
-      return { content: '', usage: response.usage, toolsUsed };
+      return { content: '', usage: response.usage, toolsUsed, toolResults };
     }
 
     messages.push(message);
 
     if (!message.tool_calls || message.tool_calls.length === 0) {
-      return { content: message.content || '', usage: response.usage, toolsUsed };
+      return { content: message.content || '', usage: response.usage, toolsUsed, toolResults };
     }
 
     for (const toolCall of message.tool_calls) {
@@ -305,6 +309,10 @@ async function generateWithTools({ userId, userQuery, context, stats, history = 
         }
       }
 
+      if (result && !result.error) {
+        toolResults.push({ name: fnName, args, result });
+      }
+
       messages.push({
         role: 'tool',
         tool_call_id: toolCall.id,
@@ -315,7 +323,7 @@ async function generateWithTools({ userId, userQuery, context, stats, history = 
     rounds += 1;
   }
 
-  return { content: "Something went wrong. Please try again.", usage: null, toolsUsed };
+  return { content: "Something went wrong. Please try again.", usage: null, toolsUsed, toolResults };
 }
 
 const VALID_INSIGHT_TYPES = ['priority', 'balance', 'improvement', 'celebration'];

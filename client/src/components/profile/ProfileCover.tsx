@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { Pressable } from '../ui/SoundPressable';
 
 import { CoverPhoto, CoverPicker } from '../dashboard';
@@ -39,7 +40,7 @@ export function ProfileCover({ onAvatarPress }: ProfileCoverProps) {
   const avatarOverlap = avatarSize / 2 + 4;
 
   return (
-    <View>
+    <Animated.View entering={FadeIn.duration(380)}>
       <View style={{ position: 'relative' }}>
         <CoverPhoto coverType={coverType} coverValue={coverValue} height={coverHeight} onPress={() => setPickerVisible(true)} />
         <BackButton onPress={() => router.push('/')} className="absolute left-4 top-4 z-20 bg-base/90" />
@@ -85,6 +86,6 @@ export function ProfileCover({ onAvatarPress }: ProfileCoverProps) {
       </ResponsiveContainer>
 
       <CoverPicker visible={pickerVisible} onClose={() => setPickerVisible(false)} currentType={coverType} currentValue={coverValue} />
-    </View>
+    </Animated.View>
   );
 }
