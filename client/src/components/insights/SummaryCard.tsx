@@ -1,8 +1,9 @@
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
 import type { AccentTone } from '../../types/dashboard';
 import type { WeeklySummaryItem } from '../../types/insights';
+import { hexToRgba } from '../../utils/color';
 import { colors } from '../../utils/theme';
 import { Icon, Text } from '../ui';
 
@@ -20,31 +21,31 @@ const tintColors: Record<AccentTone, string | undefined> = {
   red: colors.status.error,
 };
 
-/** Horizontal chip row (not StatsRow's boxy cards) — the bento 'lg' full-width card's
- * compact "5 mini stats" requirement. Wraps in a horizontal ScrollView unconditionally;
- * on wide screens all 5 chips fit without needing to scroll, so this degrades to a plain
- * row there with no visible behavior difference. */
+/** The period's headline numbers as a grid of small tiles — 2 across on phone, all in one
+ * row on wide screens. Values in text colors; the tinted icon chip carries the accent. */
 export function SummaryCard({ items }: SummaryCardProps) {
   const themeColors = useThemeColors();
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-3">
-      {items.map((item) => (
-        <View
-          key={item.id}
-          className="flex-row items-center gap-3 rounded-xl border border-subtle bg-elevated px-4 py-3"
-        >
-          <Icon name={item.icon} size={18} color={tintColors[item.tint] ?? themeColors.text.muted} />
-          <View>
-            <Text variant="body" color="primary" className="font-semibold" numberOfLines={1}>
-              {item.value}
-            </Text>
-            <Text variant="caption" color="muted" className="normal-case tracking-normal" numberOfLines={1}>
-              {item.label}
-            </Text>
+    <View className="flex-row flex-wrap gap-2.5">
+      {items.map((item) => {
+        const tint = tintColors[item.tint] ?? themeColors.text.muted;
+        return (
+          <View key={item.id} className="basis-[47%] grow flex-row items-center gap-3 rounded-2xl border border-subtle bg-base p-3 md:basis-[18%]">
+            <View className="h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: hexToRgba(tint, 0.12) }}>
+              <Icon name={item.icon} size={16} color={tint} />
+            </View>
+            <View className="flex-1" style={{ minWidth: 0 }}>
+              <Text variant="body" color="primary" className="text-[15px] font-semibold" numberOfLines={1}>
+                {item.value}
+              </Text>
+              <Text variant="body" color="muted" className="text-[11px]" numberOfLines={1}>
+                {item.label}
+              </Text>
+            </View>
           </View>
-        </View>
-      ))}
-    </ScrollView>
+        );
+      })}
+    </View>
   );
 }

@@ -1,120 +1,154 @@
-import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { View } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
-import { useThemeColors } from '../../hooks/useThemeColors';
 import type { DayTimeEntry } from '../../types/insights';
 import { formatDuration } from '../../utils/formatTime';
 import { Text } from '../ui';
+import { niceTimeTicks, useChartTheme } from './chartTheme';
 
 export interface TimeChartProps {
   data: DayTimeEntry[];
   height?: number;
 }
 
-const BAR_ANIM_DURATION = 500;
+const Y_AXIS_WIDTH = 30;
+const MAX_BAR_WIDTH = 24;
+
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 /**
- * Bar chart built from plain Views + LinearGradient rather than victory-native — see the
- * chat explanation: victory-native v42 requires @shopify/react-native-skia, whose web
- * story (CanvasKit WASM) isn't something this RN-Web-first app should take on for a bar
- * chart. Bars are flex-basis columns so the chart reflows at any width without needing
- * an SVG viewBox/onLayout dance.
+ * Daily tracked time as columns: clean hour ticks with hairline gridlines, thin columns
+ * (capped at 24px, 4px rounded tops, square at the baseline), today and the hovered/tapped
+ * day in the full teal while the rest sit in a softer step of the same hue, and a hairline
+ * average line labelled at the right edge. Plain Views (no chart library) so it reflows at
+ * any width on web and native alike.
  */
-export function TimeChart({ data, height = 130 }: TimeChartProps) {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const maxSeconds = Math.max(...data.map((d) => d.seconds), 1);
+export function TimeChart({ data, height = 168 }: TimeChartProps) {
+  const theme = useChartTheme();
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
-  // A fixed 8px gap between every bar (RN `gap` reserves that space before any bar gets
-  // width) is fine for a week/month of bars, but a 62-point Custom range would burn ~488px
-  // of pure gap on a phone-width card before any bar renders — shrink the gap as the
-  // point count grows so bars stay the majority of the available width at any range.
-  const gap = data.length > 20 ? 1 : data.length > 10 ? 2 : 4;
-  // Thin the x-axis labels the same way MoodTrend.tsx does — one label per bar overlaps
-  // into an unreadable smear well before 62 bars.
+  const maxSeconds = Math.max(...data.map((d) => d.seconds), 1);
+  const { top, ticks } = niceTimeTicks(maxSeconds);
+  const tracked = data.filter((d) => d.seconds > 0);
+  const average = tracked.length > 0 ? tracked.reduce((sum, d) => sum + d.seconds, 0) / tracked.length : 0;
+  const today = todayKey();
+
+  // Thin the x labels as the window grows (a month of labels is an unreadable smear).
   const labelStep = Math.max(1, Math.ceil(data.length / 8));
+  const gap = data.length > 20 ? 2 : data.length > 10 ? 4 : 8;
+  const yFor = (seconds: number) => height - (seconds / top) * height;
+  const active = activeIndex != null ? data[activeIndex] : null;
 
   return (
-    <View>
-      <View className="flex-row items-end" style={{ height, gap }}>
-        {data.map((entry, index) => (
-          <Bar
-            key={entry.date}
-            entry={entry}
-            maxSeconds={maxSeconds}
-            containerHeight={height}
-            isHovered={hoveredIndex === index}
-            onHoverIn={() => setHoveredIndex(index)}
-            onHoverOut={() => setHoveredIndex(null)}
-            onPress={() => setHoveredIndex((current) => (current === index ? null : index))}
-          />
-        ))}
+    <View className="gap-2">
+      {/* Readout line — the hovered/tapped day, otherwise the window's average. */}
+      <View className="h-6 flex-row items-center gap-2">
+        {active ? (
+          <>
+            <View className="h-2 w-2 rounded-full" style={{ backgroundColor: theme.accent }} />
+            <Text variant="body" color="primary" className="text-[13px] font-semibold">
+              {formatDuration(active.seconds)}
+            </Text>
+            <Text variant="body" color="muted" className="text-[12px]">
+              {active.label} · {new Date(active.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </Text>
+          </>
+        ) : (
+          <Text variant="body" color="muted" className="text-[12px]">
+            Tap a day for its total · avg {formatDuration(Math.round(average))} on tracked days
+          </Text>
+        )}
       </View>
-      <View className="mt-2 flex-row" style={{ gap }}>
+
+      <View className="flex-row">
+        {/* Y axis */}
+        <View style={{ width: Y_AXIS_WIDTH, height }}>
+          {ticks.map((tick) => (
+            <Text
+              key={tick.value}
+              variant="body"
+              color="muted"
+              style={{ position: 'absolute', top: yFor(tick.value) - 7, right: 6, fontSize: 10, fontVariant: ['tabular-nums'] }}
+            >
+              {tick.label}
+            </Text>
+          ))}
+        </View>
+
+        <View className="flex-1" style={{ height }}>
+          {/* Gridlines */}
+          {ticks.map((tick) => (
+            <View
+              key={tick.value}
+              pointerEvents="none"
+              style={{ position: 'absolute', left: 0, right: 0, top: yFor(tick.value), height: 1, backgroundColor: theme.grid }}
+            />
+          ))}
+
+          {/* Columns */}
+          <View className="flex-1 flex-row items-end" style={{ gap }}>
+            {data.map((entry, index) => {
+              const isActive = activeIndex === index;
+              const isToday = entry.date === today;
+              const barHeight = entry.seconds > 0 ? Math.max((entry.seconds / top) * height, 4) : 0;
+              return (
+                <Pressable
+                  key={entry.date}
+                  onHoverIn={() => setActiveIndex(index)}
+                  onHoverOut={() => setActiveIndex(null)}
+                  onPress={() => setActiveIndex((current) => (current === index ? null : index))}
+                  accessibilityLabel={`${entry.label}: ${formatDuration(entry.seconds)}`}
+                  className="flex-1 items-center justify-end"
+                  style={{ height }}
+                >
+                  <View
+                    style={{
+                      width: '100%',
+                      maxWidth: MAX_BAR_WIDTH,
+                      height: barHeight,
+                      borderTopLeftRadius: 4,
+                      borderTopRightRadius: 4,
+                      backgroundColor: isActive || isToday ? theme.accent : theme.accentSoft,
+                    }}
+                  />
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Average reference line — solid hairline, labelled at its right end. */}
+          {average > 0 && (
+            <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: yFor(average) }}>
+              <View style={{ height: 1, backgroundColor: theme.accent, opacity: 0.55 }} />
+              <View className="absolute left-1 rounded-md px-1.5 py-0.5" style={{ top: -18, backgroundColor: theme.surface }}>
+                <Text variant="body" color="muted" style={{ fontSize: 10 }}>
+                  avg
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* X axis */}
+      <View className="flex-row" style={{ marginLeft: Y_AXIS_WIDTH, gap }}>
         {data.map((entry, index) => (
           <View key={entry.date} className="flex-1 items-center">
-            <Text variant="caption" color="muted" className="normal-case tracking-normal" numberOfLines={1}>
+            <Text
+              variant="body"
+              color={entry.date === today ? 'primary' : 'muted'}
+              className={entry.date === today ? 'font-semibold' : undefined}
+              style={{ fontSize: 11 }}
+              numberOfLines={1}
+            >
               {index % labelStep === 0 ? entry.label : ''}
             </Text>
           </View>
         ))}
       </View>
     </View>
-  );
-}
-
-interface BarProps {
-  entry: DayTimeEntry;
-  maxSeconds: number;
-  containerHeight: number;
-  isHovered: boolean;
-  onHoverIn: () => void;
-  onHoverOut: () => void;
-  /** Tap-to-toggle fallback for touch devices, which have no hover state at all — without
-   * this, the exact per-bar duration (shown in the tooltip below) was unreachable on mobile. */
-  onPress: () => void;
-}
-
-function Bar({ entry, maxSeconds, containerHeight, isHovered, onHoverIn, onHoverOut, onPress }: BarProps) {
-  const themeColors = useThemeColors();
-  const targetHeight = Math.max((entry.seconds / maxSeconds) * containerHeight, entry.seconds > 0 ? 6 : 2);
-  const heightValue = useSharedValue(0);
-
-  useEffect(() => {
-    heightValue.value = withTiming(targetHeight, { duration: BAR_ANIM_DURATION, easing: Easing.out(Easing.cubic) });
-  }, [targetHeight, heightValue]);
-
-  const barStyle = useAnimatedStyle(() => ({ height: heightValue.value }));
-
-  return (
-    <Pressable
-      onHoverIn={onHoverIn}
-      onHoverOut={onHoverOut}
-      onPress={onPress}
-      className="flex-1 items-center justify-end"
-      style={{ height: containerHeight }}
-    >
-      {isHovered && (
-        <View
-          className="absolute -top-8 rounded-md px-2 py-1"
-          style={{ backgroundColor: themeColors.text.primary }}
-          pointerEvents="none"
-        >
-          <Text variant="caption" color="inverse" className="normal-case tracking-normal" numberOfLines={1}>
-            {formatDuration(entry.seconds)}
-          </Text>
-        </View>
-      )}
-      <Animated.View style={[{ width: '70%', borderRadius: 6, overflow: 'hidden' }, barStyle]}>
-        <LinearGradient
-          colors={isHovered ? [themeColors.brand.tideTealLight, themeColors.brand.tideTeal] : [themeColors.brand.tideTeal, themeColors.brand.tideTealDark]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={{ flex: 1 }}
-        />
-      </Animated.View>
-    </Pressable>
   );
 }

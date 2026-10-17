@@ -77,15 +77,15 @@ export function AiSuggestions() {
       {suggestions.map((suggestion, index) => {
         const meta = TYPE_META[suggestion.type] ?? TYPE_META.improvement;
         return (
-          <View key={index} className="flex-row items-start gap-3 rounded-xl border border-subtle bg-base p-3">
-            <View className="h-9 w-9 items-center justify-center rounded-full" style={{ backgroundColor: `${meta.color}1F` }}>
+          <View key={index} className="flex-row items-start gap-3 rounded-2xl border border-subtle bg-base p-3.5">
+            <View className="h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: `${meta.color}1F` }}>
               <Icon name={meta.icon} size={16} color={meta.color} />
             </View>
             <View className="flex-1 gap-0.5">
-              <Text variant="body" color="primary" className="font-medium">
+              <Text variant="body" color="primary" className="text-[14px] font-semibold">
                 {suggestion.title}
               </Text>
-              <Text variant="caption" color="muted" className="normal-case tracking-normal">
+              <Text variant="body" color="muted" className="text-[12px] leading-[17px]">
                 {suggestion.description}
               </Text>
             </View>

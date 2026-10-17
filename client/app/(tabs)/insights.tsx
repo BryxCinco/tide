@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,7 +6,6 @@ import {
   ActivityDonut,
   ActivityHistory,
   AiSuggestions,
-  BentoCard,
   Heatmap,
   HexagonStats,
   HistoryView,
@@ -18,7 +16,8 @@ import {
   TimeChart,
   TimeFilter,
 } from '@/components/insights';
-import { BackButton, ErrorState, ResponsiveContainer, SkeletonChart, Text } from '@/components/ui';
+import { BENTO_INK_TEXT, BentoHeader, BentoTile, ErrorState, ResponsiveContainer, SkeletonChart, Text } from '@/components/ui';
+import { useResponsive } from '@/hooks/useResponsive';
 import { getApiErrorMessage } from '@/services/api';
 import { insightsService, type InsightsRangeData, type InsightsSummary } from '@/services/insights.service';
 import { useLevelStore } from '@/store/levelStore';
@@ -26,7 +25,7 @@ import { useQuestStore } from '@/store/questStore';
 import { useStreakStore } from '@/store/streakStore';
 import { useTaskStore } from '@/store/taskStore';
 import { useTimerStore } from '@/store/timerStore';
-import type { ActivityBreakdownSlice, CustomInsightsRange, HeatmapDay, InsightsRange, MonthYearRange } from '@/types/insights';
+import type { ActivityBreakdownSlice, CustomInsightsRange, DayTimeEntry, HeatmapDay, InsightsRange, MonthYearRange } from '@/types/insights';
 import { formatDuration } from '@/utils/formatTime';
 import { formatMonthYear, fromDateKey, toDateKey } from '@/utils/formatDate';
 
@@ -79,25 +78,55 @@ function rangeToWindow(range: InsightsRange, customRange?: CustomInsightsRange, 
   }
 }
 
-function TotalHoursCard({ seconds, trend }: { seconds: number; trend: string }) {
+/**
+ * The hero: total tracked time for the window on a dark tile, the change vs the previous
+ * period as a chip, and a mini column sparkline of the same days (today in full teal).
+ */
+function TrackedTimeHero({ seconds, trend, series, rangeLabel }: { seconds: number; trend: string; series: DayTimeEntry[]; rangeLabel: string }) {
+  const max = Math.max(...series.map((d) => d.seconds), 1);
+  const isUp = trend.trim().startsWith('+');
+  const isDown = trend.trim().startsWith('-');
+  const today = new Date().toISOString().slice(0, 10);
+
   return (
-    <View className="flex-1 justify-between gap-1">
-      <View className="gap-1">
-        <Text variant="display" color="primary">
-          {formatDuration(seconds)}
+    <View className="flex-1 justify-between gap-6">
+      <View className="flex-row items-center justify-between">
+        <Text variant="label" style={{ color: BENTO_INK_TEXT.muted, letterSpacing: 1.4 }}>
+          Tracked {rangeLabel}
         </Text>
-        <Text variant="caption" color="muted" className="normal-case tracking-normal">
-          Total Tracked
-        </Text>
+        {trend ? (
+          <View
+            className="flex-row items-center rounded-full px-2.5 py-1"
+            style={{ backgroundColor: isDown ? 'rgba(239,68,68,0.18)' : 'rgba(20,184,166,0.18)' }}
+          >
+            <Text variant="body" className="text-[11px] font-semibold" style={{ color: isDown ? '#FCA5A5' : '#5EEAD4' }}>
+              {isUp ? '▲ ' : isDown ? '▼ ' : ''}
+              {trend.replace(/^[+-]/, '')} vs previous
+            </Text>
+          </View>
+        ) : null}
       </View>
-      <View className="flex-row items-center gap-1">
-        <Text variant="caption" color="accent" className="normal-case tracking-normal">
-          {trend}
-        </Text>
-        <Text variant="caption" color="muted" className="normal-case tracking-normal">
-          vs previous period
-        </Text>
-      </View>
+
+      <Text style={{ color: BENTO_INK_TEXT.primary, fontSize: 52, lineHeight: 58, fontFamily: 'Inter_700Bold', letterSpacing: -1.5 }}>
+        {formatDuration(seconds)}
+      </Text>
+
+      {series.length > 1 && (
+        <View className="h-14 flex-row items-end" style={{ gap: series.length > 14 ? 2 : 5 }}>
+          {series.map((d) => (
+            <View
+              key={d.date}
+              className="flex-1"
+              style={{
+                height: d.seconds > 0 ? Math.max((d.seconds / max) * 56, 3) : 2,
+                borderTopLeftRadius: 3,
+                borderTopRightRadius: 3,
+                backgroundColor: d.date === today ? '#2DD4BF' : 'rgba(255,255,255,0.16)',
+              }}
+            />
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -110,6 +139,7 @@ export default function InsightsScreen() {
     return { month: today.getMonth() + 1, year: today.getFullYear() };
   });
   const [refreshing, setRefreshing] = useState(false);
+  const { isPhone } = useResponsive();
 
   const fetchTodaySessions = useTimerStore((s) => s.fetchTodaySessions);
   const fetchTasks = useTaskStore((s) => s.fetchTasks);
@@ -218,18 +248,16 @@ export default function InsightsScreen() {
         contentContainerClassName="pb-24"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <ResponsiveContainer className="gap-6 pt-4 md:pt-6 lg:pt-8">
+        <ResponsiveContainer className="gap-3 pt-3 md:gap-4 md:pt-6">
           <View className="gap-3">
-            <View className="flex-row items-center gap-3">
-              <BackButton onPress={() => router.push('/')} />
-              <View>
-                <Text variant="h2" color="primary">
-                  Insights
-                </Text>
-                <Text variant="caption" color="muted" className="normal-case tracking-normal">
-                  Your productivity patterns, {rangeLabel}
-                </Text>
-              </View>
+            {/* Left padding on phone clears AppLayout's floating menu button. */}
+            <View className="pl-12 md:pl-0">
+              <Text variant="label" color="muted" style={{ letterSpacing: 1.4 }}>
+                Insights
+              </Text>
+              <Text variant={isPhone ? 'h3' : 'h2'} color="primary" numberOfLines={1}>
+                Your patterns, {rangeLabel}
+              </Text>
             </View>
             <TimeFilter
               value={range}
@@ -240,52 +268,73 @@ export default function InsightsScreen() {
             />
           </View>
 
-          {/* Bento grid — real CSS grid on web (react-native-web compiles Tailwind's grid
-              utilities directly), plain single-column stacking below `md` on every
-              platform. See BentoCard.tsx for the native-grid caveat. */}
-          <View className="gap-4 md:grid md:grid-cols-2 md:gap-4 lg:grid-cols-4">
-            <BentoCard size="wide" title="Your Stats" icon="Flame">
-              <HexagonStats productivityScore={summary?.productivityScore.overall} />
-            </BentoCard>
-
-            <BentoCard size="hero" title="Productivity Score" icon="Target">
-              {rangeError ? (
-                <ErrorState message={rangeError} onRetry={fetchRangeData} />
-              ) : rangeLoading || !summary ? (
+          {/* Row 1 — the hero number and the score that summarizes it. */}
+          <View className="gap-3 md:flex-row md:gap-4">
+            <BentoTile tone="ink" index={0} className="md:flex-[1.3]">
+              {rangeLoading || !summary ? (
                 <SkeletonChart />
               ) : (
-                <ProductivityScore score={summary.productivityScore} />
+                <TrackedTimeHero seconds={totalSeconds} trend={summary.totalTimeTrend} series={rangeData.time} rangeLabel={rangeLabel} />
               )}
-            </BentoCard>
+            </BentoTile>
+            <BentoTile index={1} className="md:flex-1">
+              <View className="flex-1 gap-4">
+                <BentoHeader title="Productivity score" icon="Target" />
+                {rangeError ? (
+                  <ErrorState message={rangeError} onRetry={fetchRangeData} />
+                ) : rangeLoading || !summary ? (
+                  <SkeletonChart />
+                ) : (
+                  <ProductivityScore score={summary.productivityScore} />
+                )}
+              </View>
+            </BentoTile>
+          </View>
 
-            <BentoCard size="sm" title="Tracked Time" icon="Clock">
-              {rangeLoading || !summary ? <SkeletonChart /> : <TotalHoursCard seconds={totalSeconds} trend={summary.totalTimeTrend} />}
-            </BentoCard>
+          {/* Row 2 — time per day and mood over the same days. */}
+          <View className="gap-3 lg:flex-row lg:gap-4">
+            <BentoTile index={2} className="lg:flex-[1.5]">
+              <View className="gap-3">
+                <BentoHeader title="Time tracked" icon="BarChart3" />
+                {rangeLoading ? <SkeletonChart /> : <TimeChart data={rangeData.time} />}
+              </View>
+            </BentoTile>
+            <BentoTile index={3} className="lg:flex-1">
+              <View className="gap-3">
+                <BentoHeader title="Mood trend" icon="Smile" color="#F59E0B" />
+                {rangeLoading ? <SkeletonChart /> : <MoodTrend data={rangeData.mood} />}
+              </View>
+            </BentoTile>
+          </View>
 
-            <BentoCard size="sm" title="Mood Trend" icon="Smile">
-              {rangeLoading ? <SkeletonChart /> : <MoodTrend data={rangeData.mood} />}
-            </BentoCard>
+          {/* Row 3 — where the time went, and the all-round stat wheel. */}
+          <View className="gap-3 lg:flex-row lg:gap-4">
+            <BentoTile index={4} className="lg:flex-[1.5]">
+              <View className="gap-4">
+                <BentoHeader title="Activity breakdown" icon="PieChart" color="#6366F1" />
+                {rangeLoading ? (
+                  <SkeletonChart />
+                ) : (
+                  <>
+                    <ActivityDonut slices={activityBreakdown} />
+                    {activityBreakdown.length > 0 && <ActivityHistory slices={activityBreakdown} />}
+                  </>
+                )}
+              </View>
+            </BentoTile>
+            <BentoTile index={5} className="lg:flex-1">
+              <View className="flex-1 gap-3">
+                <BentoHeader title="Your stats" icon="Hexagon" color="#14B8A6" />
+                <View className="flex-1 justify-center">
+                  <HexagonStats productivityScore={summary?.productivityScore.overall} />
+                </View>
+              </View>
+            </BentoTile>
+          </View>
 
-            <BentoCard size="wide" title="Time Tracked" icon="BarChart3">
-              {rangeLoading ? <SkeletonChart /> : <TimeChart data={rangeData.time} />}
-            </BentoCard>
-
-            <BentoCard size="wide" title="Activity Breakdown" icon="PieChart">
-              {rangeLoading ? (
-                <SkeletonChart />
-              ) : (
-                <>
-                  <ActivityDonut slices={activityBreakdown} />
-                  <ActivityHistory slices={activityBreakdown} />
-                </>
-              )}
-            </BentoCard>
-
-            <BentoCard size="wide" title="AI Suggestions" icon="Sparkles">
-              <AiSuggestions />
-            </BentoCard>
-
-            <BentoCard size="lg" title="Last 12 Months" icon="CalendarDays">
+          <BentoTile index={6}>
+            <View className="gap-4">
+              <BentoHeader title="Last 12 months" icon="CalendarDays" />
               {heatmapError ? (
                 <ErrorState message={heatmapError} onRetry={fetchHeatmap} />
               ) : heatmapLoading ? (
@@ -293,32 +342,49 @@ export default function InsightsScreen() {
               ) : (
                 <Heatmap days={heatmapData} />
               )}
-            </BentoCard>
+            </View>
+          </BentoTile>
 
-            <BentoCard size="lg" title="Task Stats" icon="ListChecks">
-              {tasksError ? (
-                <ErrorState
-                  message={tasksError}
-                  onRetry={() => {
-                    clearTasksError();
-                    fetchTasks();
-                  }}
-                />
-              ) : tasksLoading ? (
-                <SkeletonChart />
-              ) : (
-                <TaskStats range={range} customRange={customRange} monthYearRange={monthYearRange} />
-              )}
-            </BentoCard>
-
-            <BentoCard size="lg" title="Weekly Summary" icon="ListChecks">
+          <BentoTile index={7}>
+            <View className="gap-4">
+              <BentoHeader title="Period summary" icon="ListChecks" color="#0EA5E9" />
               {rangeLoading || !summary ? <SkeletonChart /> : <SummaryCard items={summary.weeklySummary} />}
-            </BentoCard>
+            </View>
+          </BentoTile>
 
-            <BentoCard size="lg" title="History" icon="History">
-              <HistoryView />
-            </BentoCard>
+          <View className="gap-3 lg:flex-row lg:items-start lg:gap-4">
+            <BentoTile index={8} className="lg:flex-[1.5]">
+              <View className="gap-4">
+                <BentoHeader title="Task stats" icon="CheckSquare" color="#14B8A6" />
+                {tasksError ? (
+                  <ErrorState
+                    message={tasksError}
+                    onRetry={() => {
+                      clearTasksError();
+                      fetchTasks();
+                    }}
+                  />
+                ) : tasksLoading ? (
+                  <SkeletonChart />
+                ) : (
+                  <TaskStats range={range} customRange={customRange} monthYearRange={monthYearRange} />
+                )}
+              </View>
+            </BentoTile>
+            <BentoTile index={9} className="lg:flex-1">
+              <View className="gap-4">
+                <BentoHeader title="AI suggestions" icon="Sparkles" color="#6366F1" />
+                <AiSuggestions />
+              </View>
+            </BentoTile>
           </View>
+
+          <BentoTile index={10}>
+            <View className="gap-4">
+              <BentoHeader title="History" icon="History" color="#64748B" />
+              <HistoryView />
+            </View>
+          </BentoTile>
         </ResponsiveContainer>
       </ScrollView>
     </SafeAreaView>

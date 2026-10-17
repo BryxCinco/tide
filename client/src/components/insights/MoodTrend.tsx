@@ -1,259 +1,203 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { type LayoutChangeEvent, View } from 'react-native';
-import Animated, { Easing, useAnimatedProps, useSharedValue, withTiming } from 'react-native-reanimated';
-import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Line, Path, Stop } from 'react-native-svg';
 
 import { MOOD_ICON_MAP } from '../journal/MoodIcon';
-import { useThemeColors } from '../../hooks/useThemeColors';
 import type { Mood } from '../../types/journal';
 import type { MoodTrendPoint } from '../../types/insights';
 import { EmptyState, Icon, Text } from '../ui';
 import { Pressable } from '../ui/SoundPressable';
-
-const AnimatedPath = Animated.createAnimatedComponent(Path);
+import { useChartTheme } from './chartTheme';
 
 export interface MoodTrendProps {
   data: MoodTrendPoint[];
-  /** Defaults to a compact height for the bento 'sm' card — pass a taller value for a
-   * standalone/full-width usage. */
   height?: number;
-  /** Shows the most recent recorded mood as an icon + label above the chart — the bento
-   * 'sm' card's "current mood label" requirement. */
+  /** Shows the latest recorded mood in the readout line when nothing is hovered. */
   showCurrentMood?: boolean;
 }
 
 const MIN_SCORE = 1;
 const MAX_SCORE = 5;
-const Y_AXIS_WIDTH = 52;
-const X_AXIS_HEIGHT = 18;
+const Y_AXIS_WIDTH = 26;
+const PAD = 8;
+const MOOD_BY_SCORE: Record<number, Mood> = { 1: 'terrible', 2: 'bad', 3: 'okay', 4: 'good', 5: 'great' };
 
-// Score 5 down to 1 — top to bottom, matching the chart's own y-axis direction.
-const MOOD_LABELS_TOP_DOWN: Mood[] = ['great', 'good', 'okay', 'bad', 'terrible'];
-
-/** Same UTC-based "YYYY-MM-DD" convention mockInsights.ts's own `isoDate()` uses to build
- * `MoodTrendPoint.date` — comparing against toDateKey's LOCAL-date convention instead would
- * risk an off-by-one mismatch right at the day boundary. */
 function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** Smooth curve through a set of points via quadratic Beziers anchored at each segment's
- * midpoint — visually reads as a proper spline at this data density (7-30 points) without
- * pulling in a curve-fitting library. */
+/** Smooth curve through the points via quadratic Beziers anchored at segment midpoints. */
 function smoothPath(points: { x: number; y: number }[]): string {
   if (points.length === 0) return '';
   if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
-
   let d = `M ${points[0].x} ${points[0].y}`;
   for (let i = 1; i < points.length; i++) {
     const prev = points[i - 1];
     const curr = points[i];
-    const midX = (prev.x + curr.x) / 2;
-    const midY = (prev.y + curr.y) / 2;
-    d += ` Q ${prev.x} ${prev.y} ${midX} ${midY}`;
+    d += ` Q ${prev.x} ${prev.y} ${(prev.x + curr.x) / 2} ${(prev.y + curr.y) / 2}`;
   }
   const last = points[points.length - 1];
-  d += ` L ${last.x} ${last.y}`;
-  return d;
+  return `${d} L ${last.x} ${last.y}`;
 }
 
-/** Smooth-through-points curve + a semi-transparent fill under the curve, y-axis mood-name
- * labels, x-axis date labels, a highlighted "today" point, and a tap/hover tooltip per
- * point — see the file-level component doc below for the rest. */
-export function MoodTrend({ data, height = 90, showCurrentMood = true }: MoodTrendProps) {
-  const themeColors = useThemeColors();
+/**
+ * Mood over the window: mood icons as the y axis with a hairline per level, a 2px smooth
+ * line with a soft wash beneath it, and 8px dots ringed in the surface color. Days without
+ * a journal entry break the line rather than inventing a mood. Hover (web) or tap shows
+ * that day in the readout line above the plot.
+ */
+export function MoodTrend({ data, height = 150, showCurrentMood = true }: MoodTrendProps) {
+  const theme = useChartTheme();
   const [width, setWidth] = useState(0);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const progress = useSharedValue(0);
-
-  useEffect(() => {
-    progress.value = 0;
-    progress.value = withTiming(1, { duration: 600, easing: Easing.out(Easing.cubic) });
-  }, [data, progress]);
-
-  const handleLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width);
 
   const hasAnyData = data.some((p) => p.score != null);
+  if (!hasAnyData) {
+    return <EmptyState icon="Smile" title="No mood data yet" description="Pick a mood when you journal to see your trend here." />;
+  }
 
-  const padding = 8;
   const plotLeft = Y_AXIS_WIDTH;
-  const plotWidth = Math.max(width - plotLeft - padding, 1);
-  const plotHeight = height - padding * 2;
+  const plotWidth = Math.max(width - plotLeft - PAD, 1);
+  const plotHeight = height - PAD * 2;
+  const xFor = (index: number) => plotLeft + (data.length === 1 ? plotWidth / 2 : (index / (data.length - 1)) * plotWidth);
+  const yFor = (score: number) => PAD + (1 - (score - MIN_SCORE) / (MAX_SCORE - MIN_SCORE)) * plotHeight;
 
-  const xFor = (index: number) => plotLeft + (index / Math.max(data.length - 1, 1)) * plotWidth;
-  const yFor = (score: number) => padding + (1 - (score - MIN_SCORE) / (MAX_SCORE - MIN_SCORE)) * plotHeight;
-
-  // Group consecutive non-null points into segments so a missing day gaps the line.
-  const segments: { x: number; y: number; index: number }[][] = [];
-  let current: { x: number; y: number; index: number }[] = [];
+  const segments: { x: number; y: number }[][] = [];
+  let current: { x: number; y: number }[] = [];
   data.forEach((point, index) => {
     if (point.score == null) {
       if (current.length) segments.push(current);
       current = [];
       return;
     }
-    current.push({ x: xFor(index), y: yFor(point.score), index });
+    current.push({ x: xFor(index), y: yFor(point.score) });
   });
   if (current.length) segments.push(current);
 
-  const baselineY = padding + plotHeight;
-
-  // 4000 comfortably exceeds any real path length at this component's typical widths —
-  // used purely as a draw-in reveal distance, not a measurement of the actual path.
-  const DASH_LENGTH = 4000;
-  const animatedDashProps = useAnimatedProps(() => ({
-    strokeDashoffset: (1 - progress.value) * DASH_LENGTH,
-  }));
-  const animatedFillProps = useAnimatedProps(() => ({ opacity: progress.value }));
-
-  const latestMoodPoint = [...data].reverse().find((p) => p.mood != null);
-  const currentMood = latestMoodPoint?.mood ? MOOD_ICON_MAP[latestMoodPoint.mood] : null;
-
-  const activePoint = activeIndex != null ? data[activeIndex] : null;
-  // X-axis gets crowded past ~10 points (month view) — thin it out to every 5th label.
-  const xLabelStep = data.length > 10 ? 5 : 1;
-
-  if (!hasAnyData) {
-    return <EmptyState icon="Smile" title="No mood data yet" description="Start journaling to see your mood trend here." />;
-  }
+  const scored = data.filter((p) => p.score != null) as (MoodTrendPoint & { score: number })[];
+  const average = scored.reduce((sum, p) => sum + p.score, 0) / scored.length;
+  const averageMood = MOOD_ICON_MAP[MOOD_BY_SCORE[Math.round(average)]];
+  const latest = [...data].reverse().find((p) => p.mood != null);
+  const active = activeIndex != null ? data[activeIndex] : null;
+  const readout = active?.mood ? { mood: MOOD_ICON_MAP[active.mood], label: active.label } : null;
+  const xLabelStep = Math.max(1, Math.ceil(data.length / 8));
+  const today = todayKey();
 
   return (
     <View className="gap-2">
-      <View className="h-5 flex-row items-center gap-1.5">
-        {activePoint?.mood ? (
+      <View className="h-6 flex-row items-center gap-2">
+        {readout ? (
           <>
-            <Icon name={MOOD_ICON_MAP[activePoint.mood].icon} size={16} color={MOOD_ICON_MAP[activePoint.mood].color} />
-            <Text variant="body" color="primary" className="font-medium">
-              {MOOD_ICON_MAP[activePoint.mood].label}
+            <Icon name={readout.mood.icon} size={15} color={readout.mood.color} />
+            <Text variant="body" color="primary" className="text-[13px] font-semibold">
+              {readout.mood.label}
             </Text>
-            <Text variant="caption" color="muted" className="normal-case tracking-normal">
-              · {activePoint.label}
-            </Text>
-          </>
-        ) : showCurrentMood && currentMood ? (
-          <>
-            <Icon name={currentMood.icon} size={16} color={currentMood.color} />
-            <Text variant="body" color="primary" className="font-medium">
-              {currentMood.label}
+            <Text variant="body" color="muted" className="text-[12px]">
+              {readout.label}
             </Text>
           </>
         ) : (
-          showCurrentMood && (
-            <Text variant="caption" color="muted" className="normal-case tracking-normal">
-              No recent entries
+          <>
+            <Icon name={averageMood.icon} size={15} color={averageMood.color} />
+            <Text variant="body" color="primary" className="text-[13px] font-semibold">
+              Mostly {averageMood.label.toLowerCase()}
             </Text>
-          )
+            {showCurrentMood && latest?.mood && (
+              <Text variant="body" color="muted" className="text-[12px]">
+                · latest {MOOD_ICON_MAP[latest.mood].label.toLowerCase()}
+              </Text>
+            )}
+          </>
         )}
       </View>
 
-      <View onLayout={handleLayout} style={{ height }}>
+      <View onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)} style={{ height }}>
         {width > 0 && (
           <>
             <Svg width={width} height={height} style={{ position: 'absolute', left: 0, top: 0 }}>
               <Defs>
-                <LinearGradient id="moodTrendFill" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <Stop offset="0%" stopColor={themeColors.brand.tideTeal} stopOpacity={0.35} />
-                  <Stop offset="100%" stopColor={themeColors.brand.tideTeal} stopOpacity={0} />
+                <LinearGradient id="moodTrendWash" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <Stop offset="0%" stopColor={theme.accent} stopOpacity={0.18} />
+                  <Stop offset="100%" stopColor={theme.accent} stopOpacity={0} />
                 </LinearGradient>
               </Defs>
 
-              {segments.map((segment, i) => {
-                if (segment.length < 2) return null;
-                const areaPath =
-                  `${smoothPath(segment)} L ${segment[segment.length - 1].x} ${baselineY} L ${segment[0].x} ${baselineY} Z`;
-                return <AnimatedPath key={`fill-${i}`} d={areaPath} fill="url(#moodTrendFill)" animatedProps={animatedFillProps} />;
-              })}
+              {[1, 2, 3, 4, 5].map((score) => (
+                <Line key={score} x1={plotLeft} x2={plotLeft + plotWidth} y1={yFor(score)} y2={yFor(score)} stroke={theme.grid} strokeWidth={1} />
+              ))}
 
+              {segments.map((segment, i) =>
+                segment.length < 2 ? null : (
+                  <Path
+                    key={`wash-${i}`}
+                    d={`${smoothPath(segment)} L ${segment[segment.length - 1].x} ${PAD + plotHeight} L ${segment[0].x} ${PAD + plotHeight} Z`}
+                    fill="url(#moodTrendWash)"
+                  />
+                ),
+              )}
               {segments.map((segment, i) => (
-                <AnimatedPath
-                  key={`line-${i}`}
-                  d={smoothPath(segment)}
-                  stroke={themeColors.brand.tideTeal}
-                  strokeWidth={2.5}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
-                  strokeDasharray={DASH_LENGTH}
-                  animatedProps={animatedDashProps}
-                />
+                <Path key={`line-${i}`} d={smoothPath(segment)} stroke={theme.accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
               ))}
 
               {data.map((point, index) => {
                 if (point.score == null) return null;
-                const isToday = point.date === todayKey();
+                const emphasized = point.date === today || activeIndex === index;
                 return (
                   <Circle
                     key={point.date}
                     cx={xFor(index)}
                     cy={yFor(point.score)}
-                    r={isToday ? 5 : activeIndex === index ? 4.5 : 3}
-                    fill={isToday ? themeColors.brand.tideTeal : themeColors.background.base}
-                    stroke={themeColors.brand.tideTeal}
-                    strokeWidth={isToday ? 0 : 2}
+                    r={emphasized ? 5.5 : 4}
+                    fill={point.mood ? MOOD_ICON_MAP[point.mood].color : theme.accent}
+                    stroke={theme.surface}
+                    strokeWidth={2}
                   />
                 );
               })}
             </Svg>
 
-            {/* Invisible per-point hit targets — hover (web) or tap (touch) surfaces the
-                tooltip line above the chart via activeIndex, same pattern Heatmap.tsx uses. */}
-            {data.map((point, index) => {
-              if (point.score == null) return null;
-              const hitSize = 22;
+            {/* Mood-icon y axis */}
+            {[5, 4, 3, 2, 1].map((score) => {
+              const mood = MOOD_ICON_MAP[MOOD_BY_SCORE[score]];
               return (
+                <View key={score} pointerEvents="none" style={{ position: 'absolute', left: 0, top: yFor(score) - 7 }}>
+                  <Icon name={mood.icon} size={14} color={mood.color} />
+                </View>
+              );
+            })}
+
+            {/* Generous hit targets (24px) around each point. */}
+            {data.map((point, index) =>
+              point.score == null ? null : (
                 <Pressable
                   key={`hit-${point.date}`}
                   onHoverIn={() => setActiveIndex(index)}
                   onHoverOut={() => setActiveIndex(null)}
-                  onPress={() => setActiveIndex((current) => (current === index ? null : index))}
-                  style={{
-                    position: 'absolute',
-                    left: xFor(index) - hitSize / 2,
-                    top: yFor(point.score) - hitSize / 2,
-                    width: hitSize,
-                    height: hitSize,
-                  }}
+                  onPress={() => setActiveIndex((c) => (c === index ? null : index))}
+                  accessibilityLabel={`${point.label}: ${point.mood ? MOOD_ICON_MAP[point.mood].label : ''}`}
+                  style={{ position: 'absolute', left: xFor(index) - 12, top: yFor(point.score) - 12, width: 24, height: 24 }}
                 />
-              );
-            })}
-
-            {/* Y-axis mood-name labels, right-aligned into the reserved left gutter. */}
-            <View style={{ position: 'absolute', left: 0, top: 0, width: Y_AXIS_WIDTH - 8, height }}>
-              {MOOD_LABELS_TOP_DOWN.map((mood, i) => (
-                <Text
-                  key={mood}
-                  variant="caption"
-                  color="muted"
-                  className="absolute right-0 normal-case tracking-normal"
-                  style={{ fontSize: 10, top: yFor(5 - i) - 6 }}
-                  numberOfLines={1}
-                >
-                  {MOOD_ICON_MAP[mood].label}
-                </Text>
-              ))}
-            </View>
+              ),
+            )}
           </>
         )}
       </View>
 
-      {/* X-axis date labels below the plot. */}
       {width > 0 && (
-        <View style={{ height: X_AXIS_HEIGHT, marginLeft: Y_AXIS_WIDTH }}>
-          {data.map((point, index) => {
-            if (index % xLabelStep !== 0) return null;
-            return (
+        <View style={{ height: 16 }}>
+          {data.map((point, index) =>
+            index % xLabelStep !== 0 ? null : (
               <Text
                 key={point.date}
-                variant="caption"
-                color="muted"
-                className="absolute normal-case tracking-normal"
-                style={{ fontSize: 10, left: xFor(index) - Y_AXIS_WIDTH - 12, width: 24, textAlign: 'center' }}
+                variant="body"
+                color={point.date === today ? 'primary' : 'muted'}
+                style={{ position: 'absolute', left: xFor(index) - 16, width: 32, textAlign: 'center', fontSize: 11 }}
                 numberOfLines={1}
               >
                 {point.label}
               </Text>
-            );
-          })}
+            ),
+          )}
         </View>
       )}
     </View>

@@ -1,7 +1,6 @@
 export * from './ActivityDonut';
 export * from './ActivityHistory';
 export * from './AiSuggestions';
-export * from './BentoCard';
 export * from './Heatmap';
 export * from './HexagonStats';
 export * from './HistoryView';
@@ -11,3 +10,4 @@ export * from './SummaryCard';
 export * from './TaskStats';
 export * from './TimeChart';
 export * from './TimeFilter';
+export * from './chartTheme';

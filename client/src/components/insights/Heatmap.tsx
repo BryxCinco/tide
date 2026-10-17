@@ -4,16 +4,16 @@ import { Pressable } from '../ui/SoundPressable';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
 import type { HeatmapDay } from '../../types/insights';
-import { hexToRgba } from '../../utils/color';
 import { formatDuration } from '../../utils/formatTime';
 import { Icon, Modal, Text } from '../ui';
+import { useChartTheme } from './chartTheme';
 
 export interface HeatmapProps {
   days: HeatmapDay[];
 }
 
 const CELL_SIZE = 12;
-const CELL_GAP = 4;
+const CELL_GAP = 3;
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** Monday-first row indices to label (every other row) — printing all 7 crowded the gutter
  * for no benefit, since the grid only needs enough of them to anchor a glance. */
@@ -88,7 +88,9 @@ export function Heatmap({ days }: HeatmapProps) {
   const themeColors = useThemeColors();
   const [detailsOpen, setDetailsOpen] = useState(false);
 
-  const levelOpacity: Record<HeatmapDay['level'], number> = { 0: 0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1 };
+  // Discrete steps of one teal ramp (light -> dark = little -> a lot), per theme — not
+  // opacity over the surface, which turns muddy in dark mode.
+  const chart = useChartTheme();
 
   const columns = useMemo(() => buildWeekColumns(days), [days]);
   const gridWidth = columns.length > 0 ? columns.length * CELL_SIZE + (columns.length - 1) * CELL_GAP : 0;
@@ -161,11 +163,7 @@ export function Heatmap({ days }: HeatmapProps) {
                         width: CELL_SIZE,
                         height: CELL_SIZE,
                         borderRadius: 3,
-                        backgroundColor: !day
-                          ? 'transparent'
-                          : day.level === 0
-                            ? themeColors.background.hover
-                            : hexToRgba(themeColors.brand.tideTeal, levelOpacity[day.level]),
+                        backgroundColor: !day ? 'transparent' : chart.heat[day.level],
                       }}
                     />
                   ))}
@@ -187,8 +185,7 @@ export function Heatmap({ days }: HeatmapProps) {
               width: 10,
               height: 10,
               borderRadius: 3,
-              backgroundColor:
-                level === 0 ? themeColors.background.hover : hexToRgba(themeColors.brand.tideTeal, levelOpacity[level]),
+              backgroundColor: chart.heat[level],
             }}
           />
         ))}

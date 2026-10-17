@@ -3,9 +3,9 @@ import { View } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
 
 import { useQuestStore } from '../../store/questStore';
-import { CircularProgress } from '../dashboard/CircularProgress';
 import type { ProductivityScoreBreakdown } from '../../types/insights';
-import { ProgressBar, Text } from '../ui';
+import { BentoRing, Text } from '../ui';
+import { useChartTheme } from './chartTheme';
 
 export interface ProductivityScoreProps {
   score: ProductivityScoreBreakdown;
@@ -13,23 +13,23 @@ export interface ProductivityScoreProps {
 
 const WEIGHTS = { focusTime: 0.4, consistency: 0.3, taskCompletion: 0.2, quests: 0.1 } as const;
 
+function verdict(score: number): string {
+  if (score >= 85) return 'Outstanding';
+  if (score >= 70) return 'Strong';
+  if (score >= 50) return 'Steady';
+  if (score >= 30) return 'Warming up';
+  return 'Just getting started';
+}
+
 /**
- * Hero-card layout — ring centered on top, breakdown bars stacked below, always
- * vertical (no side-by-side variant). This sits in BentoCard's 'hero' slot (2 columns x
- * 2 rows on desktop, roughly square), where a vertical stack reads better than the
- * wide side-by-side layout the standalone version used before the bento redesign.
- * Still built on the same CircularProgress/ProgressBar primitives, just bigger.
- *
- * `overall` is now COMPUTED here from the weighted formula (focusTime*0.4 +
- * consistency*0.3 + taskCompletion*0.2 + questsCompleted%*0.1) rather than trusting
- * `score.overall` as an independent mock number — this is what actually wires today's
- * quest completion (questStore.ts) into the score, per Fix 3. The spec's own text
- * describes the quest bonus two ways ("up to +15 points" in one bullet, `*0.1` of a 0-100
- * value — max 10 — in the formula two lines later); the formula is the more precise,
- * self-consistent spec (its four weights already sum to exactly 1.0 = a clean 100-point
- * scale), so this follows it and the bonus tops out at +10, not +15.
+ * The score as an aurora gauge with a one-word verdict, then the three components that
+ * feed it as labelled meters (each meter's track is a lighter step of its own fill). The
+ * overall number is computed here from the weighted formula — focusTime*0.4 +
+ * consistency*0.3 + taskCompletion*0.2 + today's quest completion*0.1 — so finishing daily
+ * quests moves it. Hover (web) or tap reveals the per-component points.
  */
 export function ProductivityScore({ score }: ProductivityScoreProps) {
+  const theme = useChartTheme();
   const todayQuests = useQuestStore((s) => s.todayQuests);
   const [showBreakdown, setShowBreakdown] = useState(false);
 
@@ -41,74 +41,63 @@ export function ProductivityScore({ score }: ProductivityScoreProps) {
   const taskPoints = score.taskCompletion * WEIGHTS.taskCompletion;
   const questPoints = questsCompletedPercent * WEIGHTS.quests;
   const overall = Math.min(100, Math.round(focusPoints + consistencyPoints + taskPoints + questPoints));
-  const questBonusRounded = Math.round(questPoints);
+
+  const meters = [
+    { label: 'Focus time', value: score.focusTime, points: focusPoints, weight: '40%', color: '#14B8A6' },
+    { label: 'Consistency', value: score.consistency, points: consistencyPoints, weight: '30%', color: '#6366F1' },
+    { label: 'Task completion', value: score.taskCompletion, points: taskPoints, weight: '20%', color: '#0EA5E9' },
+  ];
 
   return (
     <Pressable
       onPress={() => setShowBreakdown((v) => !v)}
       onHoverIn={() => setShowBreakdown(true)}
       onHoverOut={() => setShowBreakdown(false)}
-      className="flex-1 items-center justify-center gap-6"
+      className="flex-1 gap-5"
     >
-      <View className="items-center gap-1">
-        <CircularProgress value={overall} size={176} strokeWidth={14}>
-          <Text variant="display" color="primary">
+      <View className="flex-row items-center gap-5">
+        <BentoRing value={overall} size={128} strokeWidth={12} trackColor={theme.track}>
+          <Text variant="display" color="primary" style={{ lineHeight: 40 }}>
             {overall}
           </Text>
-          <Text variant="caption" color="muted" className="normal-case tracking-normal">
-            out of 100
+          <Text variant="body" color="muted" className="text-[11px]">
+            of 100
           </Text>
-        </CircularProgress>
-        {questBonusRounded > 0 && (
-          <Text variant="caption" color="accent" className="normal-case tracking-normal">
-            Includes +{questBonusRounded} from daily quests
+        </BentoRing>
+        <View className="flex-1 gap-1" style={{ minWidth: 0 }}>
+          <Text variant="h3" color="primary">
+            {verdict(overall)}
           </Text>
-        )}
+          <Text variant="body" color="muted" className="text-[12px] leading-[17px]">
+            Weighted from focus time, consistency, tasks and today&apos;s quests.
+          </Text>
+          {questPoints >= 0.5 && (
+            <View className="mt-1 self-start rounded-full bg-tide-teal/10 px-2 py-0.5">
+              <Text variant="body" className="text-[11px] font-semibold text-tide-teal">
+                +{Math.round(questPoints)} from quests
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
 
-      {showBreakdown && (
-        <View className="w-full gap-1.5 rounded-xl border border-subtle bg-elevated p-3">
-          <BreakdownLine label="Focus Time" weight="40%" points={focusPoints} />
-          <BreakdownLine label="Consistency" weight="30%" points={consistencyPoints} />
-          <BreakdownLine label="Task Completion" weight="20%" points={taskPoints} />
-          <BreakdownLine label="Daily Quests" weight="10%" points={questPoints} />
-        </View>
-      )}
-
-      <View className="w-full gap-4">
-        <ScoreRow label="Consistency" value={score.consistency} variant="teal" />
-        <ScoreRow label="Focus Time" value={score.focusTime} variant="blue" />
-        <ScoreRow label="Task Completion" value={score.taskCompletion} variant="purple" />
+      <View className="gap-3.5">
+        {meters.map((meter) => (
+          <View key={meter.label} className="gap-1.5">
+            <View className="flex-row items-center justify-between">
+              <Text variant="body" color="secondary" className="text-[13px] font-medium">
+                {meter.label}
+              </Text>
+              <Text variant="body" color="primary" className="text-[12px] font-semibold" style={{ fontVariant: ['tabular-nums'] }}>
+                {showBreakdown ? `+${meter.points.toFixed(1)} pts · ${meter.weight}` : `${Math.round(meter.value)}%`}
+              </Text>
+            </View>
+            <View className="h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: `${meter.color}26` }}>
+              <View style={{ width: `${Math.max(0, Math.min(100, meter.value))}%`, height: '100%', borderRadius: 999, backgroundColor: meter.color }} />
+            </View>
+          </View>
+        ))}
       </View>
     </Pressable>
-  );
-}
-
-function BreakdownLine({ label, weight, points }: { label: string; weight: string; points: number }) {
-  return (
-    <View className="flex-row items-center justify-between">
-      <Text variant="caption" color="secondary" className="normal-case tracking-normal">
-        {label} ({weight})
-      </Text>
-      <Text variant="caption" color="primary" className="font-semibold normal-case tracking-normal">
-        +{points.toFixed(1)}
-      </Text>
-    </View>
-  );
-}
-
-function ScoreRow({ label, value, variant }: { label: string; value: number; variant: 'teal' | 'blue' | 'purple' }) {
-  return (
-    <View className="gap-1.5">
-      <View className="flex-row items-center justify-between">
-        <Text variant="body" color="secondary">
-          {label}
-        </Text>
-        <Text variant="caption" color="muted" className="normal-case tracking-normal">
-          {Math.round(value)}%
-        </Text>
-      </View>
-      <ProgressBar value={value} variant={variant} size="sm" />
-    </View>
   );
 }

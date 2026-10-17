@@ -1,14 +1,12 @@
 import { useMemo } from 'react';
 import { View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
-import Svg, { Line, Polygon } from 'react-native-svg';
+import Svg, { Circle, Defs, Line, LinearGradient, Polygon, Stop } from 'react-native-svg';
 
-import { useThemeColors } from '../../hooks/useThemeColors';
 import { useLevelStore } from '../../store/levelStore';
 import { useStreakStore } from '../../store/streakStore';
-import { hexToRgba } from '../../utils/color';
 import { progressToNextLevel } from '../../utils/xp';
 import { Text } from '../ui';
+import { useChartTheme } from './chartTheme';
 
 export interface HexagonStatsProps {
   /** 0-100, from the selected range's Productivity Score card — that card fetches
@@ -18,7 +16,7 @@ export interface HexagonStatsProps {
 }
 
 // Sized to still fit a 320px-wide phone (WRAPPER_SIZE 232px vs. ~240px available inside
-// ResponsiveContainer's px-4 + BentoCard's p-6 at that width) rather than the card's own
+// ResponsiveContainer's px-4 + BentoTile's p-5 at that width) rather than the card's own
 // width on a typical phone — a fixed "looks right on my desktop" size here was overflowing
 // the card on narrower Android phones specifically.
 const RADIUS = 64;
@@ -57,7 +55,7 @@ interface Axis {
  * "hexagon graph" means and read as visually broken — this replaces that entirely.)
  */
 export function HexagonStats({ productivityScore }: HexagonStatsProps) {
-  const themeColors = useThemeColors();
+  const theme = useChartTheme();
   const streak = useStreakStore((s) => s.streak);
   const level = useLevelStore((s) => s.level);
   const totalXp = useLevelStore((s) => s.totalXp);
@@ -83,34 +81,36 @@ export function HexagonStats({ productivityScore }: HexagonStatsProps) {
     [taskStreak, questStreak, bestStreak, level, xpProgress, score]
   );
 
-  const dataPoints = useMemo(
-    () => polygonPoints(axes.map((a) => (a.norm > 0 ? Math.max(RADIUS * a.norm, 3) : 0))),
-    [axes]
-  );
+  const radii = useMemo(() => axes.map((a) => (a.norm > 0 ? Math.max(RADIUS * a.norm, 3) : 0)), [axes]);
+  const dataPoints = useMemo(() => polygonPoints(radii), [radii]);
   const gridRings = useMemo(
     () => Array.from({ length: RING_COUNT }, (_, ring) => polygonPoints(new Array(6).fill((RADIUS * (ring + 1)) / RING_COUNT))),
     []
   );
 
   return (
-    <Animated.View entering={FadeIn.duration(420)} style={{ alignItems: 'center' }}>
+    <View style={{ alignItems: 'center' }}>
       <View style={{ width: WRAPPER_SIZE, height: WRAPPER_SIZE }}>
         <Svg width={BOX} height={BOX} style={{ position: 'absolute', left: MARGIN, top: MARGIN }}>
+          <Defs>
+            <LinearGradient id="hexAurora" x1="0%" y1="0%" x2="100%" y2="100%">
+              <Stop offset="0%" stopColor="#14B8A6" stopOpacity={0.35} />
+              <Stop offset="100%" stopColor="#6366F1" stopOpacity={0.3} />
+            </LinearGradient>
+          </Defs>
           {gridRings.map((pts, i) => (
-            <Polygon key={i} points={pts} fill="none" stroke={themeColors.border.subtle} strokeWidth={1} />
+            <Polygon key={i} points={pts} fill="none" stroke={theme.grid} strokeWidth={1} />
           ))}
           {AXIS_ANGLES.map((_, i) => {
             const outer = pointAt(RADIUS, i);
-            return (
-              <Line key={i} x1={CENTER} y1={CENTER} x2={outer.x} y2={outer.y} stroke={themeColors.border.subtle} strokeWidth={1} />
-            );
+            return <Line key={i} x1={CENTER} y1={CENTER} x2={outer.x} y2={outer.y} stroke={theme.grid} strokeWidth={1} />;
           })}
-          <Polygon
-            points={dataPoints}
-            fill={hexToRgba(themeColors.brand.tideTeal, 0.28)}
-            stroke={themeColors.brand.tideTeal}
-            strokeWidth={2}
-          />
+          <Polygon points={dataPoints} fill="url(#hexAurora)" stroke={theme.accent} strokeWidth={2} strokeLinejoin="round" />
+          {radii.map((r, i) => {
+            if (r === 0) return null;
+            const p = pointAt(r, i);
+            return <Circle key={i} cx={p.x} cy={p.y} r={4} fill={theme.accent} stroke={theme.surface} strokeWidth={2} />;
+          })}
         </Svg>
 
         {axes.map((axis, i) => {
@@ -126,16 +126,16 @@ export function HexagonStats({ productivityScore }: HexagonStatsProps) {
                 alignItems: 'center',
               }}
             >
-              <Text variant="caption" color="muted" numberOfLines={1} style={{ fontSize: 10 }}>
+              <Text variant="body" color="muted" numberOfLines={1} style={{ fontSize: 10 }}>
                 {axis.tag}
               </Text>
-              <Text variant="body" color="primary" numberOfLines={1} className="font-bold">
+              <Text variant="body" color="primary" numberOfLines={1} className="text-[13px] font-semibold">
                 {axis.display}
               </Text>
             </View>
           );
         })}
       </View>
-    </Animated.View>
+    </View>
   );
 }
