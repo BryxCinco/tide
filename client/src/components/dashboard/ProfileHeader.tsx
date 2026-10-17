@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { Pressable } from '../ui/SoundPressable';
 
 import { useAuth } from '../../hooks/useAuth';
@@ -26,7 +27,7 @@ export function ProfileHeader() {
   const avatarOverlap = 40; // px the avatar rides up over the cover's bottom edge
 
   return (
-    <View>
+    <Animated.View entering={FadeIn.duration(380)}>
       <CoverPhoto coverType={coverType} coverValue={coverValue} height={coverHeight} onPress={() => setPickerVisible(true)} />
 
       {/* Same centered/max-width treatment as ResponsiveContainer everywhere else on the
@@ -116,6 +117,6 @@ export function ProfileHeader() {
       </ResponsiveContainer>
 
       <CoverPicker visible={pickerVisible} onClose={() => setPickerVisible(false)} currentType={coverType} currentValue={coverValue} />
-    </View>
+    </Animated.View>
   );
 }

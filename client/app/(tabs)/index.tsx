@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { RefreshControl, ScrollView } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -213,27 +214,33 @@ export default function DashboardScreen() {
 
         <ResponsiveContainer className="mt-6 gap-6">
           {isFreshStart && (
-            <EmptyState
-              icon="Sparkles"
-              title="Welcome to TIDE"
-              description="Start your first session to see your progress"
-              actionLabel="Start Timer"
-              onAction={() => router.push('/timer')}
-              className="rounded-2xl border border-subtle bg-base py-10"
-            />
+            <Animated.View entering={FadeInDown.duration(400)}>
+              <EmptyState
+                icon="Sparkles"
+                title="Welcome to TIDE"
+                description="Start your first session to see your progress"
+                actionLabel="Start Timer"
+                onAction={() => router.push('/timer')}
+                className="rounded-2xl border border-subtle bg-base py-10"
+              />
+            </Animated.View>
           )}
 
-          <QuestCard />
+          <Animated.View entering={FadeInDown.duration(400)}>
+            <QuestCard />
+          </Animated.View>
 
           <WidgetGrid widgets={visibleWidgets} renderWidget={renderWidget} />
 
-          <Button
-            title="Customize Dashboard"
-            variant="secondary"
-            icon="Settings"
-            onPress={() => setCustomizeVisible(true)}
-            className="mb-2 self-center"
-          />
+          <Animated.View entering={FadeInDown.delay(80).duration(400)}>
+            <Button
+              title="Customize Dashboard"
+              variant="secondary"
+              icon="Settings"
+              onPress={() => setCustomizeVisible(true)}
+              className="mb-2 self-center"
+            />
+          </Animated.View>
         </ResponsiveContainer>
       </ScrollView>
 
