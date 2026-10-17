@@ -11,7 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
-import { CHAT_COLUMN_MAX_WIDTH, ChatConversation, ChatHeader, DEFAULT_QUICK_SUGGESTIONS } from '@/components/chat';
+import { CHAT_COLUMN_MAX_WIDTH, ChatContextRail, ChatConversation, ChatHeader, DEFAULT_QUICK_SUGGESTIONS } from '@/components/chat';
 import { AppLayout, MobileTabBar } from '@/components/layout';
 import { Icon, Skeleton, Text } from '@/components/ui';
 import { Pressable } from '@/components/ui/SoundPressable';
@@ -119,7 +119,7 @@ function ChatSkeleton() {
 export default function ChatScreen() {
   const { user } = useAuth();
   const themeColors = useThemeColors();
-  const { isPhone } = useResponsive();
+  const { isPhone, isDesktop } = useResponsive();
   const messages = useChatStore((s) => s.messages);
   const hasHydrated = useChatStore((s) => s.hasHydrated);
   const isTyping = useChatStore((s) => s.isTyping);
@@ -182,76 +182,88 @@ export default function ChatScreen() {
       <SafeAreaView className="flex-1 bg-base" edges={['top']}>
         <ChatHeader isTyping={isTyping} hasMessages={messages.length > 0} onClear={clearChat} />
 
-        <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          {!hasHydrated ? (
-            <ChatSkeleton />
-          ) : (
-            <ChatConversation
-              userFirstName={user?.name?.trim().split(/\s+/)[0]}
-              quickSuggestions={
-                messages.length === 0 ? { suggestions: DEFAULT_QUICK_SUGGESTIONS, onSelect: handleSend } : undefined
-              }
-              showSmartSuggestions={showSmartSuggestions}
-              onSelectSuggestion={handleSend}
+        {/* Desktop with a conversation going: chat on the left, context rail on the right. */}
+        <View className="flex-1 flex-row">
+          <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            {!hasHydrated ? (
+              <ChatSkeleton />
+            ) : (
+              <ChatConversation
+                userFirstName={user?.name?.trim().split(/\s+/)[0]}
+                quickSuggestions={
+                  messages.length === 0 ? { suggestions: DEFAULT_QUICK_SUGGESTIONS, onSelect: handleSend } : undefined
+                }
+                showSmartSuggestions={showSmartSuggestions}
+                onSelectSuggestion={handleSend}
+              />
+            )}
+
+            {/* Floating composer card, centered on the same reading column as the messages. */}
+            <View className="w-full self-center px-3 pb-3 pt-1 md:px-6 md:pb-5" style={{ maxWidth: CHAT_COLUMN_MAX_WIDTH + 48 }}>
+              <View
+                className="flex-row items-end gap-1.5 rounded-[26px] border border-default bg-surface p-1.5"
+                style={{
+                  shadowColor: '#0F172A',
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: 0.06,
+                  shadowRadius: 24,
+                  elevation: 3,
+                }}
+              >
+                <Pressable
+                  onPress={handleVoicePress}
+                  hitSlop={6}
+                  accessibilityLabel="Voice input"
+                  className="h-10 w-10 items-center justify-center rounded-full hover:bg-elevated"
+                >
+                  <Icon name="Mic" size={18} color={themeColors.text.muted} />
+                </Pressable>
+
+                <TextInput
+                  ref={inputRef}
+                  value={draft}
+                  onChangeText={(text) => {
+                    setDraft(text);
+                    // Lets the web textarea shrink back when lines are deleted — its scrollHeight
+                    // never reports less than the box's current height.
+                    if (!text.includes('\n') && text.length < 30) setComposerHeight(MIN_COMPOSER_HEIGHT);
+                  }}
+                  onKeyPress={handleKeyPress}
+                  onContentSizeChange={(e) => {
+                    // Web reports the textarea's scrollHeight, which already includes its own
+                    // padding (and is never smaller than its current height) — adding padding
+                    // again there made the box grow by 12px on every keystroke. Native reports
+                    // just the text's height, so the vertical padding gets added back.
+                    const contentHeight = e.nativeEvent.contentSize.height + (Platform.OS === 'web' ? 0 : 20);
+                    setComposerHeight(Math.min(Math.max(MIN_COMPOSER_HEIGHT, contentHeight), MAX_COMPOSER_HEIGHT));
+                  }}
+                  multiline
+                  maxLength={MAX_MESSAGE_LENGTH}
+                  placeholder="Ask your coach anything…"
+                  placeholderTextColor={themeColors.text.disabled}
+                  className="flex-1 px-1 py-2.5 font-sans text-primary"
+                  style={{ fontSize: 15, height: composerHeight, maxHeight: MAX_COMPOSER_HEIGHT }}
+                />
+
+                <SendButton disabled={!draft.trim() || isTyping || isStreaming} onPress={() => handleSend(draft)} />
+              </View>
+              {!isPhone && (
+                <Text variant="body" color="muted" className="mt-2 text-center text-[11px]">
+                  Enter to send · Shift + Enter for a new line · TIDE Coach can make mistakes.
+                </Text>
+              )}
+            </View>
+          </KeyboardAvoidingView>
+          {isDesktop && messages.length > 0 && (
+            <ChatContextRail
+              suggestions={DEFAULT_QUICK_SUGGESTIONS}
+              onSelect={handleSend}
+              messageCount={messages.length}
+              onNewChat={clearChat}
+              busy={isTyping || isStreaming}
             />
           )}
-
-          {/* Floating composer card, centered on the same reading column as the messages. */}
-          <View className="w-full self-center px-3 pb-3 pt-1 md:px-6 md:pb-5" style={{ maxWidth: CHAT_COLUMN_MAX_WIDTH + 48 }}>
-            <View
-              className="flex-row items-end gap-1.5 rounded-[26px] border border-default bg-surface p-1.5"
-              style={{
-                shadowColor: '#0F172A',
-                shadowOffset: { width: 0, height: 8 },
-                shadowOpacity: 0.06,
-                shadowRadius: 24,
-                elevation: 3,
-              }}
-            >
-              <Pressable
-                onPress={handleVoicePress}
-                hitSlop={6}
-                accessibilityLabel="Voice input"
-                className="h-10 w-10 items-center justify-center rounded-full hover:bg-elevated"
-              >
-                <Icon name="Mic" size={18} color={themeColors.text.muted} />
-              </Pressable>
-
-              <TextInput
-                ref={inputRef}
-                value={draft}
-                onChangeText={(text) => {
-                  setDraft(text);
-                  // Lets the web textarea shrink back when lines are deleted — its scrollHeight
-                  // never reports less than the box's current height.
-                  if (!text.includes('\n') && text.length < 30) setComposerHeight(MIN_COMPOSER_HEIGHT);
-                }}
-                onKeyPress={handleKeyPress}
-                onContentSizeChange={(e) => {
-                  // Web reports the textarea's scrollHeight, which already includes its own
-                  // padding (and is never smaller than its current height) — adding padding
-                  // again there made the box grow by 12px on every keystroke. Native reports
-                  // just the text's height, so the vertical padding gets added back.
-                  const contentHeight = e.nativeEvent.contentSize.height + (Platform.OS === 'web' ? 0 : 20);
-                  setComposerHeight(Math.min(Math.max(MIN_COMPOSER_HEIGHT, contentHeight), MAX_COMPOSER_HEIGHT));
-                }}
-                multiline
-                maxLength={MAX_MESSAGE_LENGTH}
-                placeholder="Ask your coach anything…"
-                placeholderTextColor={themeColors.text.disabled}
-                className="flex-1 px-1 py-2.5 font-sans text-primary"
-                style={{ fontSize: 15, height: composerHeight, maxHeight: MAX_COMPOSER_HEIGHT }}
-              />
-
-              <SendButton disabled={!draft.trim() || isTyping || isStreaming} onPress={() => handleSend(draft)} />
-            </View>
-            {!isPhone && (
-              <Text variant="body" color="muted" className="mt-2 text-center text-[11px]">
-                Enter to send · Shift + Enter for a new line · TIDE Coach can make mistakes.
-              </Text>
-            )}
-          </View>
-        </KeyboardAvoidingView>
+        </View>
       </SafeAreaView>
 
       <MobileTabBar />

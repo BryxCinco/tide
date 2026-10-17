@@ -18,7 +18,7 @@ export interface ChatHeaderProps {
 /** Green when idle, pulsing teal + "Thinking..." while the AI Coach is working on a reply —
  * the full page's equivalent of ChatPanel's old AIStatusIndicator, folded into the header
  * instead of floating above the composer. */
-function StatusDot({ isTyping }: { isTyping: boolean }) {
+function StatusDot({ isTyping, compact = false }: { isTyping: boolean; compact?: boolean }) {
   const themeColors = useThemeColors();
   const pulse = useSharedValue(0);
 
@@ -40,7 +40,7 @@ function StatusDot({ isTyping }: { isTyping: boolean }) {
         ]}
       />
       <Text variant="body" color="muted" className="text-[12px]">
-        {isTyping ? 'Thinking…' : 'Online · your productivity assistant'}
+        {isTyping ? 'Thinking…' : compact ? 'Online' : 'Online · your productivity assistant'}
       </Text>
     </View>
   );
@@ -67,7 +67,7 @@ export function ChatHeader({ isTyping, hasMessages, onClear }: ChatHeaderProps) 
         <Text variant="body" color="primary" className="text-[16px] font-semibold" numberOfLines={1}>
           TIDE Coach
         </Text>
-        <StatusDot isTyping={isTyping} />
+        <StatusDot isTyping={isTyping} compact={isPhone} />
       </View>
 
       {hasMessages && (

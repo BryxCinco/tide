@@ -8,14 +8,14 @@ import Animated, {
   useSharedValue,
   withRepeat,
   withTiming,
-  type EntryExitAnimationFunction,
 } from 'react-native-reanimated';
 import { Pressable } from '../ui/SoundPressable';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
 import type { ChatAction, ChatMessage } from '../../types/chat';
 import { hexToRgba } from '../../utils/color';
-import { gradientDirections } from '../../utils/gradients';
+import { formatTime } from '../../utils/formatDate';
+import { gradientDirections, gradients } from '../../utils/gradients';
 import { colors } from '../../utils/theme';
 import { FadeInView, Icon, Text, type IconName } from '../ui';
 import { AIAvatar } from './AIAvatar';
@@ -60,20 +60,6 @@ export interface ChatBubbleProps {
   isNewMessage?: boolean;
 }
 
-// Short fade + 8px rise. Deliberately small: big slide distances on every message are what
-// make a chat feel like it's jumping around.
-const bubbleEntering: EntryExitAnimationFunction = () => {
-  'worklet';
-  const config = { duration: 240, easing: Easing.out(Easing.cubic) };
-  return {
-    initialValues: { opacity: 0, transform: [{ translateY: 8 }] },
-    animations: {
-      opacity: withTiming(1, config),
-      transform: [{ translateY: withTiming(0, config) }],
-    },
-  };
-};
-
 /** Blinking teal bar at the end of streaming text. */
 function StreamingCursor() {
   const opacity = useSharedValue(1);
@@ -91,53 +77,70 @@ function StreamingCursor() {
 }
 
 /**
- * User messages are a compact gradient bubble on the right; assistant replies are open text
- * beside the AI avatar (no bubble), which keeps long answers easy to read instead of boxing
- * them into a narrow card.
+ * User messages: a compact aurora bubble on the right. Assistant replies: a card on the left
+ * with a thin aurora rail down its edge and a small "TIDE Coach · time" header — readable for
+ * long answers, and unmistakably the coach at a glance. Only messages created in this session
+ * fade in; restored history appears instantly.
  */
 export function ChatBubble({ message, isStreamingCursor, isNewMessage }: ChatBubbleProps) {
   const isUser = message.role === 'user';
-  const entering = isNewMessage ? bubbleEntering : undefined;
+  const time = message.timestamp ? formatTime(message.timestamp) : '';
 
   if (isUser) {
     return (
-      <Animated.View entering={entering} className="flex-row justify-end px-4 md:px-6">
-        <View className="max-w-[82%] overflow-hidden rounded-[20px] rounded-br-md md:max-w-[70%]">
-          <LinearGradient
-            colors={['#0D9488', '#0891B2']}
-            {...gradientDirections.diagonal}
-            style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
-          />
-          <Text variant="body" color="inverse" className="px-4 py-2.5 leading-[22px]" selectable>
-            {message.content}
-          </Text>
+      <FadeInView animate={Boolean(isNewMessage)} className="px-4 md:px-6">
+        <View className="items-end">
+          <View className="max-w-[82%] overflow-hidden rounded-[20px] rounded-br-md md:max-w-[70%]">
+            <LinearGradient
+              colors={[...gradients.aurora]}
+              {...gradientDirections.diagonal}
+              style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+            />
+            <Text variant="body" color="inverse" className="px-4 py-2.5 leading-[22px]" selectable>
+              {message.content}
+            </Text>
+          </View>
+          {time ? (
+            <Text variant="body" color="muted" className="mr-1 mt-1 text-[11px]">
+              {time}
+            </Text>
+          ) : null}
         </View>
-      </Animated.View>
+      </FadeInView>
     );
   }
 
   return (
-    <Animated.View entering={entering} className="flex-row items-start gap-3 px-4 md:px-6">
-      <View className="pt-0.5">
-        <AIAvatar size={28} />
-      </View>
-      <View className="flex-1" style={{ minWidth: 0 }}>
-        <Text variant="body" color="primary" className="mb-1 text-[13px] font-semibold">
+    <FadeInView animate={Boolean(isNewMessage)} className="px-4 md:px-6">
+      <View className="flex-row items-center gap-2">
+        <AIAvatar size={24} />
+        <Text variant="body" color="primary" className="text-[13px] font-semibold">
           TIDE Coach
         </Text>
-        <View className="flex-row flex-wrap items-end">
-          <Text variant="body" color="secondary" className="leading-[23px]" selectable>
-            {message.content}
+        {time ? (
+          <Text variant="body" color="muted" className="text-[11px]">
+            · {time}
           </Text>
-          {isStreamingCursor && <StreamingCursor />}
-        </View>
-
-        {message.actions?.map((action, index) => (
-          <FadeInView key={`${action.route}-${index}`} index={index + 2}>
-            <ChatActionCard action={action} />
-          </FadeInView>
-        ))}
+        ) : null}
       </View>
-    </Animated.View>
+
+      <View className="ml-3 mt-2 max-w-[92%] flex-row overflow-hidden rounded-[20px] rounded-tl-md border border-subtle bg-surface md:max-w-[85%]">
+        <LinearGradient colors={[...gradients.aurora]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={{ width: 3 }} />
+        <View className="flex-1 px-4 py-3" style={{ minWidth: 0 }}>
+          <View className="flex-row flex-wrap items-end">
+            <Text variant="body" color="secondary" className="leading-[23px]" selectable>
+              {message.content}
+            </Text>
+            {isStreamingCursor && <StreamingCursor />}
+          </View>
+
+          {message.actions?.map((action, index) => (
+            <FadeInView key={`${action.route}-${index}`} index={index + 2}>
+              <ChatActionCard action={action} />
+            </FadeInView>
+          ))}
+        </View>
+      </View>
+    </FadeInView>
   );
 }

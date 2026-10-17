@@ -4,6 +4,7 @@ import { Pressable } from '../ui/SoundPressable';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { cn } from '../../utils/cn';
+import { hexToRgba } from '../../utils/color';
 import { Icon, Text, type IconName } from '../ui';
 
 export interface SettingsItemProps {
@@ -21,25 +22,28 @@ export interface SettingsItemProps {
   /** Set by `SettingsSection`, not passed directly — drops the row's bottom border on the
    * last item in its group. */
   isLast?: boolean;
+  /** Set by `SettingsSection` — the section's accent color for the icon tile. */
+  color?: string;
 }
 
 /** One row in a Settings section: icon, label (+ optional description), trailing control.
  * Always rendered inside `SettingsSection`, which supplies `isLast` and the shared card
  * border/background around the whole group. */
-export function SettingsItem({ icon, label, description, danger = false, disabled = false, onPress, right, isLast = false }: SettingsItemProps) {
+export function SettingsItem({ icon, label, description, danger = false, disabled = false, onPress, right, isLast = false, color }: SettingsItemProps) {
   const themeColors = useThemeColors();
   const isPressable = Boolean(onPress) && !disabled;
+  const accent = danger ? themeColors.status.error : (color ?? themeColors.brand.tideTeal);
 
   const content = (
     <View
       className={cn(
-        'flex-row items-center gap-3 px-6 py-4',
+        'flex-row items-center gap-3 px-5 py-3.5',
         !isLast && 'border-b border-subtle',
         disabled && 'opacity-60',
       )}
     >
-      <View className={cn('h-9 w-9 items-center justify-center rounded-full', danger ? 'bg-error/10' : 'bg-tide-teal/10')}>
-        <Icon name={icon} size={17} color={danger ? themeColors.status.error : themeColors.brand.tideTeal} />
+      <View className="h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: hexToRgba(accent, 0.12) }}>
+        <Icon name={icon} size={17} color={accent} />
       </View>
 
       <View className="flex-1 gap-0.5">
@@ -47,7 +51,7 @@ export function SettingsItem({ icon, label, description, danger = false, disable
           {label}
         </Text>
         {description && (
-          <Text variant="caption" color="muted" className="normal-case tracking-normal">
+          <Text variant="body" color="muted" className="text-[12px]">
             {description}
           </Text>
         )}

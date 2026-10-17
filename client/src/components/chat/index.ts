@@ -1,5 +1,6 @@
 export * from './AIAvatar';
 export * from './ChatBubble';
+export * from './ChatContextRail';
 export * from './ChatConversation';
 export * from './ChatHeader';
 export * from './QuickSuggestions';

@@ -20,7 +20,7 @@ import {
   SettingsSwitch,
   StatsRow,
 } from '@/components/profile';
-import { Button, ErrorState, Icon, ResponsiveContainer, Text, ThemeToggle } from '@/components/ui';
+import { BentoTile, ErrorState, Icon, ResponsiveContainer, Text, ThemeToggle } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { LANGUAGES, useTranslation } from '@/i18n';
@@ -143,9 +143,7 @@ export default function ProfileScreen() {
         contentContainerClassName="pb-24"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <ProfileCover onAvatarPress={() => setAvatarPickerVisible(true)} />
-
-        <ResponsiveContainer className="mt-6 gap-4">
+        <ResponsiveContainer className="gap-3 pt-14 md:gap-4 md:pt-6">
           {settingsError && (
             <ErrorState
               message={`Settings didn't sync: ${settingsError}`}
@@ -157,32 +155,24 @@ export default function ProfileScreen() {
             />
           )}
 
-          <LevelCard />
+          {/* Identity (2/3) + level (1/3) on wide screens, stacked on phone. */}
+          <View className="gap-3 md:flex-row md:gap-4">
+            <ProfileCover
+              className="md:flex-[1.6]"
+              onAvatarPress={() => setAvatarPickerVisible(true)}
+              onEditPress={() => setEditVisible(true)}
+            />
+            <LevelCard className="md:flex-1" />
+          </View>
 
           <StatsRow />
 
-          {/* Bento grid, matching Insights' layout: Account/Data pair up as half-width
-              tiles, Preferences and About get the full-width `wide` tile since they carry
-              far more rows than a half-width card comfortably fits. */}
-          <View className="gap-4 md:grid md:grid-cols-2 md:gap-4">
-            <SettingsSection title={t('profile.account')} icon="User" size="sm">
-              <SettingsItem icon="User" label={t('profile.editProfile')} onPress={() => setEditVisible(true)} />
-              <SettingsItem icon="Lock" label={t('profile.changePassword')} onPress={() => setChangePasswordVisible(true)} />
-            </SettingsSection>
-
-            <SettingsSection title={t('profile.data')} icon="Database" size="sm">
-              <SettingsItem icon="Download" label={t('profile.exportData')} description="Download a copy as JSON" onPress={exportUserData} />
-              <SettingsItem icon="Trash" label={t('profile.clearCache')} description="Recent searches & AI conversation" onPress={handleClearCache} />
-              <SettingsItem icon="UserX" label={t('profile.deleteAccount')} danger onPress={() => setDeleteVisible(true)} />
-            </SettingsSection>
-
-            <SettingsSection title={t('profile.preferences')} icon="SlidersHorizontal" size="wide">
-              {/* Same `ThemeToggle` component (and circular-reveal animation) as the
-                  sidebar — not a lookalike, the literal same one — so switching themes
-                  here and there feels identical. "Match System" is its own row instead of
-                  a 3rd toggle state, since a binary pill switch can't represent 3 values;
-                  turning it on hands appearance to the OS, turning it off locks in
-                  whichever theme is currently applied. */}
+          {/* Preferences — the longest group — gets the wide left column; the shorter
+              Account / Data / About groups stack in the right column. */}
+          <View className="gap-3 lg:flex-row lg:items-start lg:gap-4">
+            <SettingsSection title={t('profile.preferences')} icon="SlidersHorizontal" color="#6366F1" index={6} className="lg:flex-[1.3]">
+              {/* Same ThemeToggle (and circular-reveal animation) as the sidebar. "Match
+                  System" is its own row since a binary pill can't represent 3 states. */}
               <SettingsItem icon="Palette" label={t('profile.appearance')} description={appliedTheme === 'dark' ? 'Dark' : 'Light'} right={<ThemeToggle />} />
               <SettingsItem
                 icon="Monitor"
@@ -245,10 +235,33 @@ export default function ProfileScreen() {
               />
             </SettingsSection>
 
-            <AboutSection onFeedbackPress={() => setFeedbackVisible(true)} />
-          </View>
+            <View className="gap-3 lg:flex-1 lg:gap-4">
+              <SettingsSection title={t('profile.account')} icon="User" color="#14B8A6" index={7}>
+                <SettingsItem icon="User" label={t('profile.editProfile')} onPress={() => setEditVisible(true)} />
+                <SettingsItem icon="Lock" label={t('profile.changePassword')} onPress={() => setChangePasswordVisible(true)} />
+              </SettingsSection>
 
-          <Button title={t('profile.logOut')} variant="danger" size="lg" icon="LogOut" fullWidth onPress={() => setLogoutVisible(true)} className="mt-2" />
+              <SettingsSection title={t('profile.data')} icon="Database" color="#0EA5E9" index={8}>
+                <SettingsItem icon="Download" label={t('profile.exportData')} description="Download a copy as JSON" onPress={exportUserData} />
+                <SettingsItem icon="Trash" label={t('profile.clearCache')} description="Recent searches & AI conversation" onPress={handleClearCache} />
+                <SettingsItem icon="UserX" label={t('profile.deleteAccount')} danger onPress={() => setDeleteVisible(true)} />
+              </SettingsSection>
+
+              <AboutSection index={9} onFeedbackPress={() => setFeedbackVisible(true)} />
+
+              <BentoTile index={10} onPress={() => setLogoutVisible(true)} accessibilityLabel={t('profile.logOut')}>
+                <View className="flex-row items-center gap-3">
+                  <View className="h-9 w-9 items-center justify-center rounded-xl bg-error/10">
+                    <Icon name="LogOut" size={17} color={themeColors.status.error} />
+                  </View>
+                  <Text variant="body" className="flex-1 font-semibold text-error">
+                    {t('profile.logOut')}
+                  </Text>
+                  <Icon name="ChevronRight" size={18} color={themeColors.status.error} />
+                </View>
+              </BentoTile>
+            </View>
+          </View>
         </ResponsiveContainer>
       </ScrollView>
 

@@ -2,17 +2,15 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 
 import { useLevelStore } from '../../store/levelStore';
-import { colors } from '../../utils/theme';
 import { xpForLevel } from '../../utils/xp';
-import { Icon, ProgressBar, Text } from '../ui';
+import { BENTO_INK_TEXT, BentoRing, BentoTile, Text } from '../ui';
 
 /**
- * Profile's "top" level section — a big LV badge, an XP progress bar toward the next level,
- * and the raw numbers behind it. Self-fetches on mount (same pattern as this file's sibling
- * StatsRow.tsx); mutation responses elsewhere (levelStore.applyXpResult) keep it current
- * without another fetch in between, so this only needs to run once per screen visit.
+ * Level as a dark bento tile: an aurora ring showing progress to the next level with the
+ * level number inside it, and the raw XP numbers beside it. Self-fetches on mount;
+ * levelStore.applyXpResult keeps it current after that.
  */
-export function LevelCard() {
+export function LevelCard({ className, index = 1 }: { className?: string; index?: number }) {
   const level = useLevelStore((s) => s.level);
   const totalXp = useLevelStore((s) => s.totalXp);
   const fetchLevel = useLevelStore((s) => s.fetchLevel);
@@ -26,25 +24,32 @@ export function LevelCard() {
   const progress = ceiling === floor ? 100 : Math.round(((totalXp - floor) / (ceiling - floor)) * 100);
 
   return (
-    <View className="flex-row items-center gap-4 rounded-2xl border border-subtle bg-elevated p-5">
-      <View className="h-16 w-16 items-center justify-center rounded-full border-2 border-tide-teal/30 bg-tide-teal/10">
-        <Text variant="h3" color="accent" className="font-bold">
-          LV {level}
-        </Text>
-      </View>
-
-      <View className="flex-1 gap-2">
-        <View className="flex-row items-center justify-between">
-          <Text variant="label" color="muted">
-            Your Level
+    <BentoTile tone="ink" index={index} className={className}>
+      <View className="flex-1 flex-row items-center gap-5">
+        <BentoRing value={progress} size={116} strokeWidth={10}>
+          <Text variant="label" style={{ color: BENTO_INK_TEXT.muted, letterSpacing: 1.4 }}>
+            Level
           </Text>
-          <Icon name="Trophy" size={18} color={colors.brand.tideTeal} />
+          <Text variant="display" style={{ color: BENTO_INK_TEXT.primary, fontVariant: ['tabular-nums'], lineHeight: 40 }}>
+            {level}
+          </Text>
+        </BentoRing>
+        <View className="flex-1 gap-3" style={{ minWidth: 0 }}>
+          <View>
+            <Text variant="h2" style={{ color: BENTO_INK_TEXT.primary, fontVariant: ['tabular-nums'] }}>
+              {totalXp.toLocaleString()} XP
+            </Text>
+            <Text variant="body" className="text-[12px]" style={{ color: BENTO_INK_TEXT.muted }}>
+              {(ceiling - totalXp).toLocaleString()} XP to level {level + 1}
+            </Text>
+          </View>
+          <View className="self-start rounded-full px-2.5 py-1" style={{ backgroundColor: 'rgba(20,184,166,0.18)' }}>
+            <Text variant="body" className="text-[11px] font-semibold" style={{ color: '#5EEAD4' }}>
+              {progress}% of the way there
+            </Text>
+          </View>
         </View>
-        <ProgressBar value={progress} variant="teal" size="md" />
-        <Text variant="caption" color="muted" className="normal-case tracking-normal">
-          {totalXp.toLocaleString()} / {ceiling.toLocaleString()} XP to level {level + 1}
-        </Text>
       </View>
-    </View>
+    </BentoTile>
   );
 }

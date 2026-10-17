@@ -24,6 +24,31 @@ function greetingFor(name?: string): string {
 
 const SUGGESTION_COLORS = ['#14B8A6', '#0EA5E9', '#6366F1', '#F59E0B', '#EC4899', '#F97316', '#22C55E', '#8B5CF6'];
 
+export interface SnapshotItem {
+  icon: IconName;
+  /** Light tint — the snapshot is always shown on a dark `ink` tile. */
+  color: string;
+  value: string;
+  label: string;
+}
+
+/** Today's focus time, open tasks, streak and journal count — the same data the coach
+ * answers from. Shared by the welcome bento and the desktop context rail. */
+export function useTodaySnapshot(): SnapshotItem[] {
+  const activityTotals = useTimerStore((s) => s.activityTotals);
+  const openTasks = useTaskStore((s) => s.tasks.filter((t) => t.status !== 'done').length);
+  const streak = useQuestStore((s) => s.streak);
+  const journalCount = useJournalStore((s) => s.entries.length);
+  const focusSeconds = Object.values(activityTotals).reduce((sum, v) => sum + v, 0);
+
+  return [
+    { icon: 'Timer', color: '#5EEAD4', value: formatDuration(focusSeconds), label: 'focus today' },
+    { icon: 'ListChecks', color: '#7DD3FC', value: `${openTasks}`, label: 'open tasks' },
+    { icon: 'Flame', color: '#FDBA74', value: `${streak}`, label: 'day streak' },
+    { icon: 'BookOpen', color: '#C4B5FD', value: `${journalCount}`, label: 'journal entries' },
+  ];
+}
+
 export interface ChatWelcomeProps {
   userFirstName?: string;
   suggestions: QuickSuggestion[];
@@ -37,18 +62,7 @@ export interface ChatWelcomeProps {
  */
 export function ChatWelcome({ userFirstName, suggestions, onSelect }: ChatWelcomeProps) {
   const { isPhone } = useResponsive();
-  const activityTotals = useTimerStore((s) => s.activityTotals);
-  const openTasks = useTaskStore((s) => s.tasks.filter((t) => t.status !== 'done').length);
-  const streak = useQuestStore((s) => s.streak);
-  const journalCount = useJournalStore((s) => s.entries.length);
-  const focusSeconds = Object.values(activityTotals).reduce((sum, v) => sum + v, 0);
-
-  const snapshot: { icon: IconName; color: string; value: string; label: string }[] = [
-    { icon: 'Timer', color: '#5EEAD4', value: formatDuration(focusSeconds), label: 'focus today' },
-    { icon: 'ListChecks', color: '#7DD3FC', value: `${openTasks}`, label: 'open tasks' },
-    { icon: 'Flame', color: '#FDBA74', value: `${streak}`, label: 'day streak' },
-    { icon: 'BookOpen', color: '#C4B5FD', value: `${journalCount}`, label: 'journal entries' },
-  ];
+  const snapshot = useTodaySnapshot();
 
   const [featured, ...rest] = suggestions;
   const others = isPhone ? rest.slice(0, 4) : rest.slice(0, 6);

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ActivityFormModal, ActivityInfoModal, ActivityRow, FavoriteActivityTile } from '@/components/activity';
+import { ActivityCard, ActivityFormModal, ActivityInfoModal, FavoriteActivityTile } from '@/components/activity';
 import { AppLayout, MobileMenuButton, MobileTabBar } from '@/components/layout';
 import { BackButton, BENTO_INK_TEXT, BentoHeader, BentoTile, Button, EmptyState, ErrorState, Icon, Input, ResponsiveContainer, SkeletonRow, Text, type IconName } from '@/components/ui';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -51,19 +51,21 @@ function ActivityGroup({
             </View>
           }
         />
-        <View className="gap-2">
+        {/* Card grid: 2 across on phone, 3 on tablet, 4 on desktop. */}
+        <View className="flex-row flex-wrap gap-3">
           {items.map((activity, i) => (
-            <ActivityRow
+            <ActivityCard
               key={activity.id}
               activity={activity}
               index={i}
+              className="basis-[46%] grow md:basis-[30%] md:grow-0 lg:basis-[23%]"
               onInfo={() => onInfo(activity)}
               onEdit={() => onEdit(activity)}
               onToggleFavorite={() => onToggleFavorite(activity.id)}
-              onMoveUp={() => i > 0 && onReorder(activity.id, items[i - 1].id)}
-              onMoveDown={() => i < items.length - 1 && onReorder(activity.id, items[i + 1].id)}
-              canMoveUp={i > 0}
-              canMoveDown={i < items.length - 1}
+              onMoveBack={() => i > 0 && onReorder(activity.id, items[i - 1].id)}
+              onMoveForward={() => i < items.length - 1 && onReorder(activity.id, items[i + 1].id)}
+              canMoveBack={i > 0}
+              canMoveForward={i < items.length - 1}
               onDelete={() => onDelete(activity.id)}
               onToggleHide={() => onToggleHide(activity.id, !activity.isArchived)}
             />
@@ -267,34 +269,30 @@ export default function ActivitiesScreen() {
                   </View>
                 )}
 
-                <View className="gap-3 lg:flex-row lg:items-start lg:gap-4">
-                  <ActivityGroup
-                    index={4}
-                    className="lg:flex-1"
-                    title="Custom"
-                    icon="Sparkles"
-                    items={custom}
-                    onInfo={openInfo}
-                    onEdit={openEdit}
-                    onToggleFavorite={toggleFavorite}
-                    onReorder={reorderActivity}
-                    onDelete={deleteActivity}
-                    onToggleHide={setArchived}
-                  />
-                  <ActivityGroup
-                    index={5}
-                    className="lg:flex-1"
-                    title="Built-in"
-                    icon="Layers"
-                    items={predefined}
-                    onInfo={openInfo}
-                    onEdit={openEdit}
-                    onToggleFavorite={toggleFavorite}
-                    onReorder={reorderActivity}
-                    onDelete={deleteActivity}
-                    onToggleHide={setArchived}
-                  />
-                </View>
+                <ActivityGroup
+                  index={4}
+                  title="Custom"
+                  icon="Sparkles"
+                  items={custom}
+                  onInfo={openInfo}
+                  onEdit={openEdit}
+                  onToggleFavorite={toggleFavorite}
+                  onReorder={reorderActivity}
+                  onDelete={deleteActivity}
+                  onToggleHide={setArchived}
+                />
+                <ActivityGroup
+                  index={5}
+                  title="Built-in"
+                  icon="Layers"
+                  items={predefined}
+                  onInfo={openInfo}
+                  onEdit={openEdit}
+                  onToggleFavorite={toggleFavorite}
+                  onReorder={reorderActivity}
+                  onDelete={deleteActivity}
+                  onToggleHide={setArchived}
+                />
                 <ActivityGroup
                   index={6}
                   title="Hidden"

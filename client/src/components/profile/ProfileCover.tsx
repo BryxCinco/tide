@@ -1,91 +1,117 @@
-import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
-import { View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { Image, View } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
 
-import { CoverPhoto, CoverPicker } from '../dashboard';
+import { CoverPicker } from '../dashboard/CoverPicker';
 import { useAuth } from '../../hooks/useAuth';
 import { useResponsive } from '../../hooks/useResponsive';
-import { DEFAULT_COVER_GRADIENT_ID } from '../../store/userStore';
-import { Avatar, BackButton, Icon, ResponsiveContainer, Text } from '../ui';
+import { COVER_GRADIENTS, DEFAULT_COVER_GRADIENT_ID } from '../../store/userStore';
+import { gradientDirections } from '../../utils/gradients';
+import { Avatar, FadeInView, Icon, Text } from '../ui';
+
+const FILL = { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 } as const;
 
 export interface ProfileCoverProps {
-  /** The avatar's camera badge opens AvatarPickerModal (real upload now — see
-   * AvatarPickerModal.tsx), not EditProfileModal; editing name/bio/email is reached
-   * through the Account section's own "Edit Profile" row instead. */
+  /** The avatar's camera badge opens AvatarPickerModal. */
   onAvatarPress: () => void;
+  /** "Edit profile" button — name, bio and email. */
+  onEditPress: () => void;
+  className?: string;
 }
 
 /**
- * Facebook/LinkedIn-style header: full-bleed cover photo with the avatar overlapping its
- * bottom-left edge, name/handle underneath. Reuses `CoverPhoto`/`CoverPicker` straight from
- * the Dashboard (same cover data — `user.coverType`/`coverValue` via userStore.updateCover)
- * instead of building a second copy, so changing the cover here and on the Dashboard is
- * the same action with the same picker. The back button floats over the cover itself
- * (semi-opaque circle, same treatment `CoverPhoto`'s own camera button already uses)
- * rather than sitting in a separate header row above it — that row was the first thing to
- * go when trimming vertical space back for actual content.
+ * Profile identity as a bento tile: the user's own cover (shared with the Dashboard's
+ * greeting tile and the same CoverPicker) fills the tile, with the avatar, name, email/bio
+ * and an Edit profile action on top of a bottom shade that keeps white text readable.
  */
-export function ProfileCover({ onAvatarPress }: ProfileCoverProps) {
+export function ProfileCover({ onAvatarPress, onEditPress, className }: ProfileCoverProps) {
   const { user, isGuest } = useAuth();
+  const { isPhone } = useResponsive();
   const [pickerVisible, setPickerVisible] = useState(false);
-  const { isDesktop, isTablet } = useResponsive();
 
   const coverType = user?.coverType ?? 'gradient';
   const coverValue = user?.coverValue ?? DEFAULT_COVER_GRADIENT_ID;
-  const coverHeight = isDesktop ? 180 : isTablet ? 160 : 140;
-  const avatarSize = isDesktop ? 96 : 80;
-  const avatarWrapperSize = avatarSize + 6;
-  const avatarOverlap = avatarSize / 2 + 4;
+  const gradient = COVER_GRADIENTS.find((g) => g.id === coverValue) ?? COVER_GRADIENTS[0];
+  const avatarSize = isPhone ? 72 : 84;
 
   return (
-    <Animated.View entering={FadeIn.duration(380)}>
-      <View style={{ position: 'relative' }}>
-        <CoverPhoto coverType={coverType} coverValue={coverValue} height={coverHeight} onPress={() => setPickerVisible(true)} />
-        <BackButton onPress={() => router.push('/')} className="absolute left-4 top-4 z-20 bg-base/90" />
+    <FadeInView index={0} className={className} style={{ minHeight: isPhone ? 240 : 250 }}>
+      <View className="flex-1 overflow-hidden rounded-[24px]">
+        {coverType === 'image' && coverValue ? (
+          <Image source={{ uri: coverValue }} style={FILL} resizeMode="cover" />
+        ) : coverType === 'solid' ? (
+          <View style={[FILL, { backgroundColor: coverValue || '#14B8A6' }]} />
+        ) : (
+          <LinearGradient colors={gradient.colors} {...gradientDirections.diagonal} style={FILL} />
+        )}
+        <LinearGradient
+          colors={['rgba(2, 6, 23, 0)', 'rgba(2, 6, 23, 0.3)', 'rgba(2, 6, 23, 0.72)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={FILL}
+          pointerEvents="none"
+        />
+        <View
+          pointerEvents="none"
+          style={{ position: 'absolute', right: -60, top: -60, width: 240, height: 240, borderRadius: 120, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' }}
+        />
+
+        <View className="flex-1 justify-between gap-6 p-5 md:p-6">
+          <View className="flex-row items-center justify-between">
+            <View className="rounded-full px-3 py-1.5" style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}>
+              <Text variant="body" className="text-[12px] font-semibold" style={{ color: '#FFFFFF' }}>
+                {isGuest ? 'Demo account' : 'Your profile'}
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => setPickerVisible(true)}
+              accessibilityLabel="Change cover"
+              hitSlop={6}
+              className="h-9 w-9 items-center justify-center rounded-full"
+              style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}
+            >
+              <Icon name="ImagePlus" size={16} color="#FFFFFF" />
+            </Pressable>
+          </View>
+
+          <View className="flex-row items-end gap-4">
+            <Pressable onPress={onAvatarPress} accessibilityLabel="Change photo" className="relative">
+              <View className="rounded-full p-[3px]" style={{ backgroundColor: 'rgba(255,255,255,0.4)' }}>
+                <Avatar name={user?.name} source={user?.avatar} style={{ width: avatarSize, height: avatarSize }} />
+              </View>
+              <View className="absolute bottom-0 right-0 h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-tide-teal">
+                <Icon name="Camera" size={12} color="#FFFFFF" />
+              </View>
+            </Pressable>
+
+            <View className="flex-1 gap-0.5" style={{ minWidth: 0 }}>
+              <Text variant={isPhone ? 'h2' : 'h1'} style={{ color: '#FFFFFF' }} numberOfLines={1}>
+                {user?.name ?? 'Demo User'}
+              </Text>
+              <Text variant="body" className="text-[13px]" style={{ color: 'rgba(255,255,255,0.82)' }} numberOfLines={1}>
+                {isGuest ? 'Demo session' : user?.email}
+              </Text>
+              {user?.bio && (
+                <Text variant="body" className="text-[13px]" style={{ color: 'rgba(255,255,255,0.82)' }} numberOfLines={2}>
+                  {user.bio}
+                </Text>
+              )}
+            </View>
+
+            {!isPhone && (
+              <Pressable onPress={onEditPress} className="h-10 flex-row items-center gap-2 rounded-full bg-white px-4">
+                <Icon name="Pencil" size={14} color="#0F766E" />
+                <Text variant="body" className="text-[13px] font-semibold" style={{ color: '#0F766E' }}>
+                  Edit profile
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
       </View>
 
-      <ResponsiveContainer>
-        <View className="flex-row items-end justify-between" style={{ marginTop: -avatarOverlap }}>
-          <Pressable onPress={onAvatarPress} className="relative">
-            <View
-              className="items-center justify-center rounded-full bg-base"
-              style={{ width: avatarWrapperSize, height: avatarWrapperSize }}
-            >
-              <Avatar
-                name={user?.name}
-                source={user?.avatar}
-                ring
-                ringColor="teal"
-                style={{ width: avatarSize, height: avatarSize }}
-              />
-            </View>
-            <View
-              className="absolute bottom-0.5 right-0.5 items-center justify-center rounded-full border-2 border-base bg-tide-teal"
-              style={{ width: 28, height: 28 }}
-            >
-              <Icon name="Camera" size={13} color="#FFFFFF" />
-            </View>
-          </Pressable>
-        </View>
-
-        <View className="mt-3 gap-0.5 pb-1">
-          <Text variant="h2" color="primary">
-            {user?.name ?? 'Demo User'}
-          </Text>
-          <Text variant="body" color="muted" className="normal-case tracking-normal">
-            {isGuest ? 'Demo session' : user?.email}
-          </Text>
-          {user?.bio && (
-            <Text variant="body" color="secondary" numberOfLines={2} className="mt-1 max-w-md normal-case tracking-normal">
-              {user.bio}
-            </Text>
-          )}
-        </View>
-      </ResponsiveContainer>
-
       <CoverPicker visible={pickerVisible} onClose={() => setPickerVisible(false)} currentType={coverType} currentValue={coverValue} />
-    </Animated.View>
+    </FadeInView>
   );
 }

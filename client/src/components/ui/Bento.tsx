@@ -50,6 +50,8 @@ export interface FadeInViewProps {
   index?: number;
   className?: string;
   style?: StyleProp<ViewStyle>;
+  /** false renders fully visible immediately — e.g. chat history restored on open. */
+  animate?: boolean;
 }
 
 /**
@@ -57,10 +59,11 @@ export interface FadeInViewProps {
  * core Animated API rather than Reanimated: Reanimated's delayed fades could stall part-way on
  * web when the screen re-rendered mid-animation (e.g. data arriving), leaving tiles half-faded.
  */
-export function FadeInView({ children, index = 0, className, style }: FadeInViewProps) {
-  const opacity = useRef(new RNAnimated.Value(0)).current;
+export function FadeInView({ children, index = 0, className, style, animate = true }: FadeInViewProps) {
+  const opacity = useRef(new RNAnimated.Value(animate ? 0 : 1)).current;
 
   useEffect(() => {
+    if (!animate) return;
     const animation = RNAnimated.timing(opacity, {
       toValue: 1,
       duration: 320,
