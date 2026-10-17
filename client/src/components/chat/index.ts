@@ -5,3 +5,4 @@ export * from './ChatHeader';
 export * from './QuickSuggestions';
 export * from './SmartSuggestions';
 export * from './TypingIndicator';
+export * from './ChatWelcome';

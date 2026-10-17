@@ -6,25 +6,17 @@ import { useThemeStore } from '../../store/themeStore';
 import { useChatStore } from '../../store/chatStore';
 import type { QuickSuggestion } from '../../types/chat';
 import { hexToRgba } from '../../utils/color';
-import { getGreeting } from '../../utils/greeting';
 import { colors } from '../../utils/theme';
-import { Text } from '../ui';
 import { AIAvatar } from './AIAvatar';
 import { ChatBubble } from './ChatBubble';
-import { QuickSuggestions } from './QuickSuggestions';
+import { ChatWelcome } from './ChatWelcome';
 import { SmartSuggestions } from './SmartSuggestions';
 import { TypingIndicator } from './TypingIndicator';
 
 /** Reading-width cap for the conversation column on wide screens (shared with the composer
  * in app/chat.tsx so both line up). */
 export const CHAT_COLUMN_MAX_WIDTH = 780;
-
-/** "Good evening, Ana" — or "Still up, Ana?" for the late-night greeting that's a question. */
-function greetingFor(name?: string): string {
-  const greeting = getGreeting();
-  if (!name) return greeting;
-  return greeting.endsWith('?') ? `${greeting.slice(0, -1)}, ${name}?` : `${greeting}, ${name}`;
-}
+const CHAT_WELCOME_MAX_WIDTH = 1040;
 
 export interface ChatConversationProps {
   userFirstName?: string;
@@ -90,7 +82,8 @@ export function ChatConversation({
         className="flex-1"
         contentContainerStyle={{
           width: '100%',
-          maxWidth: CHAT_COLUMN_MAX_WIDTH,
+          // The welcome bento gets a wider canvas than the reading column a conversation uses.
+          maxWidth: isEmpty ? CHAT_WELCOME_MAX_WIDTH : CHAT_COLUMN_MAX_WIDTH,
           alignSelf: 'center',
           flexGrow: 1,
           justifyContent: isEmpty ? 'center' : 'flex-start',
@@ -99,21 +92,8 @@ export function ChatConversation({
         }}
         keyboardShouldPersistTaps="handled"
       >
-        {isEmpty && (
-          <View className="items-center gap-8 px-5 py-6 md:px-6">
-            <View className="items-center">
-              <AIAvatar size={60} pulse shape="squircle" />
-              <Text variant="h2" color="primary" className="mt-6 text-center">
-                {greetingFor(userFirstName)}
-              </Text>
-              <Text variant="body" color="muted" className="mt-2 max-w-[420px] text-center leading-[22px]">
-                I'm your TIDE Coach. Ask about your week, focus time, tasks, or mood — or let me plan your day.
-              </Text>
-            </View>
-            {quickSuggestions && (
-              <QuickSuggestions suggestions={quickSuggestions.suggestions} onSelect={quickSuggestions.onSelect} />
-            )}
-          </View>
+        {isEmpty && quickSuggestions && (
+          <ChatWelcome userFirstName={userFirstName} suggestions={quickSuggestions.suggestions} onSelect={quickSuggestions.onSelect} />
         )}
 
         {messages.map((message) => (

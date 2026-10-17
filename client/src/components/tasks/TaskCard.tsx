@@ -1,18 +1,21 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { View } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
 
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { isTaskDueToday, isTaskOverdue } from '../../store/taskStore';
 import type { Task, TaskPriority } from '../../types/task';
 import { cn } from '../../utils/cn';
+import { hexToRgba } from '../../utils/color';
 import { formatDateKeyCompact } from '../../utils/formatDate';
-import { colors } from '../../utils/theme';
-import { Badge, Icon, Text, VisibleDeleteButton, type BadgeVariant } from '../ui';
+import { gradientDirections, gradients } from '../../utils/gradients';
+import { Icon, Text, VisibleDeleteButton } from '../ui';
 
-const PRIORITY_BADGE: Record<TaskPriority, { label: string; variant: BadgeVariant }> = {
-  low: { label: 'Low', variant: 'default' },
-  medium: { label: 'Medium', variant: 'blue' },
-  high: { label: 'High', variant: 'warning' },
-  critical: { label: 'Critical', variant: 'error' },
+export const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
+  low: { label: 'Low', color: '#94A3B8' },
+  medium: { label: 'Medium', color: '#0EA5E9' },
+  high: { label: 'High', color: '#F59E0B' },
+  critical: { label: 'Critical', color: '#EF4444' },
 };
 
 export interface TaskCardProps {
@@ -21,71 +24,107 @@ export interface TaskCardProps {
   activityName?: string;
   onToggle: () => void;
   /** Tapping the card's main body opens the view-only info modal — Edit stays an explicit,
-   * separate action (the pencil icon below), never triggered by this. Same split as
-   * ActivityRow.tsx's onInfo/onEdit. */
+   * separate action (the pencil icon), never triggered by this. */
   onView: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
 
+function Chip({ icon, label, color }: { icon?: Parameters<typeof Icon>[0]['name']; label: string; color: string }) {
+  return (
+    <View className="flex-row items-center gap-1 rounded-full px-2 py-0.5" style={{ backgroundColor: hexToRgba(color, 0.12) }}>
+      {icon && <Icon name={icon} size={11} color={color} />}
+      <Text variant="body" className="text-[11px] font-semibold" style={{ color }}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+/** One task as a bento tile: priority-colored rail, a round check that fills with the aurora
+ * gradient when done, the title, and a row of small status chips. */
 export function TaskCard({ task, activityName, onToggle, onView, onEdit, onDelete }: TaskCardProps) {
+  const themeColors = useThemeColors();
   const isDone = task.status === 'done';
-  const priority = PRIORITY_BADGE[task.priority];
-  const dateLabel = task.dueDate ? `Due ${formatDateKeyCompact(task.dueDate)}` : null;
+  const priority = PRIORITY_META[task.priority];
   const overdue = isTaskOverdue(task);
   const dueToday = !overdue && isTaskDueToday(task);
 
   return (
     <View
-      className={cn(
-        'flex-row items-start gap-3 rounded-xl border bg-base p-3',
-        overdue ? 'border-error/30 bg-error/5' : 'border-subtle',
-      )}
+      className={cn('flex-1 flex-row overflow-hidden rounded-[20px] border bg-surface', overdue ? 'border-error/30' : 'border-subtle')}
     >
-      <Pressable
-        onPress={onToggle}
-        hitSlop={10}
-        className={cn(
-          'mt-0.5 h-5 w-5 items-center justify-center rounded-full border',
-          isDone ? 'border-tide-teal bg-tide-teal' : 'border-subtle bg-base',
-        )}
-      >
-        {isDone && <Icon name="Check" size={12} color={colors.text.inverse} />}
-      </Pressable>
+      <View className="w-1.5 self-stretch" style={{ backgroundColor: isDone ? themeColors.border.default : priority.color }} />
 
-      <Pressable onPress={onView} className="flex-1 gap-1.5">
-        <Text variant="body" color={isDone ? 'muted' : 'primary'} className={cn('font-medium', isDone && 'line-through')}>
-          {task.title}
-        </Text>
-
-        <View className="flex-row flex-wrap items-center gap-1.5">
-          <Badge label={priority.label} variant={priority.variant} size="sm" />
-          {overdue && <Badge label="Overdue" variant="error" size="sm" />}
-          {dueToday && <Badge label="Due today" variant="warning" size="sm" />}
-          {dateLabel && (
-            <View className="flex-row items-center gap-1">
-              <Icon name="Calendar" size={12} />
-              <Text variant="caption" color="muted" className="normal-case tracking-normal">
-                {dateLabel}
-              </Text>
+      <View className="flex-1 flex-row items-start gap-3 py-3.5 pl-3.5 pr-2">
+        <Pressable
+          onPress={onToggle}
+          hitSlop={10}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: isDone }}
+          accessibilityLabel={isDone ? `Mark "${task.title}" as not done` : `Mark "${task.title}" as done`}
+          className={cn('mt-0.5 h-6 w-6 items-center justify-center overflow-hidden rounded-full', !isDone && 'border-2 border-default')}
+        >
+          {isDone && (
+            <LinearGradient
+              colors={[...gradients.aurora]}
+              {...gradientDirections.diagonal}
+              style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+            />
+          )}
+          {isDone && (
+            <View>
+              <Icon name="Check" size={14} strokeWidth={3} color="#FFFFFF" />
             </View>
           )}
-          {activityName && <Badge label={activityName} variant="teal" size="sm" />}
-          {task.tags.map((tag) => (
-            <Badge key={tag} label={tag} variant="default" size="sm" />
-          ))}
-        </View>
-      </Pressable>
-
-      <View className="flex-row items-center gap-1">
-        <Pressable onPress={onEdit} hitSlop={6} className="h-8 w-8 items-center justify-center rounded-full hover:bg-elevated">
-          <Icon name="Pencil" size={16} />
         </Pressable>
-        <VisibleDeleteButton
-          onConfirm={onDelete}
-          confirmTitle="Delete task?"
-          confirmMessage={`"${task.title}" will be removed. This can't be undone.`}
-        />
+
+        <Pressable onPress={onView} className="flex-1 gap-2" style={{ minWidth: 0 }}>
+          <Text
+            variant="body"
+            color={isDone ? 'muted' : 'primary'}
+            className={cn('text-[15px] font-semibold leading-[21px]', isDone && 'line-through')}
+            numberOfLines={2}
+          >
+            {task.title}
+          </Text>
+          {task.description ? (
+            <Text variant="body" color="muted" className="text-[13px]" numberOfLines={1}>
+              {task.description}
+            </Text>
+          ) : null}
+
+          <View className="flex-row flex-wrap items-center gap-1.5">
+            <Chip label={priority.label} color={priority.color} />
+            {overdue && <Chip icon="AlertTriangle" label="Overdue" color="#EF4444" />}
+            {dueToday && <Chip icon="Clock" label="Due today" color="#F59E0B" />}
+            {task.dueDate && !dueToday && (
+              <Chip icon="Calendar" label={formatDateKeyCompact(task.dueDate)} color={themeColors.text.muted} />
+            )}
+            {activityName && <Chip icon="Layers" label={activityName} color="#14B8A6" />}
+            {task.tags.slice(0, 3).map((tag) => (
+              <Text key={tag} variant="body" color="muted" className="text-[11px] font-medium">
+                #{tag}
+              </Text>
+            ))}
+          </View>
+        </Pressable>
+
+        <View className="flex-row items-center">
+          <Pressable
+            onPress={onEdit}
+            hitSlop={6}
+            accessibilityLabel="Edit task"
+            className="h-8 w-8 items-center justify-center rounded-full hover:bg-elevated"
+          >
+            <Icon name="Pencil" size={15} />
+          </Pressable>
+          <VisibleDeleteButton
+            onConfirm={onDelete}
+            confirmTitle="Delete task?"
+            confirmMessage={`"${task.title}" will be removed. This can't be undone.`}
+          />
+        </View>
       </View>
     </View>
   );

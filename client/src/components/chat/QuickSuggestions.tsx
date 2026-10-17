@@ -12,8 +12,8 @@ export interface QuickSuggestionsProps {
 }
 
 export const DEFAULT_QUICK_SUGGESTIONS: QuickSuggestion[] = [
-  { id: 'week', label: 'How was my week?', icon: 'CalendarDays' },
   { id: 'focus', label: 'What should I focus on today?', icon: 'Target' },
+  { id: 'week', label: 'How was my week?', icon: 'CalendarDays' },
   { id: 'tip', label: 'Give me a productivity tip', icon: 'Lightbulb' },
   { id: 'tasks', label: 'Summarize my open tasks', icon: 'ListChecks' },
   { id: 'mood', label: 'How has my mood trended?', icon: 'Smile' },

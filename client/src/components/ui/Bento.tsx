@@ -6,6 +6,8 @@ import { useThemeStore } from '../../store/themeStore';
 import { cn } from '../../utils/cn';
 import { hexToRgba } from '../../utils/color';
 import { gradientDirections, gradients } from '../../utils/gradients';
+import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
+
 import { Icon, type IconName } from './Icon';
 import { Pressable } from './SoundPressable';
 import { Text } from './Text';
@@ -221,5 +223,52 @@ export function BentoStat({ icon, color, value, label, progress, onPress, index,
         </View>
       </View>
     </BentoTile>
+  );
+}
+
+export interface BentoRingProps {
+  /** 0-100. */
+  value: number;
+  size?: number;
+  strokeWidth?: number;
+  /** Track color — defaults to a faint white for use on `ink` tiles. */
+  trackColor?: string;
+  children?: ReactNode;
+}
+
+/** Static aurora progress ring (no animation, so it never jitters on re-render). */
+export function BentoRing({ value, size = 120, strokeWidth = 10, trackColor = 'rgba(255, 255, 255, 0.1)', children }: BentoRingProps) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.max(0, Math.min(100, value));
+
+  return (
+    <View style={{ width: size, height: size }} className="items-center justify-center">
+      <Svg width={size} height={size} style={{ position: 'absolute' }}>
+        <Defs>
+          <SvgGradient id="bentoRingAurora" x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor="#14B8A6" />
+            <Stop offset="55%" stopColor="#06B6D4" />
+            <Stop offset="100%" stopColor="#6366F1" />
+          </SvgGradient>
+        </Defs>
+        <Circle cx={size / 2} cy={size / 2} r={radius} stroke={trackColor} strokeWidth={strokeWidth} fill="none" />
+        {clamped > 0 && (
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke="url(#bentoRingAurora)"
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            fill="none"
+            strokeDasharray={`${circumference} ${circumference}`}
+            strokeDashoffset={circumference * (1 - clamped / 100)}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        )}
+      </Svg>
+      {children}
+    </View>
   );
 }
