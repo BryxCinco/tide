@@ -133,7 +133,17 @@ export function Heatmap({ days }: HeatmapProps) {
               {columns.map((col, i) => (
                 <View key={i} style={{ width: CELL_SIZE }}>
                   {col.monthLabel && (
-                    <Text variant="caption" color="muted" style={{ fontSize: 10 }} className="normal-case tracking-normal">
+                    // `position: absolute` keeps this column's own width at CELL_SIZE (so
+                    // it still lines up with the cell grid below) without constraining the
+                    // label itself — without it, a 3-letter month name was wrapping one
+                    // letter per line inside the 12px-wide column.
+                    <Text
+                      variant="caption"
+                      color="muted"
+                      numberOfLines={1}
+                      style={{ fontSize: 10, position: 'absolute', left: 0, top: 0 }}
+                      className="normal-case tracking-normal"
+                    >
                       {col.monthLabel}
                     </Text>
                   )}

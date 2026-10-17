@@ -244,8 +244,8 @@ export default function InsightsScreen() {
               utilities directly), plain single-column stacking below `md` on every
               platform. See BentoCard.tsx for the native-grid caveat. */}
           <View className="gap-4 md:grid md:grid-cols-2 md:gap-4 lg:grid-cols-4">
-            <BentoCard size="wide" title="Your Streaks" icon="Flame">
-              <HexagonStats />
+            <BentoCard size="wide" title="Your Stats" icon="Flame">
+              <HexagonStats productivityScore={summary?.productivityScore.overall} />
             </BentoCard>
 
             <BentoCard size="hero" title="Productivity Score" icon="Target">
