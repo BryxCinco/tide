@@ -17,10 +17,14 @@ export interface HexagonStatsProps {
   productivityScore?: number | null;
 }
 
-const RADIUS = 84;
+// Sized to still fit a 320px-wide phone (WRAPPER_SIZE 232px vs. ~240px available inside
+// ResponsiveContainer's px-4 + BentoCard's p-6 at that width) rather than the card's own
+// width on a typical phone — a fixed "looks right on my desktop" size here was overflowing
+// the card on narrower Android phones specifically.
+const RADIUS = 64;
 const RING_COUNT = 3;
-const LABEL_GAP = 26;
-const LABEL_WIDTH = 60;
+const LABEL_GAP = 20;
+const LABEL_WIDTH = 52;
 const MARGIN = LABEL_WIDTH / 2 + 6;
 const BOX = (RADIUS + LABEL_GAP) * 2;
 const WRAPPER_SIZE = BOX + MARGIN * 2;
@@ -117,15 +121,15 @@ export function HexagonStats({ productivityScore }: HexagonStatsProps) {
               style={{
                 position: 'absolute',
                 left: MARGIN + p.x - LABEL_WIDTH / 2,
-                top: MARGIN + p.y - 14,
+                top: MARGIN + p.y - 16,
                 width: LABEL_WIDTH,
                 alignItems: 'center',
               }}
             >
-              <Text variant="caption" color="muted" numberOfLines={1}>
+              <Text variant="caption" color="muted" numberOfLines={1} style={{ fontSize: 10 }}>
                 {axis.tag}
               </Text>
-              <Text variant="h3" color="primary" numberOfLines={1}>
+              <Text variant="body" color="primary" numberOfLines={1} className="font-bold">
                 {axis.display}
               </Text>
             </View>
