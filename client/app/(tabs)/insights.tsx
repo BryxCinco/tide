@@ -31,8 +31,8 @@ import { formatDuration } from '@/utils/formatTime';
 import { formatMonthYear, fromDateKey, toDateKey } from '@/utils/formatDate';
 
 /** Heatmap always shows a fixed trailing window regardless of the selected range filter —
- * ~6 months (26 weeks) of GitHub-style, calendar-aligned week columns (see Heatmap.tsx). */
-const HEATMAP_DAYS = 182;
+ * a full year (53 weeks) of GitHub-style, calendar-aligned week columns (see Heatmap.tsx). */
+const HEATMAP_DAYS = 365;
 const MAX_CUSTOM_RANGE_DAYS = 62;
 
 /**
@@ -285,7 +285,7 @@ export default function InsightsScreen() {
               <AiSuggestions />
             </BentoCard>
 
-            <BentoCard size="lg" title="Last 6 Months" icon="CalendarDays">
+            <BentoCard size="lg" title="Last 12 Months" icon="CalendarDays">
               {heatmapError ? (
                 <ErrorState message={heatmapError} onRetry={fetchHeatmap} />
               ) : heatmapLoading ? (

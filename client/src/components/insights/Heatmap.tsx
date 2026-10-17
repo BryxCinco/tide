@@ -91,6 +91,7 @@ export function Heatmap({ days }: HeatmapProps) {
   const levelOpacity: Record<HeatmapDay['level'], number> = { 0: 0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1 };
 
   const columns = useMemo(() => buildWeekColumns(days), [days]);
+  const gridWidth = columns.length > 0 ? columns.length * CELL_SIZE + (columns.length - 1) * CELL_GAP : 0;
   const activeDays = useMemo(() => days.filter((d) => d.seconds > 0), [days]);
   const totalSeconds = useMemo(() => activeDays.reduce((sum, d) => sum + d.seconds, 0), [activeDays]);
   const sortedActiveDays = useMemo(() => [...activeDays].sort((a, b) => (a.date < b.date ? 1 : -1)), [activeDays]);
@@ -116,7 +117,7 @@ export function Heatmap({ days }: HeatmapProps) {
         <View className="flex-row">
           {/* Weekday gutter — lines up under the month-label row above via the same
               top margin, so "Mon/Wed/Fri" anchor the grid's rows at a glance. */}
-          <View className="mr-2" style={{ gap: CELL_GAP, marginTop: 16 }}>
+          <View className="mr-2" style={{ gap: CELL_GAP, marginTop: 18 }}>
             {[0, 1, 2, 3, 4, 5, 6].map((row) => (
               <View key={row} style={{ height: CELL_SIZE, justifyContent: 'center' }}>
                 {WEEKDAY_LABELS[row] && (
@@ -129,26 +130,25 @@ export function Heatmap({ days }: HeatmapProps) {
           </View>
 
           <View>
-            <View className="mb-1 flex-row" style={{ gap: CELL_GAP }}>
-              {columns.map((col, i) => (
-                <View key={i} style={{ width: CELL_SIZE }}>
-                  {col.monthLabel && (
-                    // `position: absolute` keeps this column's own width at CELL_SIZE (so
-                    // it still lines up with the cell grid below) without constraining the
-                    // label itself — without it, a 3-letter month name was wrapping one
-                    // letter per line inside the 12px-wide column.
-                    <Text
-                      variant="caption"
-                      color="muted"
-                      numberOfLines={1}
-                      style={{ fontSize: 10, position: 'absolute', left: 0, top: 0 }}
-                      className="normal-case tracking-normal"
-                    >
-                      {col.monthLabel}
-                    </Text>
-                  )}
-                </View>
-              ))}
+            {/* One flat, un-clipped row the width of the whole grid — each label is
+                absolutely positioned at its own column's x-offset. Nesting a label inside
+                its own 12px-wide column (the previous approach) left each one constrained
+                to that column's width, which is what was truncating "Apr" down to "A…". */}
+            <View style={{ width: gridWidth, height: 14, marginBottom: 4 }}>
+              {columns.map((col, i) =>
+                col.monthLabel ? (
+                  <Text
+                    key={i}
+                    variant="caption"
+                    color="muted"
+                    numberOfLines={1}
+                    style={{ fontSize: 10, position: 'absolute', left: i * (CELL_SIZE + CELL_GAP), top: 0 }}
+                    className="normal-case tracking-normal"
+                  >
+                    {col.monthLabel}
+                  </Text>
+                ) : null
+              )}
             </View>
 
             <View className="flex-row" style={{ gap: CELL_GAP }}>
