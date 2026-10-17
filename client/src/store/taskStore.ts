@@ -8,6 +8,7 @@ import { hasAuthToken, isGuestMode } from '../utils/authFlags';
 import { toDateKey } from '../utils/formatDate';
 import { storage } from '../utils/storage';
 import { useLevelStore } from './levelStore';
+import { useStreakStore } from './streakStore';
 
 export type TaskFilter = 'all' | 'today' | 'done' | 'overdue';
 export type TaskSort = 'priority' | 'dueDate' | 'created';
@@ -163,7 +164,10 @@ export const useTaskStore = create<TaskState>()(
         if (isGuestMode()) return;
         taskService
           .update(id, { status: nextStatus, completedAt: completedAt ?? null })
-          .then(({ xp }) => useLevelStore.getState().applyXpResult(xp))
+          .then(({ xp, taskStreak }) => {
+            useLevelStore.getState().applyXpResult(xp);
+            useStreakStore.getState().applyTaskStreak(taskStreak);
+          })
           .catch((err) => {
             set({ tasks: previous });
             reportApiError(err);

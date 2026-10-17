@@ -79,8 +79,8 @@ export const taskService = {
     return mapApiTask(data.task);
   },
 
-  async update(id: string, payload: UpdateTaskPayload): Promise<{ task: Task; xp: XpResult | null }> {
-    const { data } = await api.patch<{ task: ApiTask; xp: XpResult | null }>(`/api/tasks/${id}`, {
+  async update(id: string, payload: UpdateTaskPayload): Promise<{ task: Task; xp: XpResult | null; taskStreak: number | null }> {
+    const { data } = await api.patch<{ task: ApiTask; xp: XpResult | null; taskStreak: number | null }>(`/api/tasks/${id}`, {
       title: payload.title,
       description: payload.description,
       status: payload.status,
@@ -90,7 +90,7 @@ export const taskService = {
       tags: payload.tags,
       completed_at: payload.completedAt,
     });
-    return { task: mapApiTask(data.task), xp: data.xp };
+    return { task: mapApiTask(data.task), xp: data.xp, taskStreak: data.taskStreak };
   },
 
   async remove(id: string): Promise<void> {

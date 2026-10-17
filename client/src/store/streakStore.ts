@@ -11,6 +11,12 @@ interface StreakState {
   error: string | null;
 
   fetchStreak: () => Promise<void>;
+  /** Patches just the task streak's current count in place, from a task-completion
+   * response's `taskStreak` field (server/routes/tasks.js's bumpTaskStreak) — avoids a
+   * full refetch for instant UI feedback. No-ops if nothing has been fetched yet or the
+   * value is null (that response's completion didn't actually advance the streak — e.g.
+   * a second task completed the same day). */
+  applyTaskStreak: (next: number | null) => void;
   clearError: () => void;
 }
 
@@ -22,7 +28,7 @@ interface StreakState {
  * for anything that wants the fuller picture (longestStreak, lastActivityDate) without
  * pulling in questStore's whole quest-list machinery.
  */
-export const useStreakStore = create<StreakState>()((set) => ({
+export const useStreakStore = create<StreakState>()((set, get) => ({
   streak: null,
   isLoading: false,
   error: null,
@@ -43,6 +49,12 @@ export const useStreakStore = create<StreakState>()((set) => ({
     } catch (err) {
       set({ error: getApiErrorMessage(err), isLoading: false });
     }
+  },
+
+  applyTaskStreak: (next) => {
+    const current = get().streak;
+    if (next == null || !current) return;
+    set({ streak: { ...current, taskCurrentStreak: next, taskLongestStreak: Math.max(current.taskLongestStreak, next) } });
   },
 
   clearError: () => set({ error: null }),

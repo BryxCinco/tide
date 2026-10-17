@@ -35,6 +35,9 @@ export interface ApiStreak {
   current_streak: number;
   longest_streak: number;
   last_activity_date: string | null;
+  task_current_streak: number;
+  task_longest_streak: number;
+  task_last_completed_date: string | null;
   updated_at: string;
 }
 
@@ -92,6 +95,9 @@ export function mapApiStreak(row: ApiStreak): Streak {
     currentStreak: row.current_streak,
     longestStreak: row.longest_streak,
     lastActivityDate: row.last_activity_date,
+    taskCurrentStreak: row.task_current_streak,
+    taskLongestStreak: row.task_longest_streak,
+    taskLastCompletedDate: row.task_last_completed_date,
   };
 }
 

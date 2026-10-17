@@ -9,6 +9,50 @@ router.use(requireAuth);
 
 const TASK_COMPLETE_XP = { low: 10, medium: 20, high: 30, critical: 50 };
 
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function daysBetween(fromKey, toKey) {
+  const [fy, fm, fd] = fromKey.split('-').map(Number);
+  const [ty, tm, td] = toKey.split('-').map(Number);
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / (24 * 60 * 60 * 1000));
+}
+
+// Bumps the Task-completion streak (separate from quests.js's quest streak) the first time
+// ANY task is completed on a given day — unlike the quest streak (which requires every one
+// of that day's quests done), this fires on a single task. task_last_completed_date makes
+// a second completion the same day a no-op, so the streak only ever advances once per day
+// no matter how many tasks get finished.
+async function bumpTaskStreak(userId, dateKey) {
+  const { data: streak, error } = await supabaseAdmin
+    .from('streaks')
+    .select('task_current_streak, task_longest_streak, task_last_completed_date')
+    .eq('user_id', userId)
+    .single();
+  if (error || !streak || streak.task_last_completed_date === dateKey) return null;
+
+  const gap = streak.task_last_completed_date ? daysBetween(streak.task_last_completed_date, dateKey) : null;
+  const nextCurrent = gap === 1 ? streak.task_current_streak + 1 : 1;
+  const nextLongest = Math.max(streak.task_longest_streak, nextCurrent);
+
+  const { error: updateError } = await supabaseAdmin
+    .from('streaks')
+    .update({
+      task_current_streak: nextCurrent,
+      task_longest_streak: nextLongest,
+      task_last_completed_date: dateKey,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('user_id', userId);
+
+  if (updateError) {
+    console.error('[tasks] bumpTaskStreak failed:', updateError.message);
+    return null;
+  }
+  return nextCurrent;
+}
+
 router.get('/', async (req, res) => {
   const { data, error } = await supabaseAdmin
     .from('tasks')
@@ -91,14 +135,16 @@ router.patch('/:id', async (req, res) => {
   }).catch((err) => console.error('[tasks] embedding failed:', err.message));
 
   let xp = null;
+  let taskStreak = null;
   if (existing && existing.status !== 'done' && data.status === 'done') {
     xp = await awardXp(req.user.id, TASK_COMPLETE_XP[data.priority] || TASK_COMPLETE_XP.medium, 'task completed').catch((err) => {
       console.error('[tasks] XP award failed:', err.message);
       return null;
     });
+    taskStreak = await bumpTaskStreak(req.user.id, todayKey());
   }
 
-  res.json({ task: data, xp });
+  res.json({ task: data, xp, taskStreak });
 });
 
 router.delete('/:id', async (req, res) => {
