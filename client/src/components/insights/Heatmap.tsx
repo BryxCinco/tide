@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { ScrollView, View } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -12,23 +12,70 @@ export interface HeatmapProps {
   days: HeatmapDay[];
 }
 
-const CELL_GAP = 6;
-const COLUMNS = 10;
+const CELL_SIZE = 11;
+const CELL_GAP = 3;
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/** Reference used to turn a day's tracked seconds into a "productivity %" — 6 focused
- * hours reads as a full day, matching the existing level-4 bucket's own >=5h threshold
- * below (a 5h day already reads as "practically full" before this, so 6h=100% keeps that
- * feel rather than requiring an unrealistic 8+ hour day just to hit 100%). */
-const DAILY_GOAL_SECONDS = 6 * 3600;
-
-function productivityPercent(seconds: number): number {
-  return Math.min(100, Math.round((seconds / DAILY_GOAL_SECONDS) * 100));
+/** Monday-first day-of-week index (0-6) for a Sunday-first JS `Date#getDay()` — matches
+ * CalendarPicker.tsx's own convention elsewhere in the app. */
+function mondayIndex(jsDay: number): number {
+  return (jsDay + 6) % 7;
 }
 
-/** GitHub-style contribution grid — 30 cells, opacity-scaled teal per level (0-4). Cells
- * are `flex: 1, aspectRatio: 1` (stretch to fill the row, stay square) rather than a
- * fixed pixel size, so the grid genuinely fills the bento 'lg' full-width card instead of
- * leaving empty space on wide screens. */
+interface GridColumn {
+  /** One of this column's 7 cells, Monday first — undefined for a leading/trailing slot
+   * the real data doesn't reach (the first partial week at the start of the window, or
+   * today's not-yet-complete week at the end). */
+  cells: (HeatmapDay | undefined)[];
+  /** Set when this column is the first one a new calendar month's days land in — drives
+   * the small month label printed above it. */
+  monthLabel: string | null;
+}
+
+/** Buckets a flat, chronological list of days into GitHub-style calendar-aligned week
+ * columns (Monday-first), padding the first/last column with `undefined` slots so every
+ * column is a real Mon-Sun week rather than an arbitrary run of 7 array entries — that's
+ * what makes the grid's rows read as actual days-of-week instead of a meaningless offset. */
+function buildWeekColumns(days: HeatmapDay[]): GridColumn[] {
+  if (days.length === 0) return [];
+
+  const first = new Date(days[0].date);
+  const leadingBlanks = mondayIndex(first.getDay());
+
+  const columns: GridColumn[] = [];
+  let seenMonths = new Set<number>();
+
+  const pushDay = (day: HeatmapDay | undefined, dateForRow: Date) => {
+    const row = mondayIndex(dateForRow.getDay());
+    if (row === 0 || columns.length === 0) {
+      const monthIndex = dateForRow.getMonth();
+      const isNewMonth = !seenMonths.has(monthIndex);
+      if (isNewMonth) seenMonths = new Set([monthIndex]);
+      columns.push({ cells: new Array(7).fill(undefined), monthLabel: isNewMonth ? MONTH_LABELS[monthIndex] : null });
+    }
+    columns[columns.length - 1].cells[row] = day;
+  };
+
+  // Leading blanks — the partial week before the data actually starts, so column 0 still
+  // represents a real Monday-Sunday week.
+  for (let i = 0; i < leadingBlanks; i++) {
+    const placeholderDate = new Date(first);
+    placeholderDate.setDate(first.getDate() - (leadingBlanks - i));
+    pushDay(undefined, placeholderDate);
+  }
+
+  for (const day of days) {
+    pushDay(day, new Date(day.date));
+  }
+
+  return columns;
+}
+
+/** GitHub-style contribution grid spanning roughly the last 6 months — calendar-aligned
+ * week columns (Monday-first rows), opacity-scaled teal per level (0-4), small enough
+ * cells that the whole window fits without dominating the card. Horizontally scrollable
+ * (not flex-shrunk to fit) so cells stay a legible, tappable size on any screen width
+ * rather than squeezing ~26 weeks into a phone-width card. */
 export function Heatmap({ days }: HeatmapProps) {
   const themeColors = useThemeColors();
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
@@ -36,73 +83,67 @@ export function Heatmap({ days }: HeatmapProps) {
 
   const levelOpacity: Record<HeatmapDay['level'], number> = { 0: 0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1 };
 
-  const rows: HeatmapDay[][] = [];
-  for (let i = 0; i < days.length; i += COLUMNS) {
-    rows.push(days.slice(i, i + COLUMNS));
-  }
+  const columns = useMemo(() => buildWeekColumns(days), [days]);
 
   return (
     <View>
-      {hoveredDay && (
-        <View className="mb-2 flex-row items-center gap-2">
-          <Text variant="caption" color="primary" className="normal-case tracking-normal">
-            {new Date(hoveredDay.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-          </Text>
-          <Text variant="caption" color="muted" className="normal-case tracking-normal">
-            {hoveredDay.seconds > 0 ? formatDuration(hoveredDay.seconds) : 'No tracked time'}
-          </Text>
-        </View>
-      )}
-      <View style={{ gap: CELL_GAP }}>
-        {rows.map((row, rowIndex) => (
-          <View key={rowIndex} style={{ flexDirection: 'row', gap: CELL_GAP }}>
-            {row.map((day) => {
-              const percent = productivityPercent(day.seconds);
-              // A day this saturated (level 3-4, teal opacity >= 0.75) is dark enough that
-              // white reads better than the theme's near-black text-primary; lighter cells
-              // (levels 0-2, including the empty theme.background.hover cell) keep
-              // text-primary instead. Always visible >=50% per spec; below that it only
-              // shows on hover, alongside the exact time in the tooltip line above.
-              const isHovered = hoveredDate === day.date;
-              const showPercent = percent >= 50 || isHovered;
-
-              return (
-                <Pressable
-                  key={day.date}
-                  onHoverIn={() => setHoveredDate(day.date)}
-                  onHoverOut={() => setHoveredDate(null)}
-                  onPress={() => setHoveredDate((current) => (current === day.date ? null : day.date))}
-                  className="items-center justify-center"
-                  style={{
-                    flex: 1,
-                    aspectRatio: 1,
-                    borderRadius: 4,
-                    backgroundColor:
-                      day.level === 0
-                        ? themeColors.background.hover
-                        : hexToRgba(themeColors.brand.tideTeal, levelOpacity[day.level]),
-                    borderWidth: isHovered ? 1.5 : 0,
-                    borderColor: themeColors.text.primary,
-                  }}
-                >
-                  {showPercent && day.seconds > 0 && (
-                    <Text
-                      style={{
-                        fontSize: 10,
-                        lineHeight: 12,
-                        fontWeight: '600',
-                        color: day.level >= 3 ? '#FFFFFF' : themeColors.text.primary,
-                      }}
-                    >
-                      {percent}%
-                    </Text>
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
-        ))}
+      <View className="mb-2 h-5 flex-row items-center">
+        <Text variant="caption" color="primary" className="normal-case tracking-normal">
+          {hoveredDay
+            ? `${new Date(hoveredDay.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${
+                hoveredDay.seconds > 0 ? formatDuration(hoveredDay.seconds) : 'No tracked time'
+              }`
+            : ''}
+        </Text>
       </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View>
+          <View className="mb-1 flex-row" style={{ gap: CELL_GAP }}>
+            {columns.map((col, i) => (
+              <View key={i} style={{ width: CELL_SIZE }}>
+                {col.monthLabel && (
+                  <Text variant="caption" color="muted" style={{ fontSize: 10 }} className="normal-case tracking-normal">
+                    {col.monthLabel}
+                  </Text>
+                )}
+              </View>
+            ))}
+          </View>
+
+          <View className="flex-row" style={{ gap: CELL_GAP }}>
+            {columns.map((col, colIndex) => (
+              <View key={colIndex} style={{ gap: CELL_GAP }}>
+                {col.cells.map((day, rowIndex) => {
+                  if (!day) {
+                    return <View key={rowIndex} style={{ width: CELL_SIZE, height: CELL_SIZE }} />;
+                  }
+                  const isHovered = hoveredDate === day.date;
+                  return (
+                    <Pressable
+                      key={rowIndex}
+                      onHoverIn={() => setHoveredDate(day.date)}
+                      onHoverOut={() => setHoveredDate(null)}
+                      onPress={() => setHoveredDate((current) => (current === day.date ? null : day.date))}
+                      hitSlop={2}
+                      style={{
+                        width: CELL_SIZE,
+                        height: CELL_SIZE,
+                        borderRadius: 2.5,
+                        backgroundColor:
+                          day.level === 0 ? themeColors.background.hover : hexToRgba(themeColors.brand.tideTeal, levelOpacity[day.level]),
+                        borderWidth: isHovered ? 1.5 : 0,
+                        borderColor: themeColors.text.primary,
+                      }}
+                    />
+                  );
+                })}
+              </View>
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+
       <View className="mt-2 flex-row items-center gap-1.5 self-end">
         <Text variant="caption" color="muted" className="normal-case tracking-normal">
           Less

@@ -3,6 +3,7 @@ export * from './ActivityHistory';
 export * from './AiSuggestions';
 export * from './BentoCard';
 export * from './Heatmap';
+export * from './HexagonStats';
 export * from './HistoryView';
 export * from './MoodTrend';
 export * from './ProductivityScore';

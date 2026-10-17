@@ -9,6 +9,7 @@ import {
   AiSuggestions,
   BentoCard,
   Heatmap,
+  HexagonStats,
   HistoryView,
   MoodTrend,
   ProductivityScore,
@@ -20,6 +21,7 @@ import {
 import { BackButton, ErrorState, ResponsiveContainer, SkeletonChart, Text } from '@/components/ui';
 import { getApiErrorMessage } from '@/services/api';
 import { insightsService, type InsightsRangeData, type InsightsSummary } from '@/services/insights.service';
+import { useLevelStore } from '@/store/levelStore';
 import { useQuestStore } from '@/store/questStore';
 import { useStreakStore } from '@/store/streakStore';
 import { useTaskStore } from '@/store/taskStore';
@@ -28,10 +30,9 @@ import type { ActivityBreakdownSlice, CustomInsightsRange, HeatmapDay, InsightsR
 import { formatDuration } from '@/utils/formatTime';
 import { formatMonthYear, fromDateKey, toDateKey } from '@/utils/formatDate';
 
-/** Heatmap always shows the most recent 30 days regardless of the selected range — a true
- * year-long contribution graph needs GitHub's own layout (53 columns x 7 rows), which is a
- * different component design than the current 10-column grid, not a range-filter change. */
-const HEATMAP_DAYS = 30;
+/** Heatmap always shows a fixed trailing window regardless of the selected range filter —
+ * ~6 months (26 weeks) of GitHub-style, calendar-aligned week columns (see Heatmap.tsx). */
+const HEATMAP_DAYS = 182;
 const MAX_CUSTOM_RANGE_DAYS = 62;
 
 /**
@@ -114,12 +115,13 @@ export default function InsightsScreen() {
   const fetchTasks = useTaskStore((s) => s.fetchTasks);
   const fetchTodayQuests = useQuestStore((s) => s.fetchTodayQuests);
   const fetchStreak = useStreakStore((s) => s.fetchStreak);
+  const fetchLevel = useLevelStore((s) => s.fetchLevel);
   const tasksLoading = useTaskStore((s) => s.isLoading);
   const tasksError = useTaskStore((s) => s.error);
   const clearTasksError = useTaskStore((s) => s.clearError);
 
   const refetchAll = () =>
-    Promise.all([fetchTodaySessions(), fetchTasks(), fetchTodayQuests(), fetchStreak()]);
+    Promise.all([fetchTodaySessions(), fetchTasks(), fetchTodayQuests(), fetchStreak(), fetchLevel()]);
 
   useEffect(() => {
     refetchAll();
@@ -242,6 +244,10 @@ export default function InsightsScreen() {
               utilities directly), plain single-column stacking below `md` on every
               platform. See BentoCard.tsx for the native-grid caveat. */}
           <View className="gap-4 md:grid md:grid-cols-2 md:gap-4 lg:grid-cols-4">
+            <BentoCard size="wide" title="Your Streaks" icon="Flame">
+              <HexagonStats />
+            </BentoCard>
+
             <BentoCard size="hero" title="Productivity Score" icon="Target">
               {rangeError ? (
                 <ErrorState message={rangeError} onRetry={fetchRangeData} />
@@ -279,7 +285,7 @@ export default function InsightsScreen() {
               <AiSuggestions />
             </BentoCard>
 
-            <BentoCard size="lg" title="Last 30 Days" icon="CalendarDays">
+            <BentoCard size="lg" title="Last 6 Months" icon="CalendarDays">
               {heatmapError ? (
                 <ErrorState message={heatmapError} onRetry={fetchHeatmap} />
               ) : heatmapLoading ? (

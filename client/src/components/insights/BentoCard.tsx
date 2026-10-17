@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
+import Animated, { Easing, FadeInUp } from 'react-native-reanimated';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useThemeStore } from '../../store/themeStore';
@@ -46,7 +47,7 @@ export function BentoCard({ title, icon, size = 'md', children, className }: Ben
   const isDark = useThemeStore((s) => s.theme === 'dark');
 
   return (
-    <View
+    <Animated.View
       // `flex-1` so a card actually fills its grid row's height (CSS grid's default
       // align-items:stretch sizes the *cell*, but this View's own children still need
       // flex-1 to expand into it) — content that doesn't naturally fill the row (e.g.
@@ -54,6 +55,7 @@ export function BentoCard({ title, icon, size = 'md', children, className }: Ben
       // made "Tracked Time" look broken next to the taller Productivity Score hero card.
       className={cn('flex-1 gap-4 overflow-hidden rounded-2xl border border-subtle p-6', SIZE_CLASSES[size], className)}
       style={[{ backgroundColor: isDark ? themeColors.background.surface : '#FFFFFF' }, shadows.sm]}
+      entering={FadeInUp.duration(420).easing(Easing.out(Easing.cubic))}
     >
       {title && (
         <View className="flex-row items-center gap-2">
@@ -64,6 +66,6 @@ export function BentoCard({ title, icon, size = 'md', children, className }: Ben
         </View>
       )}
       {children}
-    </View>
+    </Animated.View>
   );
 }
