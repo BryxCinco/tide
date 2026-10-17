@@ -6,15 +6,18 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import type { HeatmapDay } from '../../types/insights';
 import { hexToRgba } from '../../utils/color';
 import { formatDuration } from '../../utils/formatTime';
-import { Text } from '../ui';
+import { Icon, Modal, Text } from '../ui';
 
 export interface HeatmapProps {
   days: HeatmapDay[];
 }
 
-const CELL_SIZE = 11;
-const CELL_GAP = 3;
+const CELL_SIZE = 12;
+const CELL_GAP = 4;
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** Monday-first row indices to label (every other row) — printing all 7 crowded the gutter
+ * for no benefit, since the grid only needs enough of them to anchor a glance. */
+const WEEKDAY_LABELS: Record<number, string> = { 0: 'Mon', 2: 'Wed', 4: 'Fri' };
 
 /** Monday-first day-of-week index (0-6) for a Sunday-first JS `Date#getDay()` — matches
  * CalendarPicker.tsx's own convention elsewhere in the app. */
@@ -75,76 +78,95 @@ function buildWeekColumns(days: HeatmapDay[]): GridColumn[] {
  * week columns (Monday-first rows), opacity-scaled teal per level (0-4), small enough
  * cells that the whole window fits without dominating the card. Horizontally scrollable
  * (not flex-shrunk to fit) so cells stay a legible, tappable size on any screen width
- * rather than squeezing ~26 weeks into a phone-width card. */
+ * rather than squeezing ~26 weeks into a phone-width card.
+ *
+ * No hover/tap popup — a floating stat that appears and disappears over the grid read as
+ * noisy and was easy to miss on touch devices anyway (hover doesn't fire on a phone tap).
+ * Instead there's one fixed summary line that never changes, and a magnifying-glass button
+ * that opens the full day-by-day breakdown in a modal on demand. */
 export function Heatmap({ days }: HeatmapProps) {
   const themeColors = useThemeColors();
-  const [hoveredDate, setHoveredDate] = useState<string | null>(null);
-  const hoveredDay = days.find((d) => d.date === hoveredDate);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const levelOpacity: Record<HeatmapDay['level'], number> = { 0: 0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1 };
 
   const columns = useMemo(() => buildWeekColumns(days), [days]);
+  const activeDays = useMemo(() => days.filter((d) => d.seconds > 0), [days]);
+  const totalSeconds = useMemo(() => activeDays.reduce((sum, d) => sum + d.seconds, 0), [activeDays]);
+  const sortedActiveDays = useMemo(() => [...activeDays].sort((a, b) => (a.date < b.date ? 1 : -1)), [activeDays]);
 
   return (
     <View>
-      <View className="mb-2 h-5 flex-row items-center">
-        <Text variant="caption" color="primary" className="normal-case tracking-normal">
-          {hoveredDay
-            ? `${new Date(hoveredDay.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${
-                hoveredDay.seconds > 0 ? formatDuration(hoveredDay.seconds) : 'No tracked time'
-              }`
-            : ''}
+      <View className="mb-3 flex-row items-center justify-between gap-3">
+        <Text variant="caption" color="muted" className="flex-1 normal-case tracking-normal">
+          {activeDays.length} active {activeDays.length === 1 ? 'day' : 'days'} · {formatDuration(totalSeconds)} tracked
         </Text>
+        <Pressable
+          onPress={() => setDetailsOpen(true)}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel="View day-by-day details"
+          className="h-8 w-8 items-center justify-center rounded-full border border-subtle bg-base"
+        >
+          <Icon name="Search" size={14} color={themeColors.text.secondary} />
+        </Pressable>
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View>
-          <View className="mb-1 flex-row" style={{ gap: CELL_GAP }}>
-            {columns.map((col, i) => (
-              <View key={i} style={{ width: CELL_SIZE }}>
-                {col.monthLabel && (
-                  <Text variant="caption" color="muted" style={{ fontSize: 10 }} className="normal-case tracking-normal">
-                    {col.monthLabel}
+        <View className="flex-row">
+          {/* Weekday gutter — lines up under the month-label row above via the same
+              top margin, so "Mon/Wed/Fri" anchor the grid's rows at a glance. */}
+          <View className="mr-2" style={{ gap: CELL_GAP, marginTop: 16 }}>
+            {[0, 1, 2, 3, 4, 5, 6].map((row) => (
+              <View key={row} style={{ height: CELL_SIZE, justifyContent: 'center' }}>
+                {WEEKDAY_LABELS[row] && (
+                  <Text variant="caption" color="muted" style={{ fontSize: 9.5 }} className="normal-case tracking-normal">
+                    {WEEKDAY_LABELS[row]}
                   </Text>
                 )}
               </View>
             ))}
           </View>
 
-          <View className="flex-row" style={{ gap: CELL_GAP }}>
-            {columns.map((col, colIndex) => (
-              <View key={colIndex} style={{ gap: CELL_GAP }}>
-                {col.cells.map((day, rowIndex) => {
-                  if (!day) {
-                    return <View key={rowIndex} style={{ width: CELL_SIZE, height: CELL_SIZE }} />;
-                  }
-                  const isHovered = hoveredDate === day.date;
-                  return (
-                    <Pressable
+          <View>
+            <View className="mb-1 flex-row" style={{ gap: CELL_GAP }}>
+              {columns.map((col, i) => (
+                <View key={i} style={{ width: CELL_SIZE }}>
+                  {col.monthLabel && (
+                    <Text variant="caption" color="muted" style={{ fontSize: 10 }} className="normal-case tracking-normal">
+                      {col.monthLabel}
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </View>
+
+            <View className="flex-row" style={{ gap: CELL_GAP }}>
+              {columns.map((col, colIndex) => (
+                <View key={colIndex} style={{ gap: CELL_GAP }}>
+                  {col.cells.map((day, rowIndex) => (
+                    <View
                       key={rowIndex}
-                      onHoverIn={() => setHoveredDate(day.date)}
-                      onHoverOut={() => setHoveredDate(null)}
-                      onPress={() => setHoveredDate((current) => (current === day.date ? null : day.date))}
-                      hitSlop={2}
                       style={{
                         width: CELL_SIZE,
                         height: CELL_SIZE,
-                        borderRadius: 2.5,
-                        backgroundColor:
-                          day.level === 0 ? themeColors.background.hover : hexToRgba(themeColors.brand.tideTeal, levelOpacity[day.level]),
-                        borderWidth: isHovered ? 1.5 : 0,
-                        borderColor: themeColors.text.primary,
+                        borderRadius: 3,
+                        backgroundColor: !day
+                          ? 'transparent'
+                          : day.level === 0
+                            ? themeColors.background.hover
+                            : hexToRgba(themeColors.brand.tideTeal, levelOpacity[day.level]),
                       }}
                     />
-                  );
-                })}
-              </View>
-            ))}
+                  ))}
+                </View>
+              ))}
+            </View>
           </View>
         </View>
       </ScrollView>
 
-      <View className="mt-2 flex-row items-center gap-1.5 self-end">
+      <View className="mt-3 flex-row items-center gap-1.5 self-end">
         <Text variant="caption" color="muted" className="normal-case tracking-normal">
           Less
         </Text>
@@ -164,6 +186,33 @@ export function Heatmap({ days }: HeatmapProps) {
           More
         </Text>
       </View>
+
+      <Modal
+        visible={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+        title="Tracked Days"
+        subtitle={`${activeDays.length} of the last ${days.length} days`}
+        icon="CalendarDays"
+      >
+        <View className="gap-1 py-2">
+          {sortedActiveDays.length === 0 ? (
+            <Text variant="body" color="muted" className="py-6 text-center normal-case tracking-normal">
+              No tracked time in this window yet.
+            </Text>
+          ) : (
+            sortedActiveDays.map((day) => (
+              <View key={day.date} className="flex-row items-center justify-between border-b border-subtle py-2.5">
+                <Text variant="body" color="primary">
+                  {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                </Text>
+                <Text variant="body" color="muted">
+                  {formatDuration(day.seconds)}
+                </Text>
+              </View>
+            ))
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }

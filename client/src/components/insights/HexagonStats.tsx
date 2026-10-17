@@ -10,15 +10,23 @@ import { Icon, Text, type IconName } from '../ui';
 
 const HEX_WIDTH = 92;
 const HEX_HEIGHT = HEX_WIDTH * (Math.sqrt(3) / 2);
+const STROKE_WIDTH = 1.5;
+/** A centered SVG stroke draws half its width outside the path itself — with the polygon's
+ * own points touching the Svg canvas's edges exactly, that outer half was being clipped by
+ * the canvas bounds, flattening/cutting the hexagon's points and top/bottom edge. Padding
+ * the canvas (and insetting every point by the same amount) gives the stroke room to draw
+ * in full on all six sides. */
+const CANVAS_WIDTH = HEX_WIDTH + STROKE_WIDTH * 2;
+const CANVAS_HEIGHT = HEX_HEIGHT + STROKE_WIDTH * 2;
 
-/** Flat-top hexagon vertex points, inscribed in a `HEX_WIDTH` x `HEX_HEIGHT` box — six
- * points at 60° increments starting from the rightmost vertex, which is what gives a
- * flat (not pointy) top/bottom edge. */
+/** Flat-top hexagon vertex points, inscribed in a `HEX_WIDTH` x `HEX_HEIGHT` box (then
+ * offset into the padded canvas above) — six points at 60° increments starting from the
+ * rightmost vertex, which is what gives a flat (not pointy) top/bottom edge. */
 const HEX_POINTS = Array.from({ length: 6 }, (_, i) => {
   const angle = (Math.PI / 180) * (60 * i);
   const r = HEX_WIDTH / 2;
-  const x = r + r * Math.cos(angle);
-  const y = HEX_HEIGHT / 2 + r * Math.sin(angle);
+  const x = STROKE_WIDTH + r + r * Math.cos(angle);
+  const y = STROKE_WIDTH + HEX_HEIGHT / 2 + r * Math.sin(angle);
   return `${x},${y}`;
 }).join(' ');
 
@@ -41,13 +49,13 @@ function HexTile({ icon, value, label, tint, disabledColor, index, inactive }: H
 
   return (
     <Animated.View entering={FadeInDown.delay(index * 70).duration(380).springify().damping(14)}>
-      <View style={{ width: HEX_WIDTH, height: HEX_HEIGHT, alignItems: 'center', justifyContent: 'center' }}>
-        <Svg width={HEX_WIDTH} height={HEX_HEIGHT} style={{ position: 'absolute' }}>
+      <View style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT, alignItems: 'center', justifyContent: 'center' }}>
+        <Svg width={CANVAS_WIDTH} height={CANVAS_HEIGHT} style={{ position: 'absolute' }}>
           <Polygon
             points={HEX_POINTS}
             fill={hexToRgba(activeTint, inactive ? 0.06 : 0.12)}
             stroke={activeTint}
-            strokeWidth={1.5}
+            strokeWidth={STROKE_WIDTH}
           />
         </Svg>
         <View className="items-center" style={{ gap: 1 }}>
@@ -82,7 +90,11 @@ export function HexagonStats() {
   const longestStreak = Math.max(streak?.taskLongestStreak ?? 0, streak?.longestStreak ?? 0);
 
   return (
-    <View className="flex-row flex-wrap items-start justify-around gap-3 py-2">
+    // `justify-center` + a fixed gap (not `justify-around`) so this reads the same whether
+    // it fits on one row (wide card) or wraps to two (narrow phone) — `justify-around`
+    // was spacing a wrapped 2-tile row out to the full card width, which is what made the
+    // row look broken/uneven on phone.
+    <View className="flex-row flex-wrap items-center justify-center gap-x-6 gap-y-4 py-2">
       <HexTile
         index={0}
         icon="Flame"
