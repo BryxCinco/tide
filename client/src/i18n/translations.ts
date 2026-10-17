@@ -19,6 +19,8 @@ export const translations = {
     'nav.settings': 'Settings',
     'nav.theme': 'Theme',
     'nav.logout': 'Log Out',
+    'nav.section.workspace': 'Workspace',
+    'nav.section.growth': 'Growth',
 
     'common.save': 'Save',
     'common.cancel': 'Cancel',
@@ -63,6 +65,8 @@ export const translations = {
     'nav.settings': 'Mga Setting',
     'nav.theme': 'Tema',
     'nav.logout': 'Mag-log Out',
+    'nav.section.workspace': 'Workspace',
+    'nav.section.growth': 'Paglago',
 
     'common.save': 'I-save',
     'common.cancel': 'Kanselahin',
@@ -107,6 +111,8 @@ export const translations = {
     'nav.settings': 'Configuración',
     'nav.theme': 'Tema',
     'nav.logout': 'Cerrar Sesión',
+    'nav.section.workspace': 'Espacio de trabajo',
+    'nav.section.growth': 'Crecimiento',
 
     'common.save': 'Guardar',
     'common.cancel': 'Cancelar',
@@ -151,6 +157,8 @@ export const translations = {
     'nav.settings': '設定',
     'nav.theme': 'テーマ',
     'nav.logout': 'ログアウト',
+    'nav.section.workspace': 'ワークスペース',
+    'nav.section.growth': '成長',
 
     'common.save': '保存',
     'common.cancel': 'キャンセル',
@@ -195,6 +203,8 @@ export const translations = {
     'nav.settings': '设置',
     'nav.theme': '主题',
     'nav.logout': '退出登录',
+    'nav.section.workspace': '工作区',
+    'nav.section.growth': '成长',
 
     'common.save': '保存',
     'common.cancel': '取消',
@@ -239,6 +249,8 @@ export const translations = {
     'nav.settings': 'الإعدادات',
     'nav.theme': 'المظهر',
     'nav.logout': 'تسجيل الخروج',
+    'nav.section.workspace': 'مساحة العمل',
+    'nav.section.growth': 'النمو',
 
     'common.save': 'حفظ',
     'common.cancel': 'إلغاء',
@@ -283,6 +295,8 @@ export const translations = {
     'nav.settings': 'Настройки',
     'nav.theme': 'Тема',
     'nav.logout': 'Выйти',
+    'nav.section.workspace': 'Рабочее пространство',
+    'nav.section.growth': 'Рост',
 
     'common.save': 'Сохранить',
     'common.cancel': 'Отмена',
@@ -327,6 +341,8 @@ export const translations = {
     'nav.settings': '설정',
     'nav.theme': '테마',
     'nav.logout': '로그아웃',
+    'nav.section.workspace': '워크스페이스',
+    'nav.section.growth': '성장',
 
     'common.save': '저장',
     'common.cancel': '취소',
@@ -371,6 +387,8 @@ export const translations = {
     'nav.settings': 'Pengaturan',
     'nav.theme': 'Tema',
     'nav.logout': 'Keluar',
+    'nav.section.workspace': 'Ruang Kerja',
+    'nav.section.growth': 'Pertumbuhan',
 
     'common.save': 'Simpan',
     'common.cancel': 'Batal',
@@ -415,6 +433,8 @@ export const translations = {
     'nav.settings': 'Paramètres',
     'nav.theme': 'Thème',
     'nav.logout': 'Déconnexion',
+    'nav.section.workspace': 'Espace de travail',
+    'nav.section.growth': 'Progression',
 
     'common.save': 'Enregistrer',
     'common.cancel': 'Annuler',
@@ -459,6 +479,8 @@ export const translations = {
     'nav.settings': 'Einstellungen',
     'nav.theme': 'Design',
     'nav.logout': 'Abmelden',
+    'nav.section.workspace': 'Arbeitsbereich',
+    'nav.section.growth': 'Wachstum',
 
     'common.save': 'Speichern',
     'common.cancel': 'Abbrechen',
@@ -503,6 +525,8 @@ export const translations = {
     'nav.settings': 'Ayarlar',
     'nav.theme': 'Tema',
     'nav.logout': 'Çıkış Yap',
+    'nav.section.workspace': 'Çalışma Alanı',
+    'nav.section.growth': 'Gelişim',
 
     'common.save': 'Kaydet',
     'common.cancel': 'İptal',
@@ -547,6 +571,8 @@ export const translations = {
     'nav.settings': 'Impostazioni',
     'nav.theme': 'Tema',
     'nav.logout': 'Esci',
+    'nav.section.workspace': 'Area di lavoro',
+    'nav.section.growth': 'Crescita',
 
     'common.save': 'Salva',
     'common.cancel': 'Annulla',

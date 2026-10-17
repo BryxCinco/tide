@@ -41,9 +41,9 @@ export function SmartSuggestions({ lastAssistantMessage, onSelect }: SmartSugges
     <Pressable
       key={label}
       onPress={() => onSelect(label)}
-      className="rounded-full border border-subtle bg-base px-4 py-2 transition-colors hover:border-tide-teal/50 hover:bg-tide-teal/5"
+      className="rounded-full border border-subtle bg-surface px-3.5 py-2 transition-colors hover:border-tide-teal/50 hover:bg-tide-teal/5"
     >
-      <Text variant="caption" color="secondary" className="normal-case tracking-normal">
+      <Text variant="body" color="secondary" className="text-[13px] font-medium">
         {label}
       </Text>
     </Pressable>
@@ -54,12 +54,12 @@ export function SmartSuggestions({ lastAssistantMessage, onSelect }: SmartSugges
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerClassName="flex-row gap-2 px-4 pb-3 pt-1"
+        contentContainerClassName="flex-row gap-2 pb-3 pl-[56px] pr-4"
       >
         {chips}
       </ScrollView>
     );
   }
 
-  return <View className="flex-row flex-wrap gap-2 px-4 pb-3 pt-1">{chips}</View>;
+  return <View className="flex-row flex-wrap gap-2 pb-3 pl-[64px] pr-6">{chips}</View>;
 }

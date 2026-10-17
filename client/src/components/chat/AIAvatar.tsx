@@ -1,73 +1,75 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect } from 'react';
+import { View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
-import { gradients } from '../../utils/gradients';
-import { colors } from '../../utils/theme';
+import { gradientDirections, gradients } from '../../utils/gradients';
 import { Icon } from '../ui';
 
 export interface AIAvatarProps {
   size?: number;
-  /** Subtle breathing glow — on by default, but the typing indicator's own inline avatar
-   * turns it off so two independently-animated pulses don't compete visually. */
+  /** Slow breathing halo behind the avatar — an opacity-only animation on a separate layer,
+   * so the avatar itself (and any text next to it) never moves. */
   pulse?: boolean;
-  /** One-shot 360° spin on mount — Fix 6's "rotation on new message". ChatConversation only
-   * passes true for a bubble whose message was created live during this session (not one
-   * restored from persisted history on load), so old messages don't all spin at once when
-   * the screen first opens. */
+  /** Kept for API compatibility with older call sites; the spin-in was removed because a
+   * rotating avatar on every new reply made the conversation feel jumpy. */
   spinOnMount?: boolean;
+  /** Rounded-square "app icon" shape instead of a circle — used for the empty-state hero. */
+  shape?: 'circle' | 'squircle';
 }
 
-/** Teal-gradient circular avatar for the AI Coach — Sparkles icon, optional soft pulse
- * glow (a shadow, not a scale change, so it doesn't jostle text sitting next to it), and an
- * optional one-shot spin-in when it mounts as a genuinely new message. */
-export function AIAvatar({ size = 32, pulse = true, spinOnMount }: AIAvatarProps) {
-  const glow = useSharedValue(0);
-  const rotation = useSharedValue(spinOnMount ? 0 : 360);
+/** The AI Coach's identity mark: a Sparkles glyph on TIDE's aurora gradient. */
+export function AIAvatar({ size = 32, pulse = false, shape = 'circle' }: AIAvatarProps) {
+  const halo = useSharedValue(0);
+  const radius = shape === 'circle' ? size / 2 : size * 0.32;
 
   useEffect(() => {
     if (!pulse) return;
-    glow.value = withRepeat(withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.ease) }), -1, true);
-  }, [pulse, glow]);
+    halo.value = withRepeat(withTiming(1, { duration: 2200, easing: Easing.inOut(Easing.ease) }), -1, true);
+  }, [pulse, halo]);
 
-  useEffect(() => {
-    if (!spinOnMount) return;
-    rotation.value = withTiming(360, { duration: 500, easing: Easing.out(Easing.cubic) });
-    // Runs once on mount only — this is a spin-IN flourish for a bubble that was just
-    // created, not something that should re-fire on prop changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const glowStyle = useAnimatedStyle(() => ({
-    shadowOpacity: 0.25 + glow.value * 0.25,
-  }));
-
-  const spinStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }],
-  }));
+  const haloStyle = useAnimatedStyle(() => ({ opacity: 0.25 + halo.value * 0.35 }));
 
   return (
-    <Animated.View
-      style={[
-        { width: size, height: size, borderRadius: size / 2, overflow: 'hidden' },
-        pulse && {
-          shadowColor: colors.brand.tideTeal,
-          shadowOffset: { width: 0, height: 0 },
-          shadowRadius: 8,
+    <View style={{ width: size, height: size }}>
+      {pulse && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            {
+              position: 'absolute',
+              top: -size * 0.18,
+              left: -size * 0.18,
+              width: size * 1.36,
+              height: size * 1.36,
+              borderRadius: shape === 'circle' ? size : radius * 1.4,
+              backgroundColor: 'rgba(20, 184, 166, 0.22)',
+            },
+            haloStyle,
+          ]}
+        />
+      )}
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius: radius,
+          overflow: 'hidden',
+          shadowColor: '#06B6D4',
+          shadowOffset: { width: 0, height: size > 40 ? 10 : 3 },
+          shadowOpacity: 0.3,
+          shadowRadius: size > 40 ? 20 : 6,
           elevation: 4,
-        },
-        pulse && glowStyle,
-        spinStyle,
-      ]}
-    >
-      <LinearGradient
-        colors={[...gradients.primary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+        }}
       >
-        <Icon name="Sparkles" size={size * 0.5} color="#FFFFFF" />
-      </LinearGradient>
-    </Animated.View>
+        <LinearGradient
+          colors={[...gradients.aurora]}
+          {...gradientDirections.diagonal}
+          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: radius }}
+        >
+          <Icon name="Sparkles" size={size * 0.48} color="#FFFFFF" />
+        </LinearGradient>
+      </View>
+    </View>
   );
 }

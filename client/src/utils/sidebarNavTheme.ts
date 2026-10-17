@@ -1,53 +1,52 @@
 import type { ViewStyle } from 'react-native';
 
-type GlowStyle = Pick<ViewStyle, 'shadowColor' | 'shadowOffset' | 'shadowOpacity' | 'shadowRadius' | 'elevation'>;
+type ShadowStyle = Pick<ViewStyle, 'shadowColor' | 'shadowOffset' | 'shadowOpacity' | 'shadowRadius' | 'elevation'>;
 
 export interface SidebarNavPalette {
-  /** Sidebar/drawer panel background — distinct from the main content's flat bg-base. */
+  /** The floating sidebar/drawer panel itself — white "island" on the slate canvas in light
+   * mode, a slightly lifted ink panel in dark mode. */
   background: string;
   borderColor: string;
-  edgeGlow: GlowStyle;
-  /** Default (non-hover, non-active) nav label/icon color — deliberately `text-secondary`,
-   * not the app's `text-muted` token, so idle nav items stay clearly readable rather than
-   * fading into the background. */
+  /** Soft neutral lift under the panel — no colored glow, so it reads calm, not flashy. */
+  panelShadow: ShadowStyle;
+  /** Idle nav label/icon color — `text-secondary`-ish rather than muted, so idle items stay
+   * clearly readable. */
   navDefaultText: string;
-  navAccentText: string;
+  /** Active nav label color — full-strength primary text; the icon chip carries the brand
+   * color instead, so the label itself doesn't have to. */
+  navActiveText: string;
   navHoverBg: string;
-  navHoverGlow: GlowStyle;
   navActiveBg: string;
-  navActiveGlow: GlowStyle;
-  navAccentBar: string;
-  /** Extra glow specifically on the active accent bar — dark mode only, per spec. */
-  navAccentBarGlow?: GlowStyle;
+  navActiveBorder: string;
+  /** Small uppercase group headings ("Workspace", "Growth"). */
+  sectionLabel: string;
+  divider: string;
 }
 
-const TEAL = '#14B8A6';
-
 const LIGHT: SidebarNavPalette = {
-  background: '#F8FAFB',
-  borderColor: 'rgba(20, 184, 166, 0.12)',
-  edgeGlow: { shadowColor: TEAL, shadowOffset: { width: 2, height: 0 }, shadowOpacity: 0.06, shadowRadius: 24, elevation: 4 },
-  navDefaultText: '#374151',
-  navAccentText: TEAL,
-  navHoverBg: 'rgba(20, 184, 166, 0.06)',
-  navHoverGlow: { shadowColor: TEAL, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.12, shadowRadius: 14, elevation: 3 },
-  navActiveBg: 'rgba(20, 184, 166, 0.1)',
-  navActiveGlow: { shadowColor: TEAL, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.2, shadowRadius: 18, elevation: 6 },
-  navAccentBar: TEAL,
+  background: '#FFFFFF',
+  borderColor: 'rgba(15, 23, 42, 0.06)',
+  panelShadow: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.06, shadowRadius: 24, elevation: 4 },
+  navDefaultText: '#475569',
+  navActiveText: '#0F172A',
+  navHoverBg: 'rgba(15, 23, 42, 0.04)',
+  navActiveBg: 'rgba(20, 184, 166, 0.08)',
+  navActiveBorder: 'rgba(20, 184, 166, 0.18)',
+  sectionLabel: '#94A3B8',
+  divider: 'rgba(15, 23, 42, 0.06)',
 };
 
 const DARK: SidebarNavPalette = {
-  background: '#0D1319',
-  borderColor: 'rgba(20, 184, 166, 0.18)',
-  edgeGlow: { shadowColor: TEAL, shadowOffset: { width: 2, height: 0 }, shadowOpacity: 0.12, shadowRadius: 32, elevation: 12 },
-  navDefaultText: '#D1D5DB',
-  navAccentText: TEAL,
-  navHoverBg: 'rgba(20, 184, 166, 0.1)',
-  navHoverGlow: { shadowColor: TEAL, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 20, elevation: 7 },
-  navActiveBg: 'rgba(20, 184, 166, 0.18)',
-  navActiveGlow: { shadowColor: TEAL, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 24, elevation: 10 },
-  navAccentBar: TEAL,
-  navAccentBarGlow: { shadowColor: TEAL, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 6, elevation: 4 },
+  background: '#0C1119',
+  borderColor: 'rgba(255, 255, 255, 0.06)',
+  panelShadow: { shadowColor: '#000000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.45, shadowRadius: 32, elevation: 8 },
+  navDefaultText: '#94A3B8',
+  navActiveText: '#F8FAFC',
+  navHoverBg: 'rgba(255, 255, 255, 0.04)',
+  navActiveBg: 'rgba(20, 184, 166, 0.12)',
+  navActiveBorder: 'rgba(20, 184, 166, 0.22)',
+  sectionLabel: '#64748B',
+  divider: 'rgba(255, 255, 255, 0.06)',
 };
 
 /** Single source of truth for Sidebar.tsx, NavItem.tsx, and MobileDrawer.tsx — all three

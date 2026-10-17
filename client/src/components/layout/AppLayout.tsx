@@ -54,14 +54,15 @@ export function AppLayout({
         {showMobileMenuButton && (
           <Pressable
             onPress={openDrawer}
-            className="absolute h-10 w-10 items-center justify-center rounded-full border border-subtle bg-base"
+            accessibilityLabel="Open menu"
+            className="absolute h-10 w-10 items-center justify-center rounded-xl border border-subtle bg-surface"
             style={[
               { top: insets.top + 12 },
               mobileMenuPosition === 'right' ? { right: 16 } : { left: 16 },
               shadows.sm,
             ]}
           >
-            <Icon name="Menu" size={20} color={themeColors.text.primary} />
+            <Icon name="Menu" size={19} color={themeColors.text.primary} />
           </Pressable>
         )}
 

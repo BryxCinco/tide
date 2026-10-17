@@ -5,7 +5,7 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withRepe
 import { useThemeColors } from '../../hooks/useThemeColors';
 
 const DOT_COUNT = 3;
-const BOUNCE_HEIGHT = 4;
+const BOUNCE_HEIGHT = 3;
 // Each dot bounces up-and-back over 1.4s total (withRepeat's `true` reverse means this
 // duration is one direction, so the full up+down cycle is 2x = 1.4s — matching the "loop:
 // 1.4s total" spec), staggered 0.2s apart so they read as a wave, not a synchronized bounce.
@@ -29,7 +29,7 @@ function Dot({ delay, color }: { delay: number; color: string }) {
 
   return (
     <Animated.View
-      style={[{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: color }, style]}
+      style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }, style]}
     />
   );
 }
@@ -42,7 +42,7 @@ export function TypingIndicator() {
   return (
     <View className="flex-row items-center gap-1.5">
       {Array.from({ length: DOT_COUNT }, (_, i) => (
-        <Dot key={i} delay={i * STAGGER} color={themeColors.text.muted} />
+        <Dot key={i} delay={i * STAGGER} color={themeColors.brand.tideTeal} />
       ))}
     </View>
   );

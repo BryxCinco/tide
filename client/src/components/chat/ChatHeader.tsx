@@ -7,6 +7,7 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { MobileMenuButton } from '../layout/MobileMenuButton';
 import { BackButton, Icon, Text } from '../ui';
 import { Pressable } from '../ui/SoundPressable';
+import { AIAvatar } from './AIAvatar';
 
 export interface ChatHeaderProps {
   isTyping: boolean;
@@ -34,64 +35,54 @@ function StatusDot({ isTyping }: { isTyping: boolean }) {
     <View className="flex-row items-center gap-1.5">
       <Animated.View
         style={[
-          { width: 7, height: 7, borderRadius: 3.5, backgroundColor: isTyping ? themeColors.brand.tideTeal : '#22C55E' },
+          { width: 6, height: 6, borderRadius: 3, backgroundColor: isTyping ? themeColors.brand.tideTeal : '#22C55E' },
           pulseStyle,
         ]}
       />
-      <Text variant="caption" color="muted" className="normal-case tracking-normal">
-        {isTyping ? 'Thinking...' : 'Online'}
+      <Text variant="body" color="muted" className="text-[12px]">
+        {isTyping ? 'Thinking…' : 'Online · your productivity assistant'}
       </Text>
     </View>
   );
 }
 
-/** Fixed top bar for the full-page AI Coach (Fix 5) — back/menu button, title/subtitle, a
- * live status line, and a clear-chat action, all pinned above the scrollable conversation. */
+/** Fixed top bar for the full-page AI Coach — menu/back button, the coach's identity
+ * (aurora avatar, name, live status), and a "New chat" action. */
 export function ChatHeader({ isTyping, hasMessages, onClear }: ChatHeaderProps) {
   const themeColors = useThemeColors();
   const { isPhone } = useResponsive();
 
   return (
-    <View className="flex-row items-center gap-3 border-b border-subtle bg-base px-4 py-3 md:px-6">
-      {/* Same left-slot swap as Tasks/Activities: phone uses the drawer-access hamburger,
-          desktop/tablet keep BackButton (no floating-menu concept there, Sidebar is
-          always visible). */}
+    <View className="flex-row items-center gap-3 border-b border-subtle px-4 py-3 md:px-6">
+      {/* Phone uses the drawer-access hamburger; tablet/desktop keep BackButton since the
+          Sidebar is always visible there. */}
       <MobileMenuButton />
       {!isPhone && <BackButton />}
 
-      {/* minWidth: 0 overrides flexbox's default "never shrink below content's intrinsic
-          width" — without it, the subtitle row below (a long static string + status dot,
-          neither of which wrap) forces this whole column past its fair share of the header,
-          pushing the title/BackButton/clear-chat button past the screen edge instead of just
-          this column truncating its own text (same bug class as AppLayout.tsx's own
-          minWidth: 0 comment). */}
+      <AIAvatar size={36} />
+
+      {/* minWidth: 0 lets this column truncate its own text instead of pushing the action
+          button past the screen edge. */}
       <View className="flex-1" style={{ minWidth: 0 }}>
-        <Text variant="h3" color="primary" numberOfLines={1}>
-          AI Coach
+        <Text variant="body" color="primary" className="text-[16px] font-semibold" numberOfLines={1}>
+          TIDE Coach
         </Text>
-        <View className="flex-row items-center gap-2">
-          <Text
-            variant="caption"
-            color="muted"
-            numberOfLines={1}
-            className="shrink normal-case tracking-normal"
-          >
-            Your personal productivity assistant
-          </Text>
-          <Text variant="caption" color="muted">
-            •
-          </Text>
-          <StatusDot isTyping={isTyping} />
-        </View>
+        <StatusDot isTyping={isTyping} />
       </View>
 
       {hasMessages && (
         <Pressable
           onPress={onClear}
-          hitSlop={8}
-          className="h-9 w-9 items-center justify-center rounded-full hover:bg-elevated"
+          hitSlop={6}
+          accessibilityLabel="Start a new chat"
+          className="h-9 flex-row items-center gap-1.5 rounded-xl border border-subtle bg-surface px-3 transition-colors hover:border-tide-teal/40"
         >
-          <Icon name="Trash2" size={18} color={themeColors.text.secondary} />
+          <Icon name="SquarePen" size={15} color={themeColors.text.secondary} />
+          {!isPhone && (
+            <Text variant="body" color="secondary" className="text-[13px] font-medium">
+              New chat
+            </Text>
+          )}
         </Pressable>
       )}
     </View>

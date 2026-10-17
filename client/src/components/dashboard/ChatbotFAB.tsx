@@ -1,80 +1,73 @@
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { useState } from 'react';
+import { Platform, View } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
-import { useThemeColors } from '../../hooks/useThemeColors';
-import { gradients } from '../../utils/gradients';
-import { colors, shadows } from '../../utils/theme';
+import { gradientDirections, gradients } from '../../utils/gradients';
 import { Icon } from '../ui';
 
 /**
- * Floating action button for the AI Coach — navigates to the full-page /chat screen (Fix
- * 5 retired the old ChatPanel.tsx modal/overlay in favor of a dedicated page) at every
- * screen width.
+ * Floating action button for the AI Coach — navigates to the full-page /chat screen at every
+ * screen width. It sits still (no idle bobbing or pulsing, which made the page feel restless)
+ * and only reacts to the pointer: a small lift on hover and a squash on press.
  */
 export function ChatbotFAB() {
-  const themeColors = useThemeColors();
-  const size = Platform.OS === 'web' ? 64 : 56;
+  const size = Platform.OS === 'web' ? 60 : 56;
+  const [hovered, setHovered] = useState(false);
+  const scale = useSharedValue(1);
 
-  const float = useSharedValue(0);
-  const pulse = useSharedValue(0);
+  const animateTo = (value: number) => {
+    scale.value = withTiming(value, { duration: 160, easing: Easing.out(Easing.ease) });
+  };
 
-  useEffect(() => {
-    float.value = withRepeat(withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) }), -1, true);
-    pulse.value = withRepeat(withTiming(1, { duration: 1000, easing: Easing.inOut(Easing.ease) }), -1, true);
-  }, [float, pulse]);
-
-  const floatStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -float.value * 4 }],
-  }));
-
-  const dotStyle = useAnimatedStyle(() => ({
-    opacity: 0.5 + pulse.value * 0.5,
-    transform: [{ scale: 0.85 + pulse.value * 0.3 }],
-  }));
+  const scaleStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
     <Animated.View
       style={[
-        { position: 'absolute', right: 24, bottom: 24, width: size, height: size },
-        floatStyle,
-        shadows.md,
-        { shadowColor: colors.brand.tideTeal, shadowOpacity: 0.35, shadowRadius: 14 },
+        {
+          position: 'absolute',
+          right: 20,
+          bottom: 20,
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          shadowColor: '#06B6D4',
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: hovered ? 0.45 : 0.3,
+          shadowRadius: 20,
+          elevation: 8,
+        },
+        scaleStyle,
       ]}
     >
       <Pressable
         onPress={() => router.push('/chat')}
+        onHoverIn={() => {
+          setHovered(true);
+          animateTo(1.05);
+        }}
+        onHoverOut={() => {
+          setHovered(false);
+          animateTo(1);
+        }}
+        onPressIn={() => animateTo(0.94)}
+        onPressOut={() => animateTo(hovered ? 1.05 : 1)}
+        accessibilityLabel="Open AI Coach"
         style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden' }}
       >
         <LinearGradient
-          colors={[...gradients.primary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          colors={[...gradients.aurora]}
+          {...gradientDirections.diagonal}
           style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
         >
-          <Icon name="Sparkles" size={size * 0.42} color={colors.text.inverse} />
+          <View>
+            <Icon name="Sparkles" size={size * 0.42} color="#FFFFFF" />
+          </View>
         </LinearGradient>
       </Pressable>
-
-      <Animated.View
-        style={[
-          {
-            position: 'absolute',
-            top: -2,
-            right: -2,
-            width: 14,
-            height: 14,
-            borderRadius: 7,
-            backgroundColor: colors.brand.tideTeal,
-            borderWidth: 2,
-            borderColor: themeColors.background.base,
-          },
-          dotStyle,
-        ]}
-      />
     </Animated.View>
   );
 }

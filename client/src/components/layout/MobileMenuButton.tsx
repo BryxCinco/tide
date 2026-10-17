@@ -25,9 +25,10 @@ export function MobileMenuButton() {
     <Pressable
       onPress={openDrawer}
       hitSlop={6}
-      className="h-10 w-10 items-center justify-center rounded-full border border-subtle bg-base"
+      accessibilityLabel="Open menu"
+      className="h-10 w-10 items-center justify-center rounded-xl border border-subtle bg-surface"
     >
-      <Icon name="Menu" size={20} color={themeColors.text.primary} />
+      <Icon name="Menu" size={19} color={themeColors.text.primary} />
     </Pressable>
   );
 }

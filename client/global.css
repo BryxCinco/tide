@@ -5,14 +5,14 @@
 /* Thin, unobtrusive scrollbar for long-form text areas (web only — native ignores this file). */
 .thin-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #D1D5DB transparent;
+  scrollbar-color: #CBD5E1 transparent;
 }
 .thin-scrollbar::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 .thin-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #D1D5DB;
+  background-color: #CBD5E1;
   border-radius: 9999px;
 }
 .thin-scrollbar::-webkit-scrollbar-track {

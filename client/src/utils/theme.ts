@@ -9,10 +9,10 @@ interface ColorPalette {
 
 export const colors: ColorPalette = {
   background: {
-    base: '#FFFFFF',
-    elevated: '#F9FAFB',
-    surface: '#F3F4F6',
-    hover: '#E5E7EB',
+    base: '#F8FAFC',
+    elevated: '#F1F5F9',
+    surface: '#FFFFFF',
+    hover: '#E2E8F0',
   },
 
   brand: {
@@ -25,18 +25,18 @@ export const colors: ColorPalette = {
   },
 
   text: {
-    primary: '#111827',
-    secondary: '#374151',
-    muted: '#6B7280',
-    disabled: '#9CA3AF',
+    primary: '#0F172A',
+    secondary: '#334155',
+    muted: '#64748B',
+    disabled: '#94A3B8',
     /** For text placed on solid teal/dark backgrounds. */
     inverse: '#FFFFFF',
   },
 
   border: {
-    subtle: '#F3F4F6',
-    default: '#E5E7EB',
-    hover: '#D1D5DB',
+    subtle: '#E9EEF4',
+    default: '#E2E8F0',
+    hover: '#CBD5E1',
     accent: '#14B8A6',
   },
 
@@ -48,8 +48,8 @@ export const colors: ColorPalette = {
   },
 
   glass: {
-    background: 'rgba(255, 255, 255, 0.7)',
-    border: 'rgba(17, 24, 39, 0.08)',
+    background: 'rgba(255, 255, 255, 0.72)',
+    border: 'rgba(15, 23, 42, 0.08)',
   },
 };
 
@@ -61,19 +61,19 @@ export const colors: ColorPalette = {
  */
 export const darkColors: ColorPalette = {
   background: {
-    base: '#0A0E14',
-    elevated: '#111721',
-    surface: '#161D2A',
-    hover: '#1E2633',
+    base: '#07090F',
+    elevated: '#0E131C',
+    surface: '#121823',
+    hover: '#1B2230',
   },
 
   brand: colors.brand,
 
   text: {
-    primary: '#FFFFFF',
-    secondary: '#E5E7EB',
-    muted: '#9CA3AF',
-    disabled: '#6B7280',
+    primary: '#F8FAFC',
+    secondary: '#E2E8F0',
+    muted: '#94A3B8',
+    disabled: '#64748B',
     // NOT flipped: every current usage is text on a solid brand-colored surface (a teal/red
     // button, a gradient card) — that surface stays brand-colored in both themes, so its
     // label should stay white in both, not flip to near-black.
@@ -90,7 +90,7 @@ export const darkColors: ColorPalette = {
   status: colors.status,
 
   glass: {
-    background: 'rgba(17, 23, 33, 0.7)',
+    background: 'rgba(14, 19, 28, 0.72)',
     border: 'rgba(255, 255, 255, 0.08)',
   },
 };
@@ -251,8 +251,8 @@ export const shadows = {
  * button, instead of `colors.background.hover`'s navy `#1E2633`, which would look
  * mismatched against this lighter grey. Light mode is unchanged (solid white).
  */
-export const modalSurface = { light: '#FFFFFF', dark: '#27272A' } as const;
-export const modalHover = { light: '#F3F4F6', dark: '#3A3A3F' } as const;
+export const modalSurface = { light: '#FFFFFF', dark: '#1A1F29' } as const;
+export const modalHover = { light: '#F1F5F9', dark: '#262C38' } as const;
 
 export const theme = {
   colors,

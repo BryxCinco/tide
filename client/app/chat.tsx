@@ -7,21 +7,24 @@ import {
   type TextInput as RNTextInputHandle,
   type TextInputKeyPressEventData,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
-import { ChatConversation, ChatHeader, DEFAULT_QUICK_SUGGESTIONS } from '@/components/chat';
+import { CHAT_COLUMN_MAX_WIDTH, ChatConversation, ChatHeader, DEFAULT_QUICK_SUGGESTIONS } from '@/components/chat';
 import { AppLayout, MobileTabBar } from '@/components/layout';
-import { Icon, Skeleton } from '@/components/ui';
+import { Icon, Skeleton, Text } from '@/components/ui';
 import { Pressable } from '@/components/ui/SoundPressable';
 import { TextInput } from '@/components/ui/SoundTextInput';
 import { useAuth } from '@/hooks/useAuth';
+import { useResponsive } from '@/hooks/useResponsive';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useChatStore } from '@/store/chatStore';
 import { showToast } from '@/store/toastStore';
+import { gradientDirections, gradients } from '@/utils/gradients';
 import { soundManager } from '@/utils/soundManager';
 
-const MIN_COMPOSER_HEIGHT = 44;
+const MIN_COMPOSER_HEIGHT = 40;
 const MAX_COMPOSER_HEIGHT = 130; // ~5 lines at this font size, per Fix 5's "auto-grow up to 5 lines".
 // Mirrors server/routes/chat.js's MAX_MESSAGE_LENGTH — stops a pasted essay before it's even
 // sent, rather than silently truncating it after the fact server-side.
@@ -69,11 +72,20 @@ function SendButton({ disabled, onPress }: SendButtonProps) {
         }}
         disabled={disabled}
         hitSlop={8}
-        android_ripple={{ color: 'rgba(255,255,255,0.35)', borderless: true, radius: 22 }}
-        className="h-11 w-11 items-center justify-center rounded-full bg-tide-teal"
-        style={{ opacity: disabled ? 0.4 : 1 }}
+        android_ripple={{ color: 'rgba(255,255,255,0.35)', borderless: true, radius: 20 }}
+        className="h-10 w-10 items-center justify-center overflow-hidden rounded-full"
+        style={{ backgroundColor: themeColors.background.hover }}
       >
-        <Icon name="ArrowUp" size={20} color={themeColors.text.inverse} />
+        {!disabled && (
+          <LinearGradient
+            colors={[...gradients.aurora]}
+            {...gradientDirections.diagonal}
+            style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+          />
+        )}
+        <View>
+          <Icon name="ArrowUp" size={19} strokeWidth={2.4} color={disabled ? themeColors.text.disabled : '#FFFFFF'} />
+        </View>
       </Pressable>
     </Animated.View>
   );
@@ -85,7 +97,7 @@ function SendButton({ disabled, onPress }: SendButtonProps) {
  * their actual messages pop in. */
 function ChatSkeleton() {
   return (
-    <View className="flex-1 justify-end gap-3 px-4 py-4">
+    <View className="w-full flex-1 justify-end gap-4 self-center px-4 py-6" style={{ maxWidth: CHAT_COLUMN_MAX_WIDTH }}>
       <View className="max-w-[70%] self-start">
         <Skeleton className="h-10 w-48 rounded-2xl rounded-bl-sm" />
       </View>
@@ -107,6 +119,7 @@ function ChatSkeleton() {
 export default function ChatScreen() {
   const { user } = useAuth();
   const themeColors = useThemeColors();
+  const { isPhone } = useResponsive();
   const messages = useChatStore((s) => s.messages);
   const hasHydrated = useChatStore((s) => s.hasHydrated);
   const isTyping = useChatStore((s) => s.isTyping);
@@ -183,36 +196,60 @@ export default function ChatScreen() {
             />
           )}
 
-          <View className="flex-row items-end gap-2 border-t border-subtle px-4 py-3">
-            <Pressable
-              onPress={handleVoicePress}
-              hitSlop={8}
-              className="h-11 w-11 items-center justify-center rounded-full hover:bg-elevated"
-            >
-              <Icon name="Mic" size={19} color={themeColors.text.secondary} />
-            </Pressable>
-
-            <TextInput
-              ref={inputRef}
-              value={draft}
-              onChangeText={setDraft}
-              onKeyPress={handleKeyPress}
-              onContentSizeChange={(e) => {
-                const next = Math.min(
-                  Math.max(MIN_COMPOSER_HEIGHT, e.nativeEvent.contentSize.height + 12),
-                  MAX_COMPOSER_HEIGHT,
-                );
-                setComposerHeight(next);
+          {/* Floating composer card, centered on the same reading column as the messages. */}
+          <View className="w-full self-center px-3 pb-3 pt-1 md:px-6 md:pb-5" style={{ maxWidth: CHAT_COLUMN_MAX_WIDTH + 48 }}>
+            <View
+              className="flex-row items-end gap-1.5 rounded-[26px] border border-default bg-surface p-1.5"
+              style={{
+                shadowColor: '#0F172A',
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.06,
+                shadowRadius: 24,
+                elevation: 3,
               }}
-              multiline
-              maxLength={MAX_MESSAGE_LENGTH}
-              placeholder="Message your AI Coach..."
-              placeholderTextColor={themeColors.text.disabled}
-              className="flex-1 rounded-2xl bg-base px-4 py-2.5 font-sans text-primary"
-              style={{ fontSize: 15, height: composerHeight, maxHeight: MAX_COMPOSER_HEIGHT }}
-            />
+            >
+              <Pressable
+                onPress={handleVoicePress}
+                hitSlop={6}
+                accessibilityLabel="Voice input"
+                className="h-10 w-10 items-center justify-center rounded-full hover:bg-elevated"
+              >
+                <Icon name="Mic" size={18} color={themeColors.text.muted} />
+              </Pressable>
 
-            <SendButton disabled={!draft.trim() || isTyping || isStreaming} onPress={() => handleSend(draft)} />
+              <TextInput
+                ref={inputRef}
+                value={draft}
+                onChangeText={(text) => {
+                  setDraft(text);
+                  // Lets the web textarea shrink back when lines are deleted — its scrollHeight
+                  // never reports less than the box's current height.
+                  if (!text.includes('\n') && text.length < 30) setComposerHeight(MIN_COMPOSER_HEIGHT);
+                }}
+                onKeyPress={handleKeyPress}
+                onContentSizeChange={(e) => {
+                  // Web reports the textarea's scrollHeight, which already includes its own
+                  // padding (and is never smaller than its current height) — adding padding
+                  // again there made the box grow by 12px on every keystroke. Native reports
+                  // just the text's height, so the vertical padding gets added back.
+                  const contentHeight = e.nativeEvent.contentSize.height + (Platform.OS === 'web' ? 0 : 20);
+                  setComposerHeight(Math.min(Math.max(MIN_COMPOSER_HEIGHT, contentHeight), MAX_COMPOSER_HEIGHT));
+                }}
+                multiline
+                maxLength={MAX_MESSAGE_LENGTH}
+                placeholder="Ask your coach anything…"
+                placeholderTextColor={themeColors.text.disabled}
+                className="flex-1 px-1 py-2.5 font-sans text-primary"
+                style={{ fontSize: 15, height: composerHeight, maxHeight: MAX_COMPOSER_HEIGHT }}
+              />
+
+              <SendButton disabled={!draft.trim() || isTyping || isStreaming} onPress={() => handleSend(draft)} />
+            </View>
+            {!isPhone && (
+              <Text variant="body" color="muted" className="mt-2 text-center text-[11px]">
+                Enter to send · Shift + Enter for a new line · TIDE Coach can make mistakes.
+              </Text>
+            )}
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>

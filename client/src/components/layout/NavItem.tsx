@@ -1,18 +1,13 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, usePathname, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
 import { useTranslation, type TranslationKey } from '../../i18n';
 import { useThemeStore } from '../../store/themeStore';
 import { cn } from '../../utils/cn';
+import { gradientDirections, gradients } from '../../utils/gradients';
 import { getSidebarNavPalette } from '../../utils/sidebarNavTheme';
 import { soundManager } from '../../utils/soundManager';
 import { Icon, Text, Tooltip, type IconName } from '../ui';
@@ -26,77 +21,92 @@ export interface NavItemConfig {
    * translation only covers the items translations.ts actually lists strings for. */
   labelKey?: TranslationKey;
   icon: IconName;
+  /** Tiny aurora pill after the label (e.g. "AI") — for the one or two items worth calling out. */
+  badge?: string;
+  /** Never shows the active state — for a secondary shortcut (the Sidebar's "Settings")
+   * that points at the same route as a primary item, so only one of them lights up. */
+  noActiveState?: boolean;
 }
 
-/** Shared between the persistent/collapsed Sidebar and the mobile drawer. */
-export const NAV_ITEMS: NavItemConfig[] = [
-  { href: '/', label: 'Dashboard', labelKey: 'nav.dashboard', icon: 'Home' },
-  { href: '/timer', label: 'Timer', labelKey: 'nav.timer', icon: 'Clock' },
-  { href: '/journal', label: 'Journal', labelKey: 'nav.journal', icon: 'Book' },
-  { href: '/tasks', label: 'Tasks', labelKey: 'nav.tasks', icon: 'CheckSquare' },
-  { href: '/activities', label: 'Activities', labelKey: 'nav.activities', icon: 'Layers' },
-  { href: '/insights', label: 'Insights', labelKey: 'nav.insights', icon: 'BarChart3' },
-  { href: '/chat', label: 'AI Coach', labelKey: 'nav.aiCoach', icon: 'Sparkles' },
-  { href: '/profile', label: 'Profile', labelKey: 'nav.profile', icon: 'User' },
+export interface NavSection {
+  label: string;
+  labelKey?: TranslationKey;
+  items: NavItemConfig[];
+}
+
+/** Shared between the persistent/collapsed Sidebar and the mobile drawer, grouped so a long
+ * flat list reads as a few short, scannable blocks. */
+export const NAV_SECTIONS: NavSection[] = [
+  {
+    label: 'Workspace',
+    labelKey: 'nav.section.workspace',
+    items: [
+      { href: '/', label: 'Dashboard', labelKey: 'nav.dashboard', icon: 'Home' },
+      { href: '/timer', label: 'Timer', labelKey: 'nav.timer', icon: 'Clock' },
+      { href: '/tasks', label: 'Tasks', labelKey: 'nav.tasks', icon: 'CheckSquare' },
+      { href: '/activities', label: 'Activities', labelKey: 'nav.activities', icon: 'Layers' },
+      { href: '/journal', label: 'Journal', labelKey: 'nav.journal', icon: 'Book' },
+    ],
+  },
+  {
+    label: 'Growth',
+    labelKey: 'nav.section.growth',
+    items: [
+      { href: '/insights', label: 'Insights', labelKey: 'nav.insights', icon: 'BarChart3' },
+      { href: '/chat', label: 'AI Coach', labelKey: 'nav.aiCoach', icon: 'Sparkles', badge: 'AI' },
+      { href: '/profile', label: 'Profile', labelKey: 'nav.profile', icon: 'User' },
+    ],
+  },
 ];
+
+/** Flat list of every primary destination, in display order. */
+export const NAV_ITEMS: NavItemConfig[] = NAV_SECTIONS.flatMap((section) => section.items);
 
 export interface NavItemProps {
   item: NavItemConfig;
-  /** Icons-only rail (tablet collapsed sidebar) — shows a hover tooltip instead of an inline label. */
+  /** Icons-only rail (tablet / collapsed desktop sidebar) — shows a hover tooltip instead of an inline label. */
   collapsed?: boolean;
   onNavigate?: () => void;
-  /** Position within the list it's rendered in — purely for staggering the entrance
-   * animation below (each item ~35ms behind the last). Omit for a one-off item (Sidebar's
-   * standalone "Settings" row) that isn't part of a mapped list. */
+  /** Position within the list — only used to stagger `animateIn`. */
   index?: number;
+  /** Fade-in on mount. Only the mobile drawer opts in (it mounts fresh on every open); the
+   * persistent Sidebar is re-mounted on every screen change, so animating it there would
+   * make the whole nav flicker on each navigation. */
+  animateIn?: boolean;
 }
 
-const HOVER_DURATION = 200;
-const PULSE_MIN_OPACITY = 0.95;
-const ENTRANCE_DURATION = 320;
-const ENTRANCE_STAGGER_MS = 35;
+const HOVER_DURATION = 150;
+const ENTRANCE_DURATION = 260;
+const ENTRANCE_STAGGER_MS = 25;
+const CHIP_SIZE = 30;
 
-export function NavItem({ item, collapsed = false, onNavigate, index = 0 }: NavItemProps) {
+export function NavItem({ item, collapsed = false, onNavigate, index = 0, animateIn = false }: NavItemProps) {
   const pathname = usePathname();
-  const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+  const isActive =
+    !item.noActiveState && (item.href === '/' ? pathname === '/' : pathname.startsWith(item.href));
   const [isHovered, setIsHovered] = useState(false);
   const isDark = useThemeStore((s) => s.theme === 'dark');
   const palette = getSidebarNavPalette(isDark);
   const { t } = useTranslation();
   const label = item.labelKey ? t(item.labelKey) : item.label;
 
-  // onHoverIn/Out only ever fire on web (pointer devices) — a no-op on touch, so this is
-  // safe to wire up unconditionally rather than branching on Platform.OS.
+  // onHoverIn/Out only ever fire on web (pointer devices). The hover state is a pure color
+  // fade — nothing moves, scales, or changes letter-spacing, so the row never shifts.
   const hoverProgress = useSharedValue(0);
-  const pulse = useSharedValue(1);
-  // Runs once per mount, not per render — Sidebar/MobileDrawer's NavItems are what "each
-  // appearance on the navigation" refers to: the drawer unmounts its content on close (see
-  // MobileDrawer.tsx's own header comment), so every open re-mounts and re-stages this.
-  const entrance = useSharedValue(0);
+  const entrance = useSharedValue(animateIn ? 0 : 1);
 
   useEffect(() => {
-    entrance.value = withDelay(index * ENTRANCE_STAGGER_MS, withTiming(1, { duration: ENTRANCE_DURATION, easing: Easing.out(Easing.cubic) }));
+    if (!animateIn) return;
+    entrance.value = withDelay(
+      index * ENTRANCE_STAGGER_MS,
+      withTiming(1, { duration: ENTRANCE_DURATION, easing: Easing.out(Easing.cubic) }),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    // 200ms ease-out for every hover/active transition per spec — this same shared value
-    // drives the row's hover-tint overlay opacity below, not just the translateX/scale.
     hoverProgress.value = withTiming(isHovered ? 1 : 0, { duration: HOVER_DURATION, easing: Easing.out(Easing.ease) });
   }, [isHovered, hoverProgress]);
-
-  useEffect(() => {
-    if (!isActive) {
-      pulse.value = 1;
-      return;
-    }
-    // Slower, more dramatic breathing in dark mode, per the design spec.
-    pulse.value = withRepeat(
-      withTiming(PULSE_MIN_OPACITY, { duration: isDark ? 4000 : 3000, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true,
-    );
-  }, [isActive, isDark, pulse]);
 
   const handlePress = () => {
     soundManager.play('tap');
@@ -106,21 +116,29 @@ export function NavItem({ item, collapsed = false, onNavigate, index = 0 }: NavI
 
   const entranceStyle = useAnimatedStyle(() => ({
     opacity: entrance.value,
-    transform: [{ translateX: (1 - entrance.value) * (collapsed ? 0 : -12) }, { translateY: (1 - entrance.value) * (collapsed ? 8 : 0) }],
+    transform: [{ translateX: (1 - entrance.value) * -8 }],
   }));
-  const activePulseStyle = useAnimatedStyle(() => ({ opacity: pulse.value }));
   const hoverOverlayStyle = useAnimatedStyle(() => ({ opacity: isActive ? 0 : hoverProgress.value }));
-  const rowStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: collapsed ? 0 : hoverProgress.value * 2 }],
-  }));
-  const iconScaleStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 + hoverProgress.value * 0.1 }],
-  }));
 
-  // Icon color always matches the label's text color (spec: "icon color matches text
-  // color") — default state is text-secondary-equivalent (readable, not muted), not the
-  // app's dimmer text-muted token, so idle nav items stay clearly legible.
-  const textAndIconColor = isActive || isHovered ? palette.navAccentText : palette.navDefaultText;
+  const iconColor = isActive ? '#FFFFFF' : isHovered ? palette.navActiveText : palette.navDefaultText;
+  const textColor = isActive || isHovered ? palette.navActiveText : palette.navDefaultText;
+
+  const chip = (size: number, radius: number, iconSize: number) => (
+    <View style={{ width: size, height: size, borderRadius: radius, overflow: 'hidden' }} className="items-center justify-center">
+      {isActive && (
+        <LinearGradient
+          colors={[...gradients.aurora]}
+          {...gradientDirections.diagonal}
+          style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+        />
+      )}
+      {/* Own View so it stacks above the absolutely-positioned gradient on web, where a
+          non-positioned sibling would otherwise paint underneath it. */}
+      <View>
+        <Icon name={item.icon} size={iconSize} color={iconColor} />
+      </View>
+    </View>
+  );
 
   if (collapsed) {
     return (
@@ -130,23 +148,16 @@ export function NavItem({ item, collapsed = false, onNavigate, index = 0 }: NavI
             onPress={handlePress}
             onHoverIn={() => setIsHovered(true)}
             onHoverOut={() => setIsHovered(false)}
+            accessibilityRole="link"
+            accessibilityLabel={label}
             className="h-11 w-11 items-center justify-center rounded-xl"
           >
-            {isActive && (
-              <Animated.View
-                pointerEvents="none"
-                className="absolute inset-0 rounded-xl"
-                style={[{ backgroundColor: palette.navActiveBg }, palette.navActiveGlow, activePulseStyle]}
-              />
-            )}
             <Animated.View
               pointerEvents="none"
               className="absolute inset-0 rounded-xl"
-              style={[{ backgroundColor: palette.navHoverBg }, palette.navHoverGlow, hoverOverlayStyle]}
+              style={[{ backgroundColor: palette.navHoverBg }, hoverOverlayStyle]}
             />
-            <Animated.View style={iconScaleStyle} className="shrink-0">
-              <Icon name={item.icon} size={20} color={textAndIconColor} />
-            </Animated.View>
+            {chip(40, 12, 19)}
           </Pressable>
         </Tooltip>
       </Animated.View>
@@ -155,41 +166,65 @@ export function NavItem({ item, collapsed = false, onNavigate, index = 0 }: NavI
 
   return (
     <Animated.View style={entranceStyle}>
-      <Pressable onPress={handlePress} onHoverIn={() => setIsHovered(true)} onHoverOut={() => setIsHovered(false)}>
-        <Animated.View style={rowStyle} className="relative flex-row items-center gap-3 rounded-xl px-4 py-3">
-          {isActive && (
-            <Animated.View
-              pointerEvents="none"
-              className="absolute inset-0 rounded-xl"
-              style={[{ backgroundColor: palette.navActiveBg }, palette.navActiveGlow, activePulseStyle]}
-            />
-          )}
-          <Animated.View
-            pointerEvents="none"
-            className="absolute inset-0 rounded-xl"
-            style={[{ backgroundColor: palette.navHoverBg }, palette.navHoverGlow, hoverOverlayStyle]}
-          />
-          {isActive && (
-            <View
-              pointerEvents="none"
-              className="absolute bottom-1.5 left-0 top-1.5 w-[3px] rounded-full"
-              style={[{ backgroundColor: palette.navAccentBar }, palette.navAccentBarGlow]}
-            />
-          )}
+      <Pressable
+        onPress={handlePress}
+        onHoverIn={() => setIsHovered(true)}
+        onHoverOut={() => setIsHovered(false)}
+        accessibilityRole="link"
+        accessibilityLabel={label}
+        className="relative flex-row items-center gap-3 rounded-xl border px-2 py-1.5"
+        style={{
+          backgroundColor: isActive ? palette.navActiveBg : 'transparent',
+          borderColor: isActive ? palette.navActiveBorder : 'transparent',
+        }}
+      >
+        <Animated.View
+          pointerEvents="none"
+          className="absolute inset-0 rounded-xl"
+          style={[{ backgroundColor: palette.navHoverBg }, hoverOverlayStyle]}
+        />
 
-          <Animated.View style={iconScaleStyle} className="shrink-0">
-            <Icon name={item.icon} size={20} color={textAndIconColor} />
-          </Animated.View>
-          <Text
-            variant="body"
-            className={cn('shrink text-base font-medium', isActive && 'font-semibold')}
-            style={{ color: textAndIconColor, letterSpacing: isHovered ? 0.2 : 0 }}
-            numberOfLines={1}
-          >
-            {label}
-          </Text>
-        </Animated.View>
+        {chip(CHIP_SIZE, 9, 17)}
+
+        <Text
+          variant="body"
+          className={cn('flex-1 font-medium', isActive && 'font-semibold')}
+          style={{ color: textColor }}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+
+        {item.badge && (
+          <View className="overflow-hidden rounded-md px-1.5 py-0.5">
+            <LinearGradient
+              colors={[...gradients.aurora]}
+              {...gradientDirections.horizontal}
+              style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, opacity: isActive ? 1 : 0.9 }}
+            />
+            <Text variant="label" className="tracking-wider" style={{ color: '#FFFFFF', fontSize: 9 }}>
+              {item.badge}
+            </Text>
+          </View>
+        )}
       </Pressable>
     </Animated.View>
+  );
+}
+
+/** Small uppercase group heading between nav sections. Collapses to a short divider in the
+ * icon rail, where there's no room for text. */
+export function NavSectionLabel({ label, collapsed = false }: { label: string; collapsed?: boolean }) {
+  const isDark = useThemeStore((s) => s.theme === 'dark');
+  const palette = getSidebarNavPalette(isDark);
+
+  if (collapsed) {
+    return <View className="my-2 h-px w-6 self-center" style={{ backgroundColor: palette.divider }} />;
+  }
+
+  return (
+    <Text variant="label" className="mb-1 mt-4 px-2.5" style={{ color: palette.sectionLabel, letterSpacing: 1.2 }}>
+      {label}
+    </Text>
   );
 }

@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -16,7 +16,7 @@ import { cn } from '../../utils/cn';
 import { hexToRgba } from '../../utils/color';
 import { getSidebarNavPalette } from '../../utils/sidebarNavTheme';
 import { Avatar, Icon, Text, ThemeToggle, Tooltip } from '../ui';
-import { NAV_ITEMS, NavItem } from './NavItem';
+import { NAV_SECTIONS, NavItem, NavSectionLabel } from './NavItem';
 import { SidebarLogo } from './SidebarLogo';
 
 export interface SidebarProps {
@@ -25,15 +25,18 @@ export interface SidebarProps {
   collapsed?: boolean;
 }
 
-const EXPANDED_WIDTH = 240;
-const COLLAPSED_WIDTH = 72;
-const WIDTH_ANIM_DURATION = 250;
+/** Gap between the floating panel and the window's left/top/bottom edges. */
+export const SIDEBAR_GUTTER = 12;
+/** Outer widths, gutter included — SidebarCollapseToggle sits exactly on the panel's right edge. */
+export const SIDEBAR_EXPANDED_WIDTH = SIDEBAR_GUTTER + 248;
+export const SIDEBAR_COLLAPSED_WIDTH = SIDEBAR_GUTTER + 68;
+export const SIDEBAR_WIDTH_ANIM_DURATION = 240;
 
 /**
- * Persistent left-hand navigation for tablet/desktop, replacing the bottom tab bar at
- * those widths. Structure is a fixed top (brand + profile), a scrolling middle (nav
- * items), and a fixed bottom (settings/theme/logout) — so at any zoom level or short
- * viewport, items scroll instead of overlapping.
+ * Persistent left-hand navigation for tablet/desktop — a floating rounded panel inset from
+ * the window edge rather than a full-height strip glued to it. Fixed top (brand), a
+ * scrolling middle (grouped nav), and a fixed bottom (settings + account card), so at any
+ * zoom level or short viewport the nav scrolls instead of overlapping.
  */
 export function Sidebar({ collapsed: forcedCollapsed = false }: SidebarProps) {
   const { user, logout } = useAuth();
@@ -47,10 +50,10 @@ export function Sidebar({ collapsed: forcedCollapsed = false }: SidebarProps) {
 
   const collapsed = forcedCollapsed || (isDesktop && isSidebarCollapsed);
 
-  const width = useSharedValue(collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH);
+  const width = useSharedValue(collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_EXPANDED_WIDTH);
   useEffect(() => {
-    width.value = withTiming(collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH, {
-      duration: WIDTH_ANIM_DURATION,
+    width.value = withTiming(collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_EXPANDED_WIDTH, {
+      duration: SIDEBAR_WIDTH_ANIM_DURATION,
       easing: Easing.out(Easing.cubic),
     });
   }, [collapsed, width]);
@@ -62,135 +65,121 @@ export function Sidebar({ collapsed: forcedCollapsed = false }: SidebarProps) {
     router.replace('/(auth)/login');
   };
 
-  // Single source of truth (shared with NavItem.tsx and MobileDrawer.tsx) for the exact
-  // background/border/glow values — see sidebarNavTheme.ts.
+  // Single source of truth (shared with NavItem.tsx and MobileDrawer.tsx) — see sidebarNavTheme.ts.
   const palette = getSidebarNavPalette(isDark);
-  const dividerColor = hexToRgba(themeColors.brand.tideTeal, 0.1);
+  const teal = themeColors.brand.tideTeal;
 
   return (
     <Animated.View
-      style={[
-        widthStyle,
-        { backgroundColor: palette.background, borderRightWidth: 1, borderRightColor: palette.borderColor },
-        palette.edgeGlow,
-      ]}
+      style={[widthStyle, { paddingLeft: SIDEBAR_GUTTER, paddingVertical: SIDEBAR_GUTTER }]}
       className="h-full"
     >
-      <View className="flex-1 flex-col">
-        {/* FIXED TOP — brand mark, profile. Generous top padding so the logo has room to
-            breathe instead of crowding the sidebar's top edge. */}
-        <View className="shrink-0 pt-10">
-          <View className="absolute inset-x-0 top-0 h-40" pointerEvents="none">
-            <LinearGradient
-              colors={[hexToRgba(themeColors.brand.tideTeal, isDark ? 0.1 : 0.04), 'transparent']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={{ flex: 1 }}
-            />
-          </View>
-
-          <View className={cn('px-3', collapsed && 'items-center')}>
-            {collapsed ? (
-              <SidebarLogo collapsed />
-            ) : (
-              <View className="px-1">
-                <SidebarLogo width={120} />
-                <Text variant="caption" color="muted" className="mt-1 normal-case tracking-normal">
-                  Productivity Coach
-                </Text>
-              </View>
-            )}
-          </View>
-
-          <Pressable
-            onPress={() => router.push('/(tabs)/profile')}
-            className={cn(
-              'mt-8 flex-row items-center gap-3 rounded-xl px-2 py-2 hover:bg-elevated',
-              collapsed && 'mx-auto justify-center px-0',
-            )}
-          >
-            {!collapsed && (
-              <View className="absolute inset-0 rounded-xl" pointerEvents="none">
-                <LinearGradient
-                  colors={[hexToRgba(themeColors.brand.tideTeal, isDark ? 0.12 : 0.03), 'transparent']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={{ flex: 1, borderRadius: 12 }}
-                />
-              </View>
-            )}
-            <Avatar
-              name={user?.name}
-              source={user?.avatar}
-              ring
-              ringColor="teal"
-              style={{ width: collapsed ? 40 : 48, height: collapsed ? 40 : 48 }}
-            />
-            {!collapsed && (
-              <View className="flex-1">
-                <Text variant="body" color="primary" className="font-semibold" numberOfLines={1}>
-                  {user?.name ?? 'Demo User'}
-                </Text>
-                <Text variant="caption" color="muted" className="normal-case tracking-normal" numberOfLines={1}>
-                  {user?.email ?? 'Browsing in demo mode'}
-                </Text>
-              </View>
-            )}
-          </Pressable>
+      <View
+        className="flex-1 rounded-[22px] border"
+        style={[{ backgroundColor: palette.background, borderColor: palette.borderColor }, palette.panelShadow]}
+      >
+        {/* Aurora wash behind the brand mark — the panel's one decorative flourish. */}
+        <View className="absolute inset-x-0 top-0 h-36 overflow-hidden rounded-t-[22px]" pointerEvents="none">
+          <LinearGradient
+            colors={[hexToRgba(teal, isDark ? 0.14 : 0.08), hexToRgba('#6366F1', isDark ? 0.05 : 0.025), 'transparent']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={{ flex: 1 }}
+          />
         </View>
 
-        {/* SCROLLABLE MIDDLE — nav items. This is the one section that can overflow, so
-            it's the only one that scrolls; top/bottom never move. */}
+        {/* FIXED TOP — brand mark. */}
+        <View className={cn('shrink-0 pb-2 pt-6', collapsed ? 'items-center' : 'px-5')}>
+          {collapsed ? (
+            <SidebarLogo collapsed />
+          ) : (
+            <View>
+              <SidebarLogo width={104} />
+              <Text variant="label" className="mt-1.5" style={{ color: palette.sectionLabel, letterSpacing: 1.2 }}>
+                Productivity Coach
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* SCROLLABLE MIDDLE — grouped nav. The only section that can overflow. */}
         <ScrollView
-          className={cn('sidebar-scrollbar mt-4 flex-1', collapsed ? 'px-0' : 'px-3')}
-          contentContainerClassName={cn('gap-1', collapsed ? 'items-center pb-4' : 'pb-4')}
+          className={cn('sidebar-scrollbar flex-1', collapsed ? 'px-0' : 'px-3')}
+          contentContainerClassName={cn('gap-0.5 pb-3', collapsed && 'items-center')}
           showsVerticalScrollIndicator={false}
         >
-          {NAV_ITEMS.map((item, index) => (
-            <NavItem key={item.href} item={item} collapsed={collapsed} index={index} />
+          {NAV_SECTIONS.map((section) => (
+            <Fragment key={section.label}>
+              <NavSectionLabel label={section.labelKey ? t(section.labelKey) : section.label} collapsed={collapsed} />
+              {section.items.map((item) => (
+                <NavItem key={item.href} item={item} collapsed={collapsed} />
+              ))}
+            </Fragment>
           ))}
         </ScrollView>
 
-        {/* FIXED BOTTOM — settings, theme toggle, log out. */}
-        <View className={cn('shrink-0 px-3 pb-4 pt-2', collapsed && 'items-center px-0')}>
-          <View className="mb-2 h-px" style={{ backgroundColor: dividerColor, width: collapsed ? 40 : undefined }} />
+        {/* FIXED BOTTOM — settings, then the account card (profile, theme, log out). */}
+        <View className={cn('shrink-0 gap-2 pb-3 pt-2', collapsed ? 'items-center px-0' : 'px-3')}>
+          <View className="mb-1 h-px" style={{ backgroundColor: palette.divider, width: collapsed ? 32 : undefined }} />
 
-          <NavItem item={{ href: '/profile', label: 'Settings', labelKey: 'nav.settings', icon: 'Settings' }} collapsed={collapsed} />
+          <NavItem item={{ href: '/profile', label: 'Settings', labelKey: 'nav.settings', icon: 'Settings', noActiveState: true }} collapsed={collapsed} />
 
           {collapsed ? (
-            <View className="mt-2 items-center">
+            <View className="items-center gap-2 pt-1">
               <ThemeToggle collapsed />
-            </View>
-          ) : (
-            <View className="mt-3 flex-row items-center justify-between px-3">
-              <Text variant="caption" color="muted" className="normal-case tracking-normal">
-                {t('nav.theme')}
-              </Text>
-              <ThemeToggle />
-            </View>
-          )}
-
-          {collapsed ? (
-            <Tooltip label={t('nav.logout')} visible={logoutHovered}>
-              <Pressable
-                onPress={() => setLogoutVisible(true)}
-                onHoverIn={() => setLogoutHovered(true)}
-                onHoverOut={() => setLogoutHovered(false)}
-                className="mt-2 h-11 w-11 items-center justify-center rounded-xl hover:bg-error/10"
-              >
-                <Icon name="LogOut" size={20} color={themeColors.status.error} />
+              <Tooltip label={t('nav.logout')} visible={logoutHovered}>
+                <Pressable
+                  onPress={() => setLogoutVisible(true)}
+                  onHoverIn={() => setLogoutHovered(true)}
+                  onHoverOut={() => setLogoutHovered(false)}
+                  accessibilityLabel={t('nav.logout')}
+                  className="h-10 w-10 items-center justify-center rounded-xl hover:bg-error/10"
+                >
+                  <Icon name="LogOut" size={18} color={themeColors.status.error} />
+                </Pressable>
+              </Tooltip>
+              <Pressable onPress={() => router.push('/(tabs)/profile')} className="mt-1">
+                <Avatar name={user?.name} source={user?.avatar} style={{ width: 36, height: 36 }} />
               </Pressable>
-            </Tooltip>
+            </View>
           ) : (
-            <Pressable
-              onPress={() => setLogoutVisible(true)}
-              className="mt-3 flex-row items-center gap-3 rounded-xl py-2.5 pl-3 pr-4 hover:bg-error/10"
-            >
-              <Icon name="LogOut" size={19} color={themeColors.status.error} />
-              <Text variant="body" className="font-medium" style={{ color: themeColors.status.error }}>
-                {t('nav.logout')}
-              </Text>
-            </Pressable>
+            <View className="rounded-2xl border p-2.5" style={{ borderColor: palette.borderColor, backgroundColor: palette.navHoverBg }}>
+              <View className="flex-row items-center gap-2.5">
+                <Pressable
+                  onPress={() => router.push('/(tabs)/profile')}
+                  className="flex-1 flex-row items-center gap-2.5"
+                  style={{ minWidth: 0 }}
+                >
+                  <Avatar name={user?.name} source={user?.avatar} style={{ width: 36, height: 36 }} />
+                  <View className="flex-1" style={{ minWidth: 0 }}>
+                    <Text variant="body" color="primary" className="text-[14px] font-semibold" numberOfLines={1}>
+                      {user?.name ?? 'Demo User'}
+                    </Text>
+                    <Text variant="body" color="muted" className="text-[12px]" numberOfLines={1}>
+                      {user?.email ?? 'Browsing in demo mode'}
+                    </Text>
+                  </View>
+                </Pressable>
+                <Tooltip label={t('nav.logout')} visible={logoutHovered}>
+                  <Pressable
+                    onPress={() => setLogoutVisible(true)}
+                    onHoverIn={() => setLogoutHovered(true)}
+                    onHoverOut={() => setLogoutHovered(false)}
+                    accessibilityLabel={t('nav.logout')}
+                    className="h-8 w-8 items-center justify-center rounded-lg hover:bg-error/10"
+                  >
+                    <Icon name="LogOut" size={16} color={themeColors.text.muted} />
+                  </Pressable>
+                </Tooltip>
+              </View>
+
+              <View className="mt-2.5 flex-row items-center justify-between border-t pl-1 pt-2.5" style={{ borderColor: palette.divider }}>
+                <Text variant="body" color="muted" className="text-[12px] font-medium">
+                  {t('nav.theme')}
+                </Text>
+                <ThemeToggle />
+              </View>
+            </View>
           )}
         </View>
       </View>

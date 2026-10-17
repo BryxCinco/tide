@@ -5,61 +5,84 @@ import { Pressable } from '../ui/SoundPressable';
 
 import { useResponsive } from '../../hooks/useResponsive';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { useTranslation, type TranslationKey } from '../../i18n';
+import { useThemeStore } from '../../store/themeStore';
+import { hexToRgba } from '../../utils/color';
+import { getSidebarNavPalette } from '../../utils/sidebarNavTheme';
 import { Icon, Text, type IconName } from '../ui';
 
 interface TabDef {
   href: '/' | '/timer' | '/journal' | '/insights' | '/profile';
   label: string;
+  labelKey: TranslationKey;
   icon: IconName;
 }
 
-// Same 5 destinations and order as (tabs)/_layout.tsx's native <Tabs> — this is a second,
-// hand-built copy of that same tab bar rather than a shared one, because the native <Tabs>
-// navigator (and the tab bar chrome it renders) only exists for screens that are actually
-// inside the (tabs) route group. Tasks/Activities/Chat are top-level routes outside that
-// group, so they render this instead, to keep the tab bar visible (and navigable) from
-// every phone screen rather than only the 5 screens that are themselves tabs.
 const TABS: TabDef[] = [
-  { href: '/', label: 'Dashboard', icon: 'Home' },
-  { href: '/timer', label: 'Timer', icon: 'Clock' },
-  { href: '/journal', label: 'Journal', icon: 'Book' },
-  { href: '/insights', label: 'Insights', icon: 'BarChart3' },
-  { href: '/profile', label: 'Profile', icon: 'User' },
+  { href: '/', label: 'Home', labelKey: 'nav.dashboard', icon: 'Home' },
+  { href: '/timer', label: 'Timer', labelKey: 'nav.timer', icon: 'Clock' },
+  { href: '/journal', label: 'Journal', labelKey: 'nav.journal', icon: 'Book' },
+  { href: '/insights', label: 'Insights', labelKey: 'nav.insights', icon: 'BarChart3' },
+  { href: '/profile', label: 'Profile', labelKey: 'nav.profile', icon: 'User' },
 ];
 
 /**
- * Bottom tab bar for phone screens that live outside the (tabs) route group (Tasks,
- * Activities, AI Coach) — keeps the same 5 primary destinations one tap away regardless
- * of which screen the user is currently on, instead of those three screens being a
- * navigational dead end reachable only via the drawer. None of these 3 screens are
- * themselves one of the 5 tabs, so nothing here ever renders as "active" — that's
- * expected, not a bug.
+ * The one phone bottom tab bar, used everywhere: (tabs)/_layout.tsx renders it through the
+ * native <Tabs> `tabBar` prop, and Tasks/Activities/AI Coach (top-level routes outside the
+ * (tabs) group) render it directly — so the bar looks and behaves identically on every phone
+ * screen. Navigation uses router.navigate (not push) so hopping between tabs never stacks
+ * duplicate screens. The active tab gets a soft tinted pill behind its icon — a static color
+ * change, no sliding indicator, so nothing jumps around while switching.
  */
 export function MobileTabBar() {
   const { isPhone } = useResponsive();
   const pathname = usePathname();
   const themeColors = useThemeColors();
+  const isDark = useThemeStore((s) => s.theme === 'dark');
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
 
   if (!isPhone) return null;
 
+  const palette = getSidebarNavPalette(isDark);
+  const teal = themeColors.brand.tideTeal;
+
   return (
     <View
-      className="flex-row border-t border-subtle bg-base"
-      style={{ paddingBottom: insets.bottom }}
+      className="flex-row border-t px-2 pt-1.5"
+      style={{
+        backgroundColor: palette.background,
+        borderTopColor: palette.borderColor,
+        paddingBottom: Math.max(insets.bottom, 8),
+      }}
     >
       {TABS.map((tab) => {
-        const active = pathname === tab.href;
-        const color = active ? themeColors.brand.tideTeal : themeColors.text.muted;
+        const active = tab.href === '/' ? pathname === '/' : pathname.startsWith(tab.href);
+        const label = t(tab.labelKey) || tab.label;
         return (
           <Pressable
             key={tab.href}
-            onPress={() => router.push(tab.href)}
-            className="flex-1 items-center gap-1 py-2"
+            onPress={() => {
+              if (!active) router.navigate(tab.href);
+            }}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={label}
+            className="flex-1 items-center gap-1 py-1"
           >
-            <Icon name={tab.icon} size={22} color={color} />
-            <Text variant="caption" style={{ color }} className="normal-case tracking-normal">
-              {tab.label}
+            <View
+              className="h-8 w-14 items-center justify-center rounded-full"
+              style={{ backgroundColor: active ? hexToRgba(teal, isDark ? 0.18 : 0.12) : 'transparent' }}
+            >
+              <Icon name={tab.icon} size={20} strokeWidth={active ? 2.3 : 2} color={active ? teal : palette.navDefaultText} />
+            </View>
+            <Text
+              variant="body"
+              numberOfLines={1}
+              className={active ? 'font-semibold' : 'font-medium'}
+              style={{ fontSize: 11, color: active ? palette.navActiveText : palette.navDefaultText }}
+            >
+              {label}
             </Text>
           </Pressable>
         );

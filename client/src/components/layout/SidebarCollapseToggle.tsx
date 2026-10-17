@@ -6,11 +6,13 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { useThemeStore } from '../../store/themeStore';
 import { useUiStore } from '../../store/uiStore';
 import { Icon } from '../ui';
+import {
+  SIDEBAR_COLLAPSED_WIDTH as COLLAPSED_WIDTH,
+  SIDEBAR_EXPANDED_WIDTH as EXPANDED_WIDTH,
+  SIDEBAR_WIDTH_ANIM_DURATION as WIDTH_ANIM_DURATION,
+} from './Sidebar';
 
-const EXPANDED_WIDTH = 240;
-const COLLAPSED_WIDTH = 72;
-const WIDTH_ANIM_DURATION = 250;
-const TOGGLE_BUTTON_SIZE = 32;
+const TOGGLE_BUTTON_SIZE = 26;
 
 /**
  * Rendered by AppLayout as a SIBLING of Sidebar and the main content pane — not nested
@@ -52,36 +54,29 @@ export function SidebarCollapseToggle() {
     scale.value = withTiming(target, { duration, easing: Easing.out(Easing.ease) });
   };
 
-  const glowStyle = hovered
-    ? {
-        shadowColor: themeColors.brand.tideTeal,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: isDark ? 0.5 : 0.3,
-        shadowRadius: 10,
-        elevation: 6,
-      }
-    : undefined;
+  const glowStyle = {
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0.4 : 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  };
 
   return (
     <Animated.View
       pointerEvents="box-none"
       style={[
-        { position: 'absolute', top: '50%', marginTop: -TOGGLE_BUTTON_SIZE / 2, zIndex: 50 },
+        { position: 'absolute', top: 36, zIndex: 50 },
         positionStyle,
       ]}
     >
       <Pressable
         onPress={toggleSidebar}
-        onHoverIn={() => {
-          setHovered(true);
-          animateScale(1.05, 200);
-        }}
-        onHoverOut={() => {
-          setHovered(false);
-          animateScale(1, 200);
-        }}
-        onPressIn={() => animateScale(0.95, 100)}
-        onPressOut={() => animateScale(hovered ? 1.05 : 1, 150)}
+        onHoverIn={() => setHovered(true)}
+        onHoverOut={() => setHovered(false)}
+        onPressIn={() => animateScale(0.92, 100)}
+        onPressOut={() => animateScale(1, 150)}
+        hitSlop={8}
       >
         <Animated.View
           className="items-center justify-center rounded-full border border-subtle"
@@ -90,7 +85,7 @@ export function SidebarCollapseToggle() {
               width: TOGGLE_BUTTON_SIZE,
               height: TOGGLE_BUTTON_SIZE,
               borderRadius: TOGGLE_BUTTON_SIZE / 2,
-              backgroundColor: isDark ? themeColors.background.elevated : themeColors.background.base,
+              backgroundColor: isDark ? '#161C27' : '#FFFFFF',
             },
             glowStyle,
             scaleStyle,
@@ -98,7 +93,7 @@ export function SidebarCollapseToggle() {
         >
           <Icon
             name={isSidebarCollapsed ? 'ChevronRight' : 'ChevronLeft'}
-            size={16}
+            size={14}
             color={hovered ? themeColors.brand.tideTeal : themeColors.text.muted}
           />
         </Animated.View>

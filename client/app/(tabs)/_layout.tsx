@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router';
 
 import type { ColorValue } from 'react-native';
 
-import { AppLayout } from '@/components/layout';
+import { AppLayout, MobileTabBar } from '@/components/layout';
 import { Icon, type IconName } from '@/components/ui';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -29,14 +29,15 @@ export default function TabsLayout() {
   return (
     <AppLayout>
       <Tabs
+        // One shared custom bar (MobileTabBar.tsx) instead of React Navigation's default
+        // chrome, so these 5 tabs look identical to the bar on Tasks/Activities/AI Coach.
+        // It renders nothing above phone width, where the Sidebar takes over.
+        tabBar={() => (isPhone ? <MobileTabBar /> : null)}
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: themeColors.brand.tideTeal,
           tabBarInactiveTintColor: themeColors.text.muted,
-          tabBarStyle: isPhone
-            ? { backgroundColor: themeColors.background.base, borderTopColor: themeColors.border.subtle }
-            : { display: 'none' },
-          tabBarLabelStyle: { fontSize: 11, fontFamily: 'Inter_500Medium' },
+          sceneStyle: { backgroundColor: themeColors.background.base },
         }}
       >
         <Tabs.Screen name="index" options={{ title: 'Dashboard', tabBarIcon: makeTabBarIcon('Home') }} />
