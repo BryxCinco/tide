@@ -32,7 +32,7 @@ export function WeatherWidget() {
   }, []);
 
   return (
-    <Card variant="default" padding="md" className="min-h-[150px] items-center justify-center gap-1.5">
+    <Card variant="default" padding="md" className="rounded-[24px] min-h-[150px] items-center justify-center gap-1.5">
       {!weather ? (
         <Loader size="sm" />
       ) : (

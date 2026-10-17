@@ -56,7 +56,7 @@ export function ActivityBreakdown({ activities, totals }: ActivityBreakdownProps
   const maxSeconds = rows.length > 0 ? rows[0].seconds : 1;
 
   return (
-    <View className="gap-4 rounded-2xl border border-subtle bg-base p-6">
+    <View className="gap-4 rounded-[24px] border border-subtle bg-surface p-5">
       <Text variant="h3" color="primary">
         Activity Breakdown
       </Text>

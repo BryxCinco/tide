@@ -159,7 +159,7 @@ export function QuestCard() {
   };
 
   return (
-    <Card variant="default" padding="lg" className="gap-4">
+    <Card variant="default" padding="lg" className="gap-4 rounded-[24px]">
       <View className="flex-row items-center justify-between">
         <View className="flex-row items-center gap-2">
           <Icon name="Sparkles" size={18} color="#14B8A6" />

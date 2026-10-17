@@ -134,6 +134,11 @@ export const useDashboardStore = create<DashboardState>()(
   ),
 );
 
+/** Widget types the Dashboard's fixed bento overview already shows (greeting/focus tiles and
+ * the four stat tiles) — never rendered in the widget grid and hidden from Customize, so the
+ * same numbers don't appear twice. */
+export const BENTO_COVERED_WIDGETS: ReadonlySet<WidgetId> = new Set<WidgetId>(['hero', 'stats']);
+
 /** Shared by app/(tabs)/index.tsx and CustomizeDashboardModal — kept as a plain function
  * (not a store selector) so callers wrap it in their own `useMemo`. */
 export function getVisibleWidgets(widgets: WidgetInstance[]): WidgetInstance[] {

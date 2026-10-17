@@ -1,5 +1,6 @@
 export * from './EmptyJournal';
 export * from './InterestTags';
+export * from './JournalBento';
 export * from './JournalCard';
 export * from './JournalEditor';
 export * from './JournalFilters';

@@ -46,7 +46,7 @@ export function TimeWidget() {
   const dateLabel = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
   return (
-    <Card variant="default" padding="md" className="min-h-[150px] gap-1">
+    <Card variant="default" padding="md" className="rounded-[24px] min-h-[150px] gap-1">
       <View className="flex-row items-center justify-between">
         <Text variant="caption" color="muted" className="normal-case tracking-normal">
           {currentTimeZone()}

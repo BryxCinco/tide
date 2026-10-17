@@ -2,6 +2,7 @@ export * from './AnimatedThemeToggle';
 export * from './Avatar';
 export * from './BackButton';
 export * from './Badge';
+export * from './Bento';
 export * from './Button';
 export * from './CalendarPicker';
 export * from './Card';

@@ -24,7 +24,7 @@ export interface RecentActivityProps {
 
 export function RecentActivity({ entries }: RecentActivityProps) {
   return (
-    <View className="rounded-2xl border border-subtle bg-base p-6">
+    <View className="rounded-[24px] border border-subtle bg-surface p-5">
       <View className="mb-2 flex-row items-center justify-between">
         <Text variant="h3" color="primary">
           Recent Activity

@@ -6,10 +6,9 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
-  withSequence,
-  withTiming,
+    withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, Line, LinearGradient, Stop } from 'react-native-svg';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { formatClock } from '../../utils/formatTime';
@@ -48,7 +47,7 @@ const statusLabels: Record<TimerRingStatus, string> = {
 export function CircularTimer({ seconds, status, activityLabel, size = 280, countdownDurationSeconds, displaySeconds }: CircularTimerProps) {
   const themeColors = useThemeColors();
   const isCountdown = countdownDurationSeconds != null;
-  const strokeWidth = Math.max(10, Math.round(size * 0.045));
+  const strokeWidth = Math.max(8, Math.round(size * 0.036));
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const lapProgress = isCountdown
@@ -73,18 +72,11 @@ export function CircularTimer({ seconds, status, activityLabel, size = 280, coun
     }
   }, [status, pulse]);
 
+  // Opacity-only breathing halo while running — no scale changes, and no per-second "tick"
+  // bump on the digits, so the ring reads as calm and steady rather than twitchy.
   const glowStyle = useAnimatedStyle(() => ({
-    opacity: status === 'running' ? 0.2 + pulse.value * 0.3 : 0,
-    transform: [{ scale: 1 + pulse.value * 0.03 }],
+    opacity: status === 'running' ? 0.08 + pulse.value * 0.12 : 0,
   }));
-
-  const tickScale = useSharedValue(1);
-  useEffect(() => {
-    if (status !== 'running') return;
-    tickScale.value = withSequence(withTiming(1.03, { duration: 90 }), withTiming(1, { duration: 160 }));
-  }, [seconds, status, tickScale]);
-
-  const tickStyle = useAnimatedStyle(() => ({ transform: [{ scale: tickScale.value }] }));
 
   return (
     <View style={{ width: size, height: size }} className="items-center justify-center">
@@ -99,8 +91,9 @@ export function CircularTimer({ seconds, status, activityLabel, size = 280, coun
       <Svg width={size} height={size}>
         <Defs>
           <LinearGradient id="circularTimerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor={colors.brand.tideTeal} />
-            <Stop offset="100%" stopColor={colors.brand.oceanBlue} />
+            <Stop offset="0%" stopColor="#14B8A6" />
+            <Stop offset="55%" stopColor="#06B6D4" />
+            <Stop offset="100%" stopColor="#6366F1" />
           </LinearGradient>
           <LinearGradient id="circularTimerGradientCountdown" x1="0%" y1="0%" x2="100%" y2="100%">
             <Stop offset="0%" stopColor={colors.brand.deepPurple} />
@@ -109,6 +102,26 @@ export function CircularTimer({ seconds, status, activityLabel, size = 280, coun
         </Defs>
 
         <Circle cx={size / 2} cy={size / 2} r={radius} stroke={themeColors.background.hover} strokeWidth={strokeWidth} fill="none" />
+        {/* Fine minute-tick dial just inside the track — 60 marks, every 5th one longer. */}
+        {Array.from({ length: 60 }, (_, i) => {
+          const angle = (i / 60) * Math.PI * 2;
+          const outer = radius - strokeWidth;
+          const inner = outer - (i % 5 === 0 ? 8 : 4);
+          const c = size / 2;
+          return (
+            <Line
+              key={i}
+              x1={c + Math.sin(angle) * inner}
+              y1={c - Math.cos(angle) * inner}
+              x2={c + Math.sin(angle) * outer}
+              y2={c - Math.cos(angle) * outer}
+              stroke={themeColors.text.disabled}
+              strokeOpacity={i % 5 === 0 ? 0.55 : 0.25}
+              strokeWidth={i % 5 === 0 ? 1.5 : 1}
+              strokeLinecap="round"
+            />
+          );
+        })}
 
         {status !== 'idle' && (
           <AnimatedCircle
@@ -127,11 +140,9 @@ export function CircularTimer({ seconds, status, activityLabel, size = 280, coun
       </Svg>
 
       <View className="absolute inset-0 items-center justify-center">
-        <Animated.View style={tickStyle}>
-          <Text variant="display" color="primary" style={{ fontVariant: ['tabular-nums'] }}>
-            {formatClock(displaySeconds ?? seconds)}
-          </Text>
-        </Animated.View>
+        <Text variant="display" color="primary" style={{ fontVariant: ['tabular-nums'], fontSize: Math.round(size * 0.16), lineHeight: Math.round(size * 0.2) }}>
+          {formatClock(displaySeconds ?? seconds)}
+        </Text>
         <Text variant="body" color="secondary" className="mt-2 font-medium">
           {status === 'idle' ? 'Ready to start' : activityLabel}
         </Text>

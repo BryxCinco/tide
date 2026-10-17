@@ -1,17 +1,15 @@
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { useResponsive } from '../../hooks/useResponsive';
 import type { WidgetId, WidgetInstance, WidgetSize } from '../../types/dashboard';
+import { FadeInView } from '../ui';
 
 export interface WidgetGridProps {
   /** Already filtered to enabled widgets and sorted by order — see getVisibleWidgets. */
   widgets: WidgetInstance[];
   renderWidget: (type: WidgetId, instance: WidgetInstance) => ReactNode;
 }
-
-const STAGGER_MS = 70;
 
 /** phone 1-col, tablet 2-col, desktop 3-col (Phase 13 Fix 5) — a widget's `size` spans up to
  * that many of the row's columns ('full' always spans every column, i.e. the whole row,
@@ -39,18 +37,18 @@ export function WidgetGrid({ widgets, renderWidget }: WidgetGridProps) {
   const columns = columnsFor(isPhone, isTablet);
 
   return (
-    <View className="flex-row flex-wrap" style={{ gap: 24 }}>
+    <View className="flex-row flex-wrap" style={{ gap: 16 }}>
       {widgets.map((widget, index) => {
         const span = spanFor(widget.size, columns);
         const basisPercent = (span / columns) * 100;
         return (
-          <Animated.View
+          <FadeInView
             key={widget.id}
-            entering={FadeInDown.delay(index * STAGGER_MS).duration(400)}
+            index={index + 7}
             style={{ flexBasis: `${basisPercent}%`, flexGrow: basisPercent >= 100 ? 1 : 0 }}
           >
             {renderWidget(widget.type, widget)}
-          </Animated.View>
+          </FadeInView>
         );
       })}
     </View>

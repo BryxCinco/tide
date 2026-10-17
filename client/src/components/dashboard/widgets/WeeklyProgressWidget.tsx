@@ -17,7 +17,7 @@ export function WeeklyProgressWidget() {
   const percent = Math.min(100, Math.round((trackedSeconds / WEEKLY_GOAL_SECONDS) * 100));
 
   return (
-    <Card variant="default" padding="md" className="min-h-[150px] items-center justify-center gap-2">
+    <Card variant="default" padding="md" className="rounded-[24px] min-h-[150px] items-center justify-center gap-2">
       <CircularProgress value={percent} size={72} strokeWidth={7}>
         <Text variant="body" color="primary" className="font-bold">
           {percent}%

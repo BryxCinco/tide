@@ -22,6 +22,9 @@ export interface ActivityPickerProps {
   /** Renders a "Surprise Me" shuffle button at the top-right of the picker — picks a random
    * activity on the caller's behalf (weighted toward ones not done recently). Omit to hide. */
   onShuffle?: () => void;
+  /** At most 3 across at every width — for a narrower bento column, where the default 6-across
+   * desktop grid would crush each chip. */
+  compact?: boolean;
 }
 
 /** 2-across on phone, 3-across on tablet (md, 768px+), 6-across on desktop (lg, 1024px+).
@@ -35,7 +38,9 @@ export function ActivityPicker({
   onAddCustom,
   onDeselect,
   onShuffle,
+  compact = false,
 }: ActivityPickerProps) {
+  const chipBasis = compact ? 'basis-[30%] grow' : 'basis-[47%] md:basis-[30%] lg:basis-[14%]';
   // Only split into "Today"/"All" sections once there's actually at least one recurring
   // activity scheduled for today — otherwise every account (the vast majority, who've never
   // touched recurrence) sees the exact same flat grid as before this existed.
@@ -56,8 +61,8 @@ export function ActivityPicker({
             disabled={disabled}
             onPress={() => (isSelected && onDeselect ? onDeselect() : onSelect(activity))}
             className={cn(
-              'relative basis-[47%] items-center gap-2 rounded-xl border p-3 md:basis-[30%] lg:basis-[14%]',
-              isSelected ? 'border-tide-teal bg-tide-teal/5' : 'border-subtle bg-base',
+              cn('relative items-center gap-2 rounded-2xl border p-3', chipBasis),
+              isSelected ? 'border-tide-teal bg-tide-teal/10' : 'border-subtle bg-base hover:border-default',
               disabled && !isSelected && 'opacity-50',
             )}
           >
@@ -92,7 +97,7 @@ export function ActivityPicker({
           disabled={disabled}
           onPress={onAddCustom}
           className={cn(
-            'basis-[47%] items-center gap-2 rounded-xl border border-dashed border-subtle bg-base p-3 md:basis-[30%] lg:basis-[14%]',
+            cn('items-center gap-2 rounded-2xl border border-dashed border-subtle bg-base p-3', chipBasis),
             disabled && 'opacity-50',
           )}
         >

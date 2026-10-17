@@ -9,7 +9,7 @@ export function QuoteCard() {
   const quote = getQuoteOfTheDay();
 
   return (
-    <Card variant="default" padding="lg" className="gap-3 border-subtle bg-base">
+    <Card variant="default" padding="lg" className="gap-3 rounded-[24px]">
       <Icon name="Quote" size={20} color={colors.brand.tideTeal} />
       <Text variant="body-lg" color="primary" className="italic">
         {quote.text}

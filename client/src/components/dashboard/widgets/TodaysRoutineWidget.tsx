@@ -25,7 +25,7 @@ export function TodaysRoutineWidget() {
   };
 
   return (
-    <Card variant="default" padding="md" className="gap-3">
+    <Card variant="default" padding="md" className="rounded-[24px] gap-3">
       <Text variant="h3" color="primary">
         Today's Routine
       </Text>

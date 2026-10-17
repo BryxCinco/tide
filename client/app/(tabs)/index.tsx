@@ -1,17 +1,18 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { RefreshControl, ScrollView } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   ChatbotFAB,
   CustomizeDashboardModal,
+  FocusTodayTile,
+  GreetingTile,
   QuestCard,
   FocusFlow,
   HabitTracker,
   HeroCard,
-  ProfileHeader,
   QuickActions,
   QuoteCard,
   RecentActivity,
@@ -22,10 +23,10 @@ import {
 } from '@/components/dashboard';
 import { CalendarWidget, StreakWidget, TimeWidget, TodaysRoutineWidget, WeatherWidget, WeeklyProgressWidget } from '@/components/dashboard/widgets';
 import { TaskFormModal } from '@/components/tasks';
-import { Button, EmptyState, ResponsiveContainer } from '@/components/ui';
+import { BentoStat, Button, EmptyState, FadeInView, ResponsiveContainer } from '@/components/ui';
 import { MOOD_ICON_MAP } from '@/components/journal/MoodIcon';
 import { mockHeroFocus, mockQuickActions } from '@/mocks/mockDashboard';
-import { getVisibleWidgets, useDashboardStore } from '@/store/dashboardStore';
+import { BENTO_COVERED_WIDGETS, getVisibleWidgets, useDashboardStore } from '@/store/dashboardStore';
 import { useJournalStore } from '@/store/journalStore';
 import { useLevelStore } from '@/store/levelStore';
 import { useQuestStore } from '@/store/questStore';
@@ -45,7 +46,12 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const allWidgets = useDashboardStore((s) => s.preferences.widgets);
-  const visibleWidgets = useMemo(() => getVisibleWidgets(allWidgets), [allWidgets]);
+  // 'hero' and 'stats' are covered by the bento overview at the top of the screen (the
+  // greeting/focus tiles and the four stat tiles), so they're never rendered twice below.
+  const visibleWidgets = useMemo(
+    () => getVisibleWidgets(allWidgets).filter((w) => !BENTO_COVERED_WIDGETS.has(w.type)),
+    [allWidgets],
+  );
 
   const todaySessions = useTimerStore((s) => s.todaySessions);
   const activityTotals = useTimerStore((s) => s.activityTotals);
@@ -82,7 +88,6 @@ export default function DashboardScreen() {
   const todayTotalSeconds = Object.values(activityTotals).reduce((sum, value) => sum + value, 0);
   const openTasksCount = tasks.filter((t) => t.status !== 'done').length;
   const missedTasksCount = tasks.filter(isTaskOverdue).length;
-  const isFreshStart = todaySessions.length === 0 && tasks.length === 0 && journalCount === 0;
 
   // Fresh-start-friendly: real zeros instead of the old fabricated "2h 14m / 4 today /
   // 12 days / Productive" mock numbers. No "trend" values either — a trend needs a
@@ -210,29 +215,68 @@ export default function DashboardScreen() {
         contentContainerClassName="pb-24"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <ProfileHeader />
+        <ResponsiveContainer className="gap-3 pt-14 md:gap-4 md:pt-6">
+          {/* BENTO OVERVIEW — greeting (2/3) + today's focus (1/3) on wide screens, stacked on
+              phone; then four stat tiles, 2x2 on phone and one row on wide screens. */}
+          <View className="gap-3 md:flex-row md:gap-4">
+            <GreetingTile className="md:flex-[2]" index={0} />
+            <FocusTodayTile
+              className="md:flex-1"
+              index={1}
+              totalLabel={formatDuration(todayTotalSeconds)}
+              sessionsCount={todaySessions.length}
+              focusScore={focusScore}
+              activities={focusActivities}
+            />
+          </View>
 
-        <ResponsiveContainer className="mt-6 gap-6">
-          {isFreshStart && (
-            <Animated.View entering={FadeInDown.duration(400)}>
-              <EmptyState
-                icon="Sparkles"
-                title="Welcome to TIDE"
-                description="Start your first session to see your progress"
-                actionLabel="Start Timer"
-                onAction={() => router.push('/timer')}
-                className="rounded-2xl border border-subtle bg-base py-10"
-              />
-            </Animated.View>
-          )}
+          <View className="flex-row flex-wrap gap-3 md:flex-nowrap md:gap-4">
+            <BentoStat
+              className="basis-[47%] grow md:basis-0"
+              index={2}
+              icon="Flame"
+              color="#F97316"
+              value={`${streak}`}
+              label="day streak"
+              onPress={() => router.push('/(tabs)/insights')}
+            />
+            <BentoStat
+              className="basis-[47%] grow md:basis-0"
+              index={3}
+              icon="Trophy"
+              color="#6366F1"
+              value={`Lv ${level}`}
+              label="Level progress"
+              progress={progressToNextLevel(totalXp)}
+              onPress={() => router.push('/(tabs)/profile')}
+            />
+            <BentoStat
+              className="basis-[47%] grow md:basis-0"
+              index={4}
+              icon="ListChecks"
+              color="#14B8A6"
+              value={`${openTasksCount}`}
+              label={missedTasksCount > 0 ? `open · ${missedTasksCount} overdue` : 'open tasks'}
+              onPress={() => router.push('/tasks')}
+            />
+            <BentoStat
+              className="basis-[47%] grow md:basis-0"
+              index={5}
+              icon="BookOpen"
+              color="#0EA5E9"
+              value={`${journalCount}`}
+              label={journalCount === 1 ? 'journal entry' : 'journal entries'}
+              onPress={() => router.push('/(tabs)/journal')}
+            />
+          </View>
 
-          <Animated.View entering={FadeInDown.duration(400)}>
+          <FadeInView index={6} className="mt-1">
             <QuestCard />
-          </Animated.View>
+          </FadeInView>
 
           <WidgetGrid widgets={visibleWidgets} renderWidget={renderWidget} />
 
-          <Animated.View entering={FadeInDown.delay(80).duration(400)}>
+          <FadeInView index={2}>
             <Button
               title="Customize Dashboard"
               variant="secondary"
@@ -240,7 +284,7 @@ export default function DashboardScreen() {
               onPress={() => setCustomizeVisible(true)}
               className="mb-2 self-center"
             />
-          </Animated.View>
+          </FadeInView>
         </ResponsiveContainer>
       </ScrollView>
 

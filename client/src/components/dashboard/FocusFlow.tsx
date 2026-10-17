@@ -12,7 +12,7 @@ export interface FocusFlowProps {
 /** Circular focus-score ring + a breakdown of today's activities as mini progress bars. */
 export function FocusFlow({ score, activities }: FocusFlowProps) {
   return (
-    <View className="gap-6 rounded-2xl border border-subtle bg-base p-6">
+    <View className="gap-6 rounded-[24px] border border-subtle bg-surface p-5">
       <View>
         <Text variant="h3" color="primary">
           Focus Flow

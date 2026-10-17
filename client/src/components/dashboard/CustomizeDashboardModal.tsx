@@ -4,7 +4,7 @@ import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable
 import { Pressable } from '../ui/SoundPressable';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { getOrderedWidgets, useDashboardStore } from '../../store/dashboardStore';
+import { BENTO_COVERED_WIDGETS, getOrderedWidgets, useDashboardStore } from '../../store/dashboardStore';
 import type { WidgetId, WidgetInstance, WidgetSize } from '../../types/dashboard';
 import { cn } from '../../utils/cn';
 import { soundManager } from '../../utils/soundManager';
@@ -29,7 +29,7 @@ const WIDGET_LABELS: Record<WidgetId, { label: string; icon: IconName }> = {
   todaysRoutine: { label: "Today's Routine", icon: 'Repeat' },
 };
 
-const WIDGET_TYPES = Object.keys(WIDGET_LABELS) as WidgetId[];
+const WIDGET_TYPES = (Object.keys(WIDGET_LABELS) as WidgetId[]).filter((type) => !BENTO_COVERED_WIDGETS.has(type));
 
 /** The scrollable list itself, split out as its own component purely so it can call
  * useModalBodyMaxHeight() — that hook only resolves to a real number inside Modal's own
@@ -101,7 +101,7 @@ export function CustomizeDashboardModal({ visible, onClose }: CustomizeDashboard
   const themeColors = useThemeColors();
   const [addVisible, setAddVisible] = useState(false);
 
-  const ordered = getOrderedWidgets(widgets);
+  const ordered = getOrderedWidgets(widgets).filter((w) => !BENTO_COVERED_WIDGETS.has(w.type));
   const typeCounts = ordered.reduce<Partial<Record<WidgetId, number>>>((acc, w) => {
     acc[w.type] = (acc[w.type] ?? 0) + 1;
     return acc;

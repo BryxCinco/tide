@@ -13,7 +13,8 @@ import {
   TimerDisplay,
   TodayLogs,
 } from '@/components/timer';
-import { BackButton, Button, ErrorState, Input, Modal, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
+import { BENTO_INK_TEXT, BentoHeader, BentoStat, BentoTile, Button, ErrorState, Icon, Input, Modal, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
+import { useResponsive } from '@/hooks/useResponsive';
 import { useTimer } from '@/hooks/useTimer';
 import { useActivityStore } from '@/store/activityStore';
 import { showToast } from '@/store/toastStore';
@@ -68,6 +69,7 @@ export default function TimerScreen() {
     reset,
   } = useTimer();
 
+  const { isPhone } = useResponsive();
   const allActivities = useActivityStore((s) => s.activities);
   const activitiesLoading = useActivityStore((s) => s.isLoading);
   const fetchActivities = useActivityStore((s) => s.fetchActivities);
@@ -176,71 +178,124 @@ export default function TimerScreen() {
     <SafeAreaView className="flex-1 bg-base">
       <ScrollView
         className="flex-1"
-        contentContainerClassName="pb-24 pt-4 md:pt-6 lg:pt-8"
+        contentContainerClassName="pb-24 pt-3 md:pt-6"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <ResponsiveContainer className="gap-8">
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center gap-3">
-              <BackButton onPress={() => router.push('/')} />
-              <View>
-                <Text variant="h2" color="primary">
-                  Focus Timer
-                </Text>
-                <Text variant="caption" color="muted" className="mt-1 normal-case tracking-normal">
-                  {formatDuration(todayTotalSeconds)} tracked today
-                </Text>
-              </View>
+        <ResponsiveContainer className="gap-3 md:gap-4">
+          {/* Header — left padding on phone clears AppLayout's floating menu button. */}
+          <View className="flex-row items-center justify-between pl-12 md:pl-0">
+            <View className="flex-1" style={{ minWidth: 0 }}>
+              <Text variant="label" color="muted" style={{ letterSpacing: 1.4 }}>
+                Focus
+              </Text>
+              <Text variant={isPhone ? 'h3' : 'h2'} color="primary" numberOfLines={2}>
+                Deep work, one session at a time
+              </Text>
             </View>
-            <Button title="History" variant="ghost" size="sm" onPress={() => router.push('/(tabs)/insights')} />
+            {!isPhone && (
+              <Button title="History" variant="ghost" size="sm" icon="History" onPress={() => router.push('/(tabs)/insights')} />
+            )}
           </View>
 
-          <TimerDisplay
-            seconds={seconds}
-            status={status}
-            activityLabel={currentActivity?.name}
-            onTap={handleTap}
-            onDoubleTap={handleDoubleTap}
-            onReset={reset}
-            countdownDurationSeconds={mode === 'countdown' ? (countdownDurationSeconds ?? undefined) : undefined}
-            displaySeconds={mode === 'countdown' ? (secondsRemaining ?? undefined) : undefined}
-          />
+          <View className="gap-3 md:flex-row md:gap-4">
+            {/* STAGE — the ring, mode switch and controls. */}
+            <BentoTile tone="glow" index={0} className="md:flex-[1.35]">
+              <View className="flex-1 justify-between gap-5">
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center gap-2 rounded-full border border-subtle bg-base px-3 py-1.5">
+                    <View
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: status === 'running' ? '#22C55E' : status === 'paused' ? '#F59E0B' : '#94A3B8' }}
+                    />
+                    <Text variant="body" color="secondary" className="text-[12px] font-semibold">
+                      {status === 'running' ? 'In session' : status === 'paused' ? 'Paused' : 'Ready'}
+                    </Text>
+                  </View>
+                  <Text variant="body" color="muted" className="text-[12px] font-medium">
+                    {mode === 'countdown' ? 'Countdown' : 'Stopwatch'}
+                  </Text>
+                </View>
 
-          {status === 'idle' && (
-            <CountdownMode
-              mode={mode}
-              countdownDurationSeconds={countdownDurationSeconds}
-              onModeChange={setMode}
-              onDurationSelect={setCountdownDuration}
-            />
-          )}
+                <TimerDisplay
+                  seconds={seconds}
+                  status={status}
+                  activityLabel={currentActivity?.name}
+                  onTap={handleTap}
+                  onDoubleTap={handleDoubleTap}
+                  onReset={reset}
+                  countdownDurationSeconds={mode === 'countdown' ? (countdownDurationSeconds ?? undefined) : undefined}
+                  displaySeconds={mode === 'countdown' ? (secondsRemaining ?? undefined) : undefined}
+                />
 
-          <ActivityPicker
-            activities={activities}
-            selectedId={currentActivity?.id}
-            onSelect={handleSelectActivity}
-            onDeselect={isSessionActive ? undefined : clearActivity}
-            onAddCustom={isSessionActive ? undefined : () => setCustomModalVisible(true)}
-            onShuffle={handleSurpriseMe}
-          />
+                {status === 'idle' && (
+                  <CountdownMode
+                    mode={mode}
+                    countdownDurationSeconds={countdownDurationSeconds}
+                    onModeChange={setMode}
+                    onDurationSelect={setCountdownDuration}
+                  />
+                )}
 
-          <InterestTags tags={INTEREST_TAGS} selectedTags={selectedTags} onToggle={toggleTag} />
+                <TimerControls
+                  status={status}
+                  seconds={seconds}
+                  onStart={start}
+                  onPause={pause}
+                  onResume={resume}
+                  onConfirmStop={stop}
+                />
+              </View>
+            </BentoTile>
 
-          <Input
-            label="Notes"
-            placeholder="What are you working on?"
-            value={notes}
-            onChangeText={setNotes}
-          />
+            {/* SIDE COLUMN — today's numbers, what you're working on, tags & notes. */}
+            <View className="gap-3 md:flex-1 md:gap-4">
+              <View className="flex-row gap-3 md:gap-4">
+                <BentoTile tone="ink" index={1} className="flex-1">
+                  <View className="gap-3">
+                    <Icon name="Hourglass" size={18} color="#5EEAD4" />
+                    <View>
+                      <Text variant="h2" style={{ color: BENTO_INK_TEXT.primary, fontVariant: ['tabular-nums'] }} numberOfLines={1}>
+                        {formatDuration(todayTotalSeconds)}
+                      </Text>
+                      <Text variant="body" className="text-[12px] font-medium" style={{ color: BENTO_INK_TEXT.muted }}>
+                        tracked today
+                      </Text>
+                    </View>
+                  </View>
+                </BentoTile>
+                <BentoStat
+                  className="flex-1"
+                  index={2}
+                  icon="Target"
+                  color="#6366F1"
+                  value={`${todaySessions.length}`}
+                  label={todaySessions.length === 1 ? 'session today' : 'sessions today'}
+                />
+              </View>
 
-          <TimerControls
-            status={status}
-            seconds={seconds}
-            onStart={start}
-            onPause={pause}
-            onResume={resume}
-            onConfirmStop={stop}
-          />
+              <BentoTile index={3}>
+                <View className="gap-4">
+                  <BentoHeader title="What are you focusing on?" icon="Layers" />
+                  <ActivityPicker
+                    compact={!isPhone}
+                    activities={activities}
+                    selectedId={currentActivity?.id}
+                    onSelect={handleSelectActivity}
+                    onDeselect={isSessionActive ? undefined : clearActivity}
+                    onAddCustom={isSessionActive ? undefined : () => setCustomModalVisible(true)}
+                    onShuffle={handleSurpriseMe}
+                  />
+                </View>
+              </BentoTile>
+
+              <BentoTile index={4}>
+                <View className="gap-4">
+                  <InterestTags tags={INTEREST_TAGS} selectedTags={selectedTags} onToggle={toggleTag} />
+                  <Input label="Notes" placeholder="What are you working on?" value={notes} onChangeText={setNotes} />
+                </View>
+              </BentoTile>
+            </View>
+          </View>
 
           {error && todaySessions.length === 0 ? (
             <ErrorState
@@ -257,10 +312,14 @@ export default function TimerScreen() {
               ))}
             </View>
           ) : (
-            <>
-              <TodayLogs sessions={todaySessions} />
-              <ActivityBreakdown activities={activities} totals={activityTotals} />
-            </>
+            <View className="gap-3 md:flex-row md:gap-4">
+              <View className="md:flex-[1.35]">
+                <TodayLogs sessions={todaySessions} />
+              </View>
+              <View className="md:flex-1">
+                <ActivityBreakdown activities={activities} totals={activityTotals} />
+              </View>
+            </View>
           )}
         </ResponsiveContainer>
       </ScrollView>

@@ -4,7 +4,6 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 import Animated, {
   Easing,
-  FadeIn,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -18,7 +17,7 @@ import type { ChatAction, ChatMessage } from '../../types/chat';
 import { hexToRgba } from '../../utils/color';
 import { gradientDirections } from '../../utils/gradients';
 import { colors } from '../../utils/theme';
-import { Icon, Text, type IconName } from '../ui';
+import { FadeInView, Icon, Text, type IconName } from '../ui';
 import { AIAvatar } from './AIAvatar';
 
 /** The "View in Tasks"-style card(s) a reply can carry when the AI actually did something —
@@ -134,9 +133,9 @@ export function ChatBubble({ message, isStreamingCursor, isNewMessage }: ChatBub
         </View>
 
         {message.actions?.map((action, index) => (
-          <Animated.View key={`${action.route}-${index}`} entering={FadeIn.delay(100 + index * 80).duration(260)}>
+          <FadeInView key={`${action.route}-${index}`} index={index + 2}>
             <ChatActionCard action={action} />
-          </Animated.View>
+          </FadeInView>
         ))}
       </View>
     </Animated.View>

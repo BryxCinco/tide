@@ -36,7 +36,7 @@ export function HabitTracker() {
   if (habits.length === 0) return null;
 
   return (
-    <Card variant="default" padding="lg" className="gap-4 border-subtle bg-base">
+    <Card variant="default" padding="lg" className="gap-4 rounded-[24px]">
       <Text variant="h3" color="primary">
         Habits
       </Text>

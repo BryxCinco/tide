@@ -28,7 +28,7 @@ export function HeroCard({ label, subtitle, onStartSession }: HeroCardProps) {
   }));
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-subtle bg-base">
+    <View className="overflow-hidden rounded-[24px] border border-subtle bg-surface">
       <View className="absolute inset-0" pointerEvents="none">
         <LinearGradient
           colors={[...gradients.primary]}

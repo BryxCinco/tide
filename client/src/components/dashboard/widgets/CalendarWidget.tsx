@@ -46,7 +46,7 @@ export function CalendarWidget() {
   }, [today]);
 
   return (
-    <Card variant="default" padding="md" className="min-h-[150px] gap-2">
+    <Card variant="default" padding="md" className="rounded-[24px] min-h-[150px] gap-2">
       <Text variant="caption" color="primary" className="font-semibold normal-case tracking-normal">
         {MONTH_FORMATTER.format(today)}
       </Text>

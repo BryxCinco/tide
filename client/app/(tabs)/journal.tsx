@@ -1,11 +1,11 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { EmptyJournal, JournalCard, JournalFilters, SearchBar } from '@/components/journal';
-import { BackButton, ErrorState, FAB, ResponsiveContainer, SkeletonCard, Text } from '@/components/ui';
+import { EmptyJournal, JournalCard, JournalFilters, JournalPromptTile, JournalStatsTile, SearchBar } from '@/components/journal';
+import { BentoTile, Button, ErrorState, FAB, ResponsiveContainer, SkeletonCard, Text } from '@/components/ui';
+import { useAuth } from '@/hooks/useAuth';
 import { useResponsive } from '@/hooks/useResponsive';
 import { getVisibleEntries, useJournalStore } from '@/store/journalStore';
 
@@ -26,7 +26,8 @@ export default function JournalScreen() {
   const toggleFavorite = useJournalStore((s) => s.toggleFavorite);
   const deleteEntry = useJournalStore((s) => s.deleteEntry);
 
-  const { isDesktop, isTablet } = useResponsive();
+  const { isDesktop, isTablet, isPhone } = useResponsive();
+  const { user } = useAuth();
 
   // Local, immediate value for the input; committed to the store (debounced) so the
   // filtered list doesn't re-run on every keystroke.
@@ -61,36 +62,60 @@ export default function JournalScreen() {
   const columns = isDesktop ? 3 : isTablet ? 2 : 1;
   const basisClass = columns === 3 ? 'basis-full md:basis-[48%] lg:basis-[31%]' : columns === 2 ? 'basis-full md:basis-[48%]' : 'basis-full';
 
+  // Bento rhythm for the entry grid: every 5th entry (starting with the newest) is a large
+  // "featured" tile two columns wide, the rest are regular tiles. flexGrow lets each row
+  // fill exactly, so rows never end ragged on wide screens.
+  const tileStyle = (index: number) => {
+    const featured = columns > 1 && index % 5 === 0;
+    if (columns === 1) return { featured: false, style: { flexBasis: '100%' as const } };
+    if (columns === 2) return { featured, style: { flexBasis: featured ? ('100%' as const) : ('45%' as const), flexGrow: 1 } };
+    return { featured, style: { flexBasis: featured ? ('60%' as const) : ('30%' as const), flexGrow: 1 } };
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-base">
       <ScrollView
         className="flex-1"
-        contentContainerClassName="pb-24 pt-4 md:pt-6 lg:pt-8"
+        contentContainerClassName="pb-24 pt-3 md:pt-6"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <ResponsiveContainer className="gap-5">
-          <Animated.View entering={FadeInDown.duration(380)} className="flex-row items-center gap-3">
-            <BackButton onPress={() => router.push('/')} />
-            <View className="flex-1">
-              <Text variant="h2" color="primary">
+        <ResponsiveContainer className="gap-3 md:gap-4">
+          <View className="flex-row items-center justify-between pl-12 md:pl-0">
+            <View className="flex-1" style={{ minWidth: 0 }}>
+              <Text variant="label" color="muted" style={{ letterSpacing: 1.4 }}>
                 Journal
               </Text>
-              <Text variant="caption" color="muted" className="normal-case tracking-normal">
-                {allEntries.length} {allEntries.length === 1 ? 'entry' : 'entries'}
+              <Text variant={isPhone ? 'h3' : 'h2'} color="primary" numberOfLines={2}>
+                Your story, day by day
               </Text>
             </View>
-          </Animated.View>
+            {!isPhone && <Button title="New entry" icon="Plus" size="sm" onPress={openNewEntry} />}
+          </View>
 
-          <Animated.View entering={FadeInDown.delay(40).duration(380)} className="gap-5">
-            <SearchBar value={searchDraft} onChangeText={setSearchDraft} />
-
-            <JournalFilters
-              filter={filter}
-              moodFilter={moodFilter}
-              onFilterChange={setFilter}
-              onMoodFilterChange={setMoodFilter}
+          <View className="gap-3 md:flex-row md:gap-4">
+            <JournalPromptTile
+              className="md:flex-[1.6]"
+              firstName={user?.name?.trim().split(/\s+/)[0]}
+              onWrite={openNewEntry}
             />
-          </Animated.View>
+            <JournalStatsTile
+              className="md:flex-1"
+              entries={allEntries}
+              onMoodPress={(mood) => setMoodFilter(moodFilter === mood ? null : mood)}
+            />
+          </View>
+
+          <BentoTile index={2}>
+            <View className="gap-4">
+              <SearchBar value={searchDraft} onChangeText={setSearchDraft} />
+              <JournalFilters
+                filter={filter}
+                moodFilter={moodFilter}
+                onFilterChange={setFilter}
+                onMoodFilterChange={setMoodFilter}
+              />
+            </View>
+          </BentoTile>
 
           {error && allEntries.length === 0 ? (
             <ErrorState
@@ -111,24 +136,28 @@ export default function JournalScreen() {
           ) : visibleEntries.length === 0 ? (
             <EmptyJournal hasActiveFilters={hasActiveFilters} onNewEntry={openNewEntry} />
           ) : (
-            <View className="flex-row flex-wrap gap-3">
-              {visibleEntries.map((entry, index) => (
-                <View key={entry.id} className={basisClass}>
-                  <JournalCard
-                    entry={entry}
-                    index={index}
-                    onPress={() => openEntry(entry.id)}
-                    onToggleFavorite={() => toggleFavorite(entry.id)}
-                    onDelete={() => deleteEntry(entry.id)}
-                  />
-                </View>
-              ))}
+            <View className="flex-row flex-wrap gap-3 md:gap-4">
+              {visibleEntries.map((entry, index) => {
+                const tile = tileStyle(index);
+                return (
+                  <View key={entry.id} style={tile.style}>
+                    <JournalCard
+                      entry={entry}
+                      index={index}
+                      featured={tile.featured}
+                      onPress={() => openEntry(entry.id)}
+                      onToggleFavorite={() => toggleFavorite(entry.id)}
+                      onDelete={() => deleteEntry(entry.id)}
+                    />
+                  </View>
+                );
+              })}
             </View>
           )}
         </ResponsiveContainer>
       </ScrollView>
 
-      <FAB icon="Plus" onPress={openNewEntry} />
+      {isPhone && <FAB icon="Plus" onPress={openNewEntry} accessibilityLabel="New journal entry" />}
     </SafeAreaView>
   );
 }

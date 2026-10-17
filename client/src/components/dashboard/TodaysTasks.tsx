@@ -33,7 +33,7 @@ export function TodaysTasks({ onAddTask }: TodaysTasksProps) {
     .slice(0, 3);
 
   return (
-    <View className="gap-4 rounded-2xl border border-subtle bg-base p-6">
+    <View className="gap-4 rounded-[24px] border border-subtle bg-surface p-5">
       <View className="flex-row items-center justify-between">
         <Text variant="h3" color="primary">
           Today&apos;s Tasks

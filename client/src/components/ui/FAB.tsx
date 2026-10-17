@@ -1,57 +1,60 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect } from 'react';
+import { View } from 'react-native';
 import { Pressable } from './SoundPressable';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
 import { useResponsive } from '../../hooks/useResponsive';
-import { gradients } from '../../utils/gradients';
-import { colors, shadows } from '../../utils/theme';
+import { gradientDirections, gradients } from '../../utils/gradients';
 import { Icon, type IconName } from './Icon';
 
 export interface FABProps {
   icon: IconName;
   onPress: () => void;
+  accessibilityLabel?: string;
 }
 
 /**
- * Bottom-right gradient floating action button — 56px on phone, 64px on tablet/desktop,
- * with a subtle 2s float loop and a press-in scale. Distinct from ChatbotFAB (Dashboard's
- * chat entry point has its own pulsing-dot behavior); this is the generic "create" FAB.
+ * Bottom-right aurora floating action button — 56px on phone, 60px on tablet/desktop. It
+ * sits still (no idle float loop) and only squashes slightly on press. The shadow lives on
+ * a round wrapper so it renders as a soft circle, not a square halo.
  */
-export function FAB({ icon, onPress }: FABProps) {
+export function FAB({ icon, onPress, accessibilityLabel }: FABProps) {
   const { isPhone } = useResponsive();
-  const size = isPhone ? 56 : 64;
-
-  const float = useSharedValue(0);
-
-  useEffect(() => {
-    float.value = withRepeat(withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) }), -1, true);
-  }, [float]);
-
-  const floatStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -float.value * 4 }],
-  }));
+  const size = isPhone ? 56 : 60;
 
   return (
-    <Animated.View
-      style={[{ position: 'absolute', right: 24, bottom: 24, width: size, height: size }, floatStyle, shadows.glowTeal]}
+    <View
+      style={{
+        position: 'absolute',
+        right: 20,
+        bottom: 20,
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        shadowColor: '#06B6D4',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 8,
+      }}
     >
       <Pressable
         onPress={onPress}
+        accessibilityLabel={accessibilityLabel}
         style={({ pressed }) => [
           { width: size, height: size, borderRadius: size / 2, overflow: 'hidden' },
-          pressed && { transform: [{ scale: 0.95 }] },
+          pressed && { transform: [{ scale: 0.94 }] },
         ]}
       >
         <LinearGradient
-          colors={[...gradients.primary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          colors={[...gradients.aurora]}
+          {...gradientDirections.diagonal}
           style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
         >
-          <Icon name={icon} size={28} color={colors.text.inverse} />
+          <View>
+            <Icon name={icon} size={26} color="#FFFFFF" />
+          </View>
         </LinearGradient>
       </Pressable>
-    </Animated.View>
+    </View>
   );
 }

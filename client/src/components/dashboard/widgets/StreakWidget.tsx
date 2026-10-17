@@ -17,7 +17,7 @@ export function StreakWidget() {
   const streak = useQuestStore((s) => s.streak);
 
   return (
-    <Card variant="default" padding="md" className="min-h-[150px] items-center justify-center gap-1">
+    <Card variant="default" padding="md" className="rounded-[24px] min-h-[150px] items-center justify-center gap-1">
       <View className="h-11 w-11 items-center justify-center rounded-full bg-orange-500/10">
         <Icon name="Flame" size={22} color="#F97316" />
       </View>
