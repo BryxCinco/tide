@@ -320,10 +320,13 @@ function contextMessage(context, stats) {
 function baseMessages({ context, stats, history, timezone, extraSystem }) {
   const messages = [{ role: 'system', content: SYSTEM_PROMPT }];
   if (extraSystem) messages.push({ role: 'system', content: extraSystem });
-  messages.push(buildDatetimeMessage(timezone));
   const ctx = contextMessage(context, stats);
   if (ctx) messages.push(ctx);
   messages.push(...recentHistory(history));
+  // Last, right before the user's message: older dates in the context (journal entries,
+  // mostProductiveDay) or in earlier replies ("today is Oct 13" from a week-old chat)
+  // otherwise get read as "today".
+  messages.push(buildDatetimeMessage(timezone));
   return messages;
 }
 
