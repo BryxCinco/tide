@@ -4,6 +4,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } 
 
 import { QuestFormModal, QuestManagerModal } from '../quest';
 import { useQuestStore } from '../../store/questStore';
+import { useDayStreak } from '../../store/streakStore';
 import { QUEST_CATEGORY_COLOR, QUEST_CATEGORY_ICON, QUEST_CATEGORY_LABEL, QUEST_TIER_META, type Quest, type QuestCategory } from '../../types/quest';
 import { confirmAsync } from '../../utils/confirm';
 import { hexToRgba } from '../../utils/color';
@@ -115,7 +116,8 @@ function CategoryGroup({ category, quests, onToggle, onEdit, onDelete }: { categ
  */
 export function QuestCard() {
   const todayQuests = useQuestStore((s) => s.todayQuests);
-  const streak = useQuestStore((s) => s.streak);
+  // The same day streak as the Dashboard/Profile stat — not the all-quests-done streak.
+  const streak = useDayStreak();
   const questStreak = useQuestStore((s) => s.questStreak);
   const isLoading = useQuestStore((s) => s.isLoading);
   const fetchTodayQuests = useQuestStore((s) => s.fetchTodayQuests);

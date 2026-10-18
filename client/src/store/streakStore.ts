@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { create } from 'zustand';
 
 import { getApiErrorMessage } from '../services/api';
@@ -41,6 +42,8 @@ export const useStreakStore = create<StreakState>()((set, get) => ({
     // No token yet — skip rather than 401 for a reason unrelated to the token itself. See
     // taskStore.ts's fetchTasks for the full rationale.
     if (!hasAuthToken()) return;
+    // Several screens mount useDayStreak at once — one request is enough.
+    if (get().isLoading) return;
 
     set({ isLoading: true, error: null });
     try {
@@ -66,4 +69,13 @@ export const useStreakStore = create<StreakState>()((set, get) => ({
 
 /** The headline "day streak" — days in a row with at least one task or quest completed
  * (server/lib/dailyStreak.js). Shown on the Dashboard, Profile and Streak widget. */
-export const useDayStreak = () => useStreakStore((s) => s.streak?.taskCurrentStreak ?? 0);
+export function useDayStreak(): number {
+  const loaded = useStreakStore((s) => s.streak !== null);
+  const fetchStreak = useStreakStore((s) => s.fetchStreak);
+  useEffect(() => {
+    // Screens that don't fetch it themselves (Tasks, AI Coach) still show the real number.
+    if (!loaded) fetchStreak();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return useStreakStore((s) => s.streak?.taskCurrentStreak ?? 0);
+}

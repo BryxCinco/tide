@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import { useResponsive } from '../../hooks/useResponsive';
 import { useJournalStore } from '../../store/journalStore';
-import { useQuestStore } from '../../store/questStore';
+import { useDayStreak } from '../../store/streakStore';
 import { useTaskStore } from '../../store/taskStore';
 import { useTimerStore } from '../../store/timerStore';
 import type { QuickSuggestion } from '../../types/chat';
@@ -37,7 +37,7 @@ export interface SnapshotItem {
 export function useTodaySnapshot(): SnapshotItem[] {
   const activityTotals = useTimerStore((s) => s.activityTotals);
   const openTasks = useTaskStore((s) => s.tasks.filter((t) => t.status !== 'done').length);
-  const streak = useQuestStore((s) => s.streak);
+  const streak = useDayStreak();
   const journalCount = useJournalStore((s) => s.entries.length);
   const focusSeconds = Object.values(activityTotals).reduce((sum, v) => sum + v, 0);
 
