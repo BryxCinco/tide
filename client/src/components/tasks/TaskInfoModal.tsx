@@ -96,20 +96,22 @@ export function TaskInfoModal({ visible, onClose, task, activityName, onToggle, 
           {task.completedAt && <InfoRow icon="CheckCircle2" label="Completed" value={formatEntryDate(task.completedAt)} />}
         </View>
 
-        <View className="gap-2">
-          <Button
-            title={isDone ? 'Mark as Not Done' : 'Mark as Done'}
-            variant="primary"
-            size="lg"
-            fullWidth
-            icon={isDone ? 'RotateCcw' : 'Check'}
-            onPress={() => onToggle(task.id)}
-          />
-          <Button title="Edit" variant="secondary" size="md" fullWidth icon="Pencil" onPress={() => onEdit(task)} />
-          <View className="items-center pt-1">
-            <Button title="Delete Task" variant="ghost" size="sm" icon="Trash2" onPress={handleDelete} />
+        {isDone ? (
+          <View className="flex-row items-center justify-center gap-2 rounded-xl bg-base py-3">
+            <Icon name="Lock" size={14} />
+            <Text variant="body" color="muted" className="text-[13px] normal-case tracking-normal">
+              Completed tasks are locked and can&apos;t be changed.
+            </Text>
           </View>
-        </View>
+        ) : (
+          <View className="gap-2">
+            <Button title="Mark as Done" variant="primary" size="lg" fullWidth icon="Check" onPress={() => onToggle(task.id)} />
+            <Button title="Edit" variant="secondary" size="md" fullWidth icon="Pencil" onPress={() => onEdit(task)} />
+            <View className="items-center pt-1">
+              <Button title="Delete Task" variant="ghost" size="sm" icon="Trash2" onPress={handleDelete} />
+            </View>
+          </View>
+        )}
       </View>
     </Modal>
   );

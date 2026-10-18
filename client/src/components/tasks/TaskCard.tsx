@@ -59,10 +59,11 @@ export function TaskCard({ task, activityName, onToggle, onView, onEdit, onDelet
       <View className="flex-1 flex-row items-start gap-3 py-3.5 pl-3.5 pr-2">
         <Pressable
           onPress={onToggle}
+          disabled={isDone}
           hitSlop={10}
           accessibilityRole="checkbox"
-          accessibilityState={{ checked: isDone }}
-          accessibilityLabel={isDone ? `Mark "${task.title}" as not done` : `Mark "${task.title}" as done`}
+          accessibilityState={{ checked: isDone, disabled: isDone }}
+          accessibilityLabel={isDone ? `"${task.title}" is completed` : `Mark "${task.title}" as done`}
           className={cn('mt-0.5 h-6 w-6 items-center justify-center overflow-hidden rounded-full', !isDone && 'border-2 border-default')}
         >
           {isDone && (
@@ -110,21 +111,28 @@ export function TaskCard({ task, activityName, onToggle, onView, onEdit, onDelet
           </View>
         </Pressable>
 
-        <View className="flex-row items-center">
-          <Pressable
-            onPress={onEdit}
-            hitSlop={6}
-            accessibilityLabel="Edit task"
-            className="h-8 w-8 items-center justify-center rounded-full hover:bg-elevated"
-          >
-            <Icon name="Pencil" size={15} />
-          </Pressable>
-          <VisibleDeleteButton
-            onConfirm={onDelete}
-            confirmTitle="Delete task?"
-            confirmMessage={`"${task.title}" will be removed. This can't be undone.`}
-          />
-        </View>
+        {isDone ? (
+          // Completed tasks are locked — no un-check, edit or delete (the server enforces it too).
+          <View className="h-8 w-8 items-center justify-center" accessibilityLabel="Completed — locked">
+            <Icon name="Lock" size={14} color={themeColors.text.disabled} />
+          </View>
+        ) : (
+          <View className="flex-row items-center">
+            <Pressable
+              onPress={onEdit}
+              hitSlop={6}
+              accessibilityLabel="Edit task"
+              className="h-8 w-8 items-center justify-center rounded-full hover:bg-elevated"
+            >
+              <Icon name="Pencil" size={15} />
+            </Pressable>
+            <VisibleDeleteButton
+              onConfirm={onDelete}
+              confirmTitle="Delete task?"
+              confirmMessage={`"${task.title}" will be removed. This can't be undone.`}
+            />
+          </View>
+        )}
       </View>
     </View>
   );

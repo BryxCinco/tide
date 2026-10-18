@@ -112,6 +112,7 @@ export const useTaskStore = create<TaskState>()(
 
       updateTask: (id, updates) => {
         const previous = get().tasks;
+        if (previous.find((t) => t.id === id)?.status === 'done') return; // locked
         // `updates` may carry explicit `null` (to clear completedAt server-side — see
         // UpdateTaskPayload's comment), but Task's own fields are `string | undefined`, never
         // `null` — normalize before merging into local state.
@@ -136,7 +137,8 @@ export const useTaskStore = create<TaskState>()(
       deleteTask: (id) => {
         const previous = get().tasks;
         const task = previous.find((t) => t.id === id);
-        const wasWithdrawn = task != null && task.status !== 'done';
+        if (task?.status === 'done') return; // locked
+        const wasWithdrawn = task != null;
 
         set((state) => ({
           tasks: state.tasks.filter((t) => t.id !== id),
@@ -152,9 +154,10 @@ export const useTaskStore = create<TaskState>()(
       toggleTaskStatus: (id) => {
         const previous = get().tasks;
         const task = previous.find((t) => t.id === id);
-        if (!task) return;
+        // Completed tasks are locked — only ever not-done -> done.
+        if (!task || task.status === 'done') return;
 
-        const done = task.status === 'done';
+        const done = false;
         const nextStatus: TaskStatus = done ? 'todo' : 'done';
         const completedAt = done ? undefined : new Date().toISOString();
 

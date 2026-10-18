@@ -62,6 +62,9 @@ router.patch('/:id', async (req, res) => {
   // transition, not on every subsequent edit of an already-done task (which would otherwise
   // resend status: 'done' and double-award).
   const { data: existing } = await supabaseAdmin.from('tasks').select('*').eq('id', req.params.id).eq('user_id', req.user.id).single();
+  if (!existing) return res.status(404).json({ error: 'Task not found' });
+  // A completed task is locked — no un-checking, editing or deleting — same as quests.
+  if (existing.status === 'done') return res.status(409).json({ error: 'This task is already completed and can no longer be changed.', code: 'task_locked' });
 
   const update = { title, description, status, priority, activity_type, due_date, tags };
   // completed_at follows status unless the caller passes it explicitly.
@@ -108,6 +111,9 @@ router.patch('/:id', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
+  const { data: existing } = await supabaseAdmin.from('tasks').select('status').eq('id', req.params.id).eq('user_id', req.user.id).maybeSingle();
+  if (existing?.status === 'done') return res.status(409).json({ error: 'This task is already completed and can no longer be changed.', code: 'task_locked' });
+
   const { error } = await supabaseAdmin.from('tasks').delete().eq('id', req.params.id).eq('user_id', req.user.id);
 
   if (error) return res.status(500).json({ error: error.message });
