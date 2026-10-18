@@ -28,7 +28,9 @@ const app = express();
 // this is here to catch: env vars added in the dashboard only apply to deployments created
 // AFTER they were saved — an existing deployment that predates adding them keeps running
 // without them until you trigger a fresh deploy.
-const REQUIRED_ENV_VARS = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_KEY', 'JWT_SECRET'];
+// GROQ_API_KEY powers the AI Coach and Insights suggestions. (JWT_SECRET used to be listed
+// here but nothing in the server reads it — tokens are verified by Supabase itself.)
+const REQUIRED_ENV_VARS = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_KEY', 'GROQ_API_KEY'];
 
 function getEnvStatus() {
   return REQUIRED_ENV_VARS.reduce((status, key) => {
@@ -96,7 +98,9 @@ app.get('/api/health', async (req, res) => {
     return res.status(500).json({ status: 'error', supabaseConnected: false, message: error.message });
   }
 
-  res.json({ status: 'ok', supabaseConnected: true });
+  // aiConfigured is presence-only (never the key itself) — a quick way to confirm from the
+  // browser that the AI Coach's key actually reached this deployment.
+  res.json({ status: 'ok', supabaseConnected: true, aiConfigured: Boolean(process.env.GROQ_API_KEY) });
 });
 
 // Diagnostic endpoint — reports whether each required env var is present (never its value)

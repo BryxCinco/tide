@@ -6,11 +6,24 @@ const { tools, toolHandlers } = require('./tools');
 // 20-40s per retry before the user saw anything (measured: 18s / 38s / 76s replies). Retries
 // are decided in createCompletion below instead, where a long wait can be skipped in favor
 // of the fallback model. `timeout` caps a single hung call well inside the client's 60s.
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-  maxRetries: 0,
-  timeout: 25000,
-});
+//
+// Created lazily, on the first AI request: `new Groq()` throws when GROQ_API_KEY is missing,
+// and at module load that crashed the whole Vercel function — every route (login, tasks,
+// journal...) failed, not just the coach. Now only AI requests fail, with a clear log line.
+let groqClient = null;
+
+function getGroq() {
+  if (!groqClient) {
+    if (!process.env.GROQ_API_KEY) {
+      const err = new Error('GROQ_API_KEY is not set on the server — add it in Vercel → Settings → Environment Variables, then redeploy.');
+      err.status = 503;
+      err.isConfigError = true;
+      throw err;
+    }
+    groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY, maxRetries: 0, timeout: 25000 });
+  }
+  return groqClient;
+}
 
 // Model: 'llama-3.3-70b-versatile' no longer exists on this account's Groq catalog (verified
 // live via groq.models.list() — the classic Llama chat models are gone entirely). Of what's
@@ -46,7 +59,7 @@ function paramsForModel(params, model) {
 }
 
 async function callOnce(params, model) {
-  return groq.chat.completions.create(paramsForModel(params, model));
+  return getGroq().chat.completions.create(paramsForModel(params, model));
 }
 
 /**
@@ -61,6 +74,8 @@ async function createCompletion(params) {
   try {
     return await callOnce(params, primary);
   } catch (err) {
+    // A missing key won't be fixed by retrying or by another model.
+    if (err?.isConfigError) throw err;
     const status = err?.status;
     if (TRANSIENT_STATUS.has(status)) {
       console.log(`[llmService] ${primary} returned ${status}, retrying once`);

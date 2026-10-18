@@ -17,6 +17,9 @@ function friendlyChatError(err) {
   if (err?.status === 429) {
     return { status: 429, error: "TIDE Coach is getting a lot of requests right now. Please wait a moment and try again." };
   }
+  if (err?.status === 503) {
+    return { status: 503, error: 'TIDE Coach is temporarily unavailable. Please try again later.' };
+  }
   if (err?.status === 400) {
     return { status: 400, error: "That message (or the conversation so far) is a bit too long for me to process. Try shortening it or starting a new chat." };
   }
