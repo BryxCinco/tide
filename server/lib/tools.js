@@ -10,6 +10,7 @@ const { retrieveStats, retrieveRelevantContext } = require('./ragService');
 const { awardXp, xpForLevel } = require('./xpService');
 const { isActivityScheduledToday } = require('./activityRecurrence');
 const { computeQuestXp, questTierMeta } = require('./questXp');
+const { bumpDailyStreak } = require('./dailyStreak');
 const { generateDailyQuestsForUser, getQuestStreakInfo, gatherSignals, weakestMeasurableCategory, weaknessReason, pickTemplate, STRETCH_TEMPLATES } = require('./questGenerator');
 
 const TASK_COMPLETE_XP = { low: 10, medium: 20, high: 30, critical: 50 };
@@ -528,7 +529,7 @@ toolHandlers.createTask = async ({ userId, title, description, priority, dueDate
   return { task: data, message: `Created task: "${data.title}"${dateNote}` };
 };
 
-toolHandlers.completeTask = async ({ userId, taskTitle }) => {
+toolHandlers.completeTask = async ({ userId, timezone, taskTitle }) => {
   const match = await findTaskByTitle(userId, taskTitle, { onlyOpen: true });
   if (!match) {
     return { matched: false, message: `I couldn't find an open task matching "${taskTitle}".` };
@@ -550,6 +551,7 @@ toolHandlers.completeTask = async ({ userId, taskTitle }) => {
   await awardXp(userId, TASK_COMPLETE_XP[data.priority] || TASK_COMPLETE_XP.medium, 'task completed via AI').catch((err) =>
     console.error('[tools] completeTask XP award failed:', err.message),
   );
+  await bumpDailyStreak(userId, timezone);
 
   return { task: data, matched: true, message: `Marked "${data.title}" as done.` };
 };
@@ -585,7 +587,7 @@ toolHandlers.listMissedTasks = async ({ userId }) => {
   return { tasks: data, count: data.length, message };
 };
 
-toolHandlers.updateTask = async ({ userId, taskTitle, updates = {} }) => {
+toolHandlers.updateTask = async ({ userId, timezone, taskTitle, updates = {} }) => {
   const match = await findTaskByTitle(userId, taskTitle);
   if (!match) {
     return { matched: false, message: `I couldn't find a task matching "${taskTitle}".` };
@@ -612,6 +614,7 @@ toolHandlers.updateTask = async ({ userId, taskTitle, updates = {} }) => {
     await awardXp(userId, TASK_COMPLETE_XP[data.priority] || TASK_COMPLETE_XP.medium, 'task completed via AI').catch((err) =>
       console.error('[tools] updateTask XP award failed:', err.message),
     );
+    await bumpDailyStreak(userId, timezone);
   }
 
   return { task: data, message: `Updated "${data.title}".` };

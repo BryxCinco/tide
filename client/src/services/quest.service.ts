@@ -167,10 +167,10 @@ export const questService = {
    * (it does NOT currently revoke a streak that was already credited earlier that day — a
    * known gap, called out in questStore).
    */
-  async complete(id: string, isCompleted = true): Promise<{ quest: Quest; streak: Streak | null; xp: XpResult | null }> {
-    const { data } = await api.patch<{ quest: ApiQuest; streak: ApiStreak | null; xp: XpResult | null }>(`/api/quests/${id}`, {
+  async complete(id: string, isCompleted = true): Promise<{ quest: Quest; streak: Streak | null; xp: XpResult | null; dayStreak: number | null }> {
+    const { data } = await api.patch<{ quest: ApiQuest; streak: ApiStreak | null; xp: XpResult | null; dayStreak?: number | null }>(`/api/quests/${id}`, {
       is_completed: isCompleted,
     });
-    return { quest: mapApiQuest(data.quest), streak: data.streak ? mapApiStreak(data.streak) : null, xp: data.xp };
+    return { quest: mapApiQuest(data.quest), streak: data.streak ? mapApiStreak(data.streak) : null, xp: data.xp, dayStreak: data.dayStreak ?? null };
   },
 };

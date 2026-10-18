@@ -71,7 +71,7 @@ export function HexagonStats({ productivityScore }: HexagonStatsProps) {
   // full radius for a solid run instead of forever reading as a tiny sliver.
   const axes: Axis[] = useMemo(
     () => [
-      { tag: 'Task', display: `${taskStreak}d`, norm: Math.min(taskStreak / 14, 1) },
+      { tag: 'Daily', display: `${taskStreak}d`, norm: Math.min(taskStreak / 14, 1) },
       { tag: 'Quest', display: `${questStreak}d`, norm: Math.min(questStreak / 14, 1) },
       { tag: 'Best', display: `${bestStreak}d`, norm: Math.min(bestStreak / 30, 1) },
       { tag: 'Level', display: `${level}`, norm: Math.min(level / 20, 1) },

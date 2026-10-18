@@ -53,9 +53,17 @@ export const useStreakStore = create<StreakState>()((set, get) => ({
 
   applyTaskStreak: (next) => {
     const current = get().streak;
-    if (next == null || !current) return;
+    if (next == null) return;
+    if (!current) {
+      get().fetchStreak();
+      return;
+    }
     set({ streak: { ...current, taskCurrentStreak: next, taskLongestStreak: Math.max(current.taskLongestStreak, next) } });
   },
 
   clearError: () => set({ error: null }),
 }));
+
+/** The headline "day streak" — days in a row with at least one task or quest completed
+ * (server/lib/dailyStreak.js). Shown on the Dashboard, Profile and Streak widget. */
+export const useDayStreak = () => useStreakStore((s) => s.streak?.taskCurrentStreak ?? 0);

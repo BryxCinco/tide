@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { chatService } from '../services/chat.service';
+import { useStreakStore } from './streakStore';
 import { showToast } from './toastStore';
 import type { ChatAction, ChatMessage } from '../types/chat';
 import { storage } from '../utils/storage';
@@ -71,6 +72,8 @@ export const useChatStore = create<ChatState>()(
         try {
           const response = await chatService.sendMessage(trimmed, historyBeforeThisMessage);
           await revealMessage(set, response.message, response.actions);
+          // The coach may have completed a task, which credits today to the day streak.
+          if (response.actions?.length) useStreakStore.getState().fetchStreak();
         } catch (err) {
           // chatService/the server already translate Groq/network failures into one of a
           // small set of friendly messages (see server/routes/chat.js's friendlyChatError) —

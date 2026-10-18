@@ -29,8 +29,7 @@ import { mockHeroFocus, mockQuickActions } from '@/mocks/mockDashboard';
 import { BENTO_COVERED_WIDGETS, getVisibleWidgets, useDashboardStore } from '@/store/dashboardStore';
 import { useJournalStore } from '@/store/journalStore';
 import { useLevelStore } from '@/store/levelStore';
-import { useQuestStore } from '@/store/questStore';
-import { useStreakStore } from '@/store/streakStore';
+import { useDayStreak, useStreakStore } from '@/store/streakStore';
 import { isTaskOverdue, useTaskStore } from '@/store/taskStore';
 import { useTimerStore } from '@/store/timerStore';
 import type { AccentTone, FocusActivity, JournalPreview, StatItem, TimeLogEntry, WidgetId } from '@/types/dashboard';
@@ -62,7 +61,7 @@ export default function DashboardScreen() {
   const journalEntries = useJournalStore((s) => s.entries);
   const fetchJournalEntries = useJournalStore((s) => s.fetchEntries);
   const journalCount = journalEntries.length;
-  const streak = useQuestStore((s) => s.streak);
+  const streak = useDayStreak();
   const level = useLevelStore((s) => s.level);
   const totalXp = useLevelStore((s) => s.totalXp);
   const fetchLevel = useLevelStore((s) => s.fetchLevel);

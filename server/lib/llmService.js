@@ -369,7 +369,7 @@ async function* generateResponseStream({ userQuery, context, stats, history = []
 }
 
 /** Runs one tool call and returns the `tool` message for it, never throwing. */
-async function runToolCall(toolCall, userId, toolsUsed, toolResults) {
+async function runToolCall(toolCall, userId, timezone, toolsUsed, toolResults) {
   const fnName = toolCall.function.name;
   toolsUsed.push(fnName);
 
@@ -386,7 +386,7 @@ async function runToolCall(toolCall, userId, toolsUsed, toolResults) {
     result = { error: `Unknown tool: ${fnName}` };
   } else {
     try {
-      result = await handler({ userId, ...args });
+      result = await handler({ ...args, userId, timezone });
     } catch (err) {
       // The model reads this and may repeat it to the user, so it only ever sees a safe,
       // generic reason; the real one is logged here.
@@ -448,7 +448,7 @@ async function generateWithTools({ userId, userQuery, context, stats, history = 
     }
 
     // Independent tool calls in one turn run in parallel rather than one after another.
-    const toolMessages = await Promise.all(message.tool_calls.map((call) => runToolCall(call, userId, toolsUsed, toolResults)));
+    const toolMessages = await Promise.all(message.tool_calls.map((call) => runToolCall(call, userId, timezone, toolsUsed, toolResults)));
     messages.push(...toolMessages);
   }
 

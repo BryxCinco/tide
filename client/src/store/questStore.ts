@@ -11,6 +11,7 @@ import { generateDailyQuests } from '../utils/questGenerator';
 import { computeQuestXp } from '../utils/questXp';
 import { storage } from '../utils/storage';
 import { useLevelStore } from './levelStore';
+import { useStreakStore } from './streakStore';
 import { showToast } from './toastStore';
 
 export interface CustomQuestInput {
@@ -171,7 +172,7 @@ export const useQuestStore = create<QuestState>()(
         if (isGuestMode()) return;
 
         questService.complete(id, isCompleted).then(
-          ({ quest: updatedQuest, streak, xp }) => {
+          ({ quest: updatedQuest, streak, xp, dayStreak }) => {
             // The server recomputes xp at completion time (streak + category-diversity
             // bonuses) — sync that back instead of trusting the optimistic value above.
             set((state) => ({ todayQuests: state.todayQuests.map((q) => (q.id === id ? { ...q, xp: updatedQuest.xp } : q)) }));
@@ -180,6 +181,7 @@ export const useQuestStore = create<QuestState>()(
             // a streak update (the server doesn't revoke an already-credited day), so the
             // locally displayed streak can stay stale until the next fetchTodayQuests().
             if (streak) set({ streak: streak.currentStreak });
+            useStreakStore.getState().applyTaskStreak(dayStreak);
             if (xp) {
               useLevelStore.setState({ level: xp.level, totalXp: xp.totalXp });
               const tierName = QUEST_TIER_META[updatedQuest.tier].name;

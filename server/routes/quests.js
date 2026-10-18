@@ -2,6 +2,7 @@ const express = require('express');
 const { supabaseAdmin } = require('../lib/supabaseClient');
 const { requireAuth } = require('../middleware/auth');
 const { awardXp } = require('../lib/xpService');
+const { bumpDailyStreak, requestTimezone } = require('../lib/dailyStreak');
 const { computeQuestXp, applyCompletionBonus } = require('../lib/questXp');
 const { generateDailyQuestsForUser, getQuestStreakInfo } = require('../lib/questGenerator');
 
@@ -210,6 +211,7 @@ router.patch('/:id', async (req, res) => {
   let finalQuest = quest;
   let xp = null;
   let streak = null;
+  let dayStreak = null;
 
   if (justCompleted) {
     // Pre-bump streak length — "+10% per consecutive day" means days already banked going
@@ -231,13 +233,15 @@ router.patch('/:id', async (req, res) => {
     finalQuest = updatedQuest || quest;
 
     streak = await bumpStreakIfDayComplete(req.user.id, quest.date);
+    // Any completed quest is an accomplishment for the day streak, not just a full day's set.
+    dayStreak = await bumpDailyStreak(req.user.id, requestTimezone(req));
     xp = await awardXp(req.user.id, awardedXp, 'quest completed').catch((err) => {
       console.error('[quests] XP award failed:', err.message);
       return null;
     });
   }
 
-  res.json({ quest: finalQuest, streak, xp });
+  res.json({ quest: finalQuest, streak, xp, dayStreak });
 });
 
 // DELETE /api/quests/:id — custom (user-created) quests only; system-generated ones can be

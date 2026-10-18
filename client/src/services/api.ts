@@ -52,7 +52,18 @@ export function registerTokenGetter(getter: TokenGetter): void {
   getInMemoryToken = getter;
 }
 
+// The device's IANA zone, so day-based features (the day streak) roll over at the user's
+// own midnight rather than UTC's.
+const DEVICE_TIMEZONE = (() => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return undefined;
+  }
+})();
+
 api.interceptors.request.use(async (config) => {
+  if (DEVICE_TIMEZONE) config.headers['X-Timezone'] = DEVICE_TIMEZONE;
   const token = getInMemoryToken() ?? (await storage.getItem(AUTH_TOKEN_KEY));
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

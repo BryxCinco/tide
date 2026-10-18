@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 
 import { useJournalStore } from '../../store/journalStore';
-import { useQuestStore } from '../../store/questStore';
+import { useDayStreak } from '../../store/streakStore';
 import { useTimerStore } from '../../store/timerStore';
 import { formatDuration } from '../../utils/formatTime';
 import { BentoStat, type IconName } from '../ui';
@@ -15,7 +15,7 @@ import { BentoStat, type IconName } from '../ui';
  */
 export function StatsRow({ startIndex = 2 }: { startIndex?: number }) {
   const journalCount = useJournalStore((s) => s.entries.length);
-  const streak = useQuestStore((s) => s.streak);
+  const streak = useDayStreak();
   const todaySessions = useTimerStore((s) => s.todaySessions);
   const activityTotals = useTimerStore((s) => s.activityTotals);
   const fetchTodaySessions = useTimerStore((s) => s.fetchTodaySessions);
