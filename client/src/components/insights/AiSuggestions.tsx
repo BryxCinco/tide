@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { getApiErrorMessage } from '../../services/api';
+import { useAuthStore } from '../../store/authStore';
 import { chatService, type InsightSuggestion, type InsightSuggestionType } from '../../services/chat.service';
 import { colors } from '../../utils/theme';
 import { Icon, SkeletonRow, Text, type IconName } from '../ui';
@@ -19,12 +20,22 @@ const TYPE_META: Record<InsightSuggestionType, { icon: IconName; color: string }
  * route's comment) and renders 3-5 suggestion rows, each tinted by its type (priority/
  * balance/improvement/celebration).
  */
+// Suggestions are an AI call that shares the coach's tokens-per-minute budget, and the
+// underlying weekly stats barely move between visits — reuse a result for a while instead of
+// spending a model call every time Insights is opened.
+const CACHE_MS = 15 * 60 * 1000;
+// Keyed by user so a different account signing in on the same device never sees these.
+let cached: { userId: string; at: number; suggestions: InsightSuggestion[] } | null = null;
+
 export function AiSuggestions() {
-  const [suggestions, setSuggestions] = useState<InsightSuggestion[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const userId = useAuthStore((s) => s.user?.id ?? '');
+  const fresh = cached && cached.userId === userId && Date.now() - cached.at < CACHE_MS ? cached.suggestions : null;
+  const [suggestions, setSuggestions] = useState<InsightSuggestion[]>(fresh ?? []);
+  const [isLoading, setIsLoading] = useState(!fresh);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (fresh) return;
     let cancelled = false;
     setIsLoading(true);
     setError(null);
@@ -32,6 +43,7 @@ export function AiSuggestions() {
     chatService
       .getInsightSuggestions()
       .then((result) => {
+        cached = { userId, at: Date.now(), suggestions: result };
         if (!cancelled) setSuggestions(result);
       })
       .catch((err) => {
@@ -44,6 +56,8 @@ export function AiSuggestions() {
     return () => {
       cancelled = true;
     };
+    // Mount-only: a cached result for this user is used as-is until it ages out.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (isLoading) {

@@ -9,9 +9,17 @@ let extractorPromise = null;
 async function getExtractor() {
   if (!extractorPromise) {
     extractorPromise = (async () => {
-      const { pipeline } = await import('@xenova/transformers');
+      const { pipeline, env } = await import('@xenova/transformers');
+      // On Vercel the deployment filesystem is read-only except /tmp, so the default cache
+      // location (inside node_modules) can't hold the downloaded ONNX weights — every cold
+      // start would download them again. /tmp survives for the life of a warm instance.
+      if (process.env.VERCEL) env.cacheDir = '/tmp/transformers-cache';
       return pipeline('feature-extraction', MODEL);
-    })();
+    })().catch((err) => {
+      // Don't cache a failed load forever — let the next call try again.
+      extractorPromise = null;
+      throw err;
+    });
   }
   return extractorPromise;
 }

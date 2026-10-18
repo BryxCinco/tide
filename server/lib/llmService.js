@@ -1,47 +1,95 @@
 const Groq = require('groq-sdk');
 const { tools, toolHandlers } = require('./tools');
 
+// maxRetries: 0 — the SDK's own default (2 retries) silently honors Groq's `retry-after`
+// on a 429, which on this account's 8,000 tokens-per-minute tier routinely meant sitting
+// 20-40s per retry before the user saw anything (measured: 18s / 38s / 76s replies). Retries
+// are decided in createCompletion below instead, where a long wait can be skipped in favor
+// of the fallback model. `timeout` caps a single hung call well inside the client's 60s.
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
+  maxRetries: 0,
+  timeout: 25000,
 });
 
-// Retried on exactly the errors a short wait can actually fix — a rate limit (429, this
-// account's free-tier TPM cap) or a transient server-side hiccup (500/502/503). Everything
-// else (400 bad request, 401 auth, a genuine model/content problem) retrying wouldn't change,
-// so those still throw straight through on the first attempt. Two attempts with doubling
-// delays (900ms, 1800ms) rather than parsing Groq's `retry-after` header — simpler, and gives
-// a 429 two chances to land inside the free tier's TPM window resetting instead of just one.
-const RETRYABLE_STATUS = new Set([429, 500, 502, 503]);
-const RETRY_DELAYS_MS = [900, 1800];
+// Model: 'llama-3.3-70b-versatile' no longer exists on this account's Groq catalog (verified
+// live via groq.models.list() — the classic Llama chat models are gone entirely). Of what's
+// left, 'openai/gpt-oss-20b'/'120b' are reasoning models — they spend part of `max_tokens` on
+// an invisible `message.reasoning` field before producing visible `content`, and ran 2-3x
+// slower than 'qwen/qwen3.8-27b', which replies directly in `content` and was consistently
+// the fastest tested (~300-450ms for a trivial completion). Better fit for a short coach reply.
+const MODEL = 'qwen/qwen3.8-27b';
 
-async function createCompletion(params) {
-  let lastErr;
-  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
-    try {
-      return await groq.chat.completions.create(params);
-    } catch (err) {
-      lastErr = err;
-      if (!RETRYABLE_STATUS.has(err?.status) || attempt === RETRY_DELAYS_MS.length) throw err;
-      const delay = RETRY_DELAYS_MS[attempt];
-      console.log(`[llmService] Groq call failed (${err.status}), retrying in ${delay}ms (attempt ${attempt + 1}/${RETRY_DELAYS_MS.length}):`, err.message);
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-  }
-  throw lastErr;
+// Fallback: Groq's rate limits are per model, so a second model is a second 8,000-TPM
+// budget: when the primary is
+// rate-limited, the same request goes to FALLBACK_MODEL immediately instead of waiting out
+// the primary's reset window. gpt-oss-20b is a reasoning model, so it's called with
+// reasoning_effort 'low' to keep its hidden reasoning (and latency) small.
+const FALLBACK_MODEL = 'openai/gpt-oss-20b';
+
+const TRANSIENT_STATUS = new Set([500, 502, 503]);
+// A 429 whose retry-after is at most this long is worth one short wait on the same model;
+// anything longer goes straight to the fallback model.
+const MAX_INLINE_WAIT_MS = 2500;
+
+function retryAfterMs(err) {
+  const raw = err?.headers?.get ? err.headers.get('retry-after') : err?.headers?.['retry-after'];
+  const seconds = Number(raw);
+  return Number.isFinite(seconds) ? Math.ceil(seconds * 1000) : null;
 }
 
-// Model: 'llama-3.3-70b-versatile' no longer exists on this account's Groq catalog (verified
-// live via groq.models.list() — the classic Llama chat models are gone entirely; only
-// allam-2-7b, canopylabs/orpheus-*, whisper-*, and openai/gpt-oss-* remain). Of what's left,
-// 'openai/gpt-oss-20b'/'120b' are reasoning models — they spend part of `max_tokens` on an
-// invisible `message.reasoning` field before producing visible `content`, which returned
-// empty output entirely at this file's own max_tokens: 500 setting in a quick test with a
-// low budget, and ran 2-3x slower than the alternative even once given enough tokens to
-// finish reasoning. 'qwen/qwen3.8-27b' has no such split, replies directly in `content`
-// only, and was consistently the fastest of the three tested (~300ms for a trivial
-// completion vs ~800ms for gpt-oss-20b) — the better fit for a short, low-latency coach
-// reply either way.
-const MODEL = 'qwen/qwen3.8-27b';
+function paramsForModel(params, model) {
+  if (model !== FALLBACK_MODEL) return { ...params, model };
+  // Reasoning models spend max_tokens on hidden reasoning before visible content — give it
+  // headroom and keep the reasoning short.
+  return { ...params, model, reasoning_effort: 'low', max_tokens: Math.max(params.max_tokens || 0, 900) };
+}
+
+async function callOnce(params, model) {
+  return groq.chat.completions.create(paramsForModel(params, model));
+}
+
+/**
+ * One completion with bounded, fast recovery:
+ * - transient 5xx: one quick retry on the same model;
+ * - 429 with a short retry-after: wait that long once on the same model;
+ * - 429 otherwise (or still failing): try FALLBACK_MODEL right away.
+ * Worst case is a couple of seconds of extra wait, never the 20-40s silent SDK backoff.
+ */
+async function createCompletion(params) {
+  const primary = params.model || MODEL;
+  try {
+    return await callOnce(params, primary);
+  } catch (err) {
+    const status = err?.status;
+    if (TRANSIENT_STATUS.has(status)) {
+      console.log(`[llmService] ${primary} returned ${status}, retrying once`);
+      await new Promise((r) => setTimeout(r, 600));
+      try {
+        return await callOnce(params, primary);
+      } catch (retryErr) {
+        err = retryErr;
+      }
+    } else if (status === 429) {
+      const wait = retryAfterMs(err);
+      if (wait != null && wait <= MAX_INLINE_WAIT_MS) {
+        console.log(`[llmService] ${primary} rate-limited, waiting ${wait}ms once`);
+        await new Promise((r) => setTimeout(r, wait));
+        try {
+          return await callOnce(params, primary);
+        } catch (retryErr) {
+          err = retryErr;
+        }
+      }
+    } else {
+      throw err;
+    }
+
+    if (primary === FALLBACK_MODEL) throw err;
+    console.log(`[llmService] ${primary} unavailable (${err?.status}), using fallback ${FALLBACK_MODEL}`);
+    return callOnce(params, FALLBACK_MODEL);
+  }
+}
 
 // System prompt for TIDE Coach
 const SYSTEM_PROMPT = `You are TIDE Coach, a personal productivity assistant
@@ -63,6 +111,8 @@ Guidelines:
 - Never make up data you don't see in the context
 - Use metric units (hours, minutes) not imperial
 - Be conversational, not robotic
+- Reply in the language the user writes in — English, Filipino/Tagalog, or Taglish (a mix);
+  match their mix rather than switching to English
 
 Example responses:
 - "This week you tracked 18h 24m of focus time—up 12% from last week.
@@ -110,69 +160,113 @@ function buildDatetimeMessage(timezone) {
   };
 }
 
-// Appended only for generateWithTools — plain generateResponse/generateResponseStream never
-// have tools available, so this instruction would be dead weight there.
-const TOOLS_SAFETY_NOTE = `You have access to these tools — call one whenever it matches
-what the user is asking for, instead of just describing what you would do:
+// Tool-use rules for generateWithTools. Only the parts relevant to the tools actually sent
+// on a given request are included (see selectTools) — the full tool list and every rule on
+// every request cost ~3,500 prompt tokens, which on an 8,000 tokens-per-minute tier meant a
+// single tool-using message could exhaust the minute.
+const TOOLS_BASE_NOTE = `Call a tool whenever it matches what the user asks, instead of describing what you
+would do. Only call one when the intent is clear; if a detail is ambiguous (for example
+which of several similar tasks), ask a short clarifying question. You already know the
+current date and time — answer those directly, no tool needed.`;
 
-Tasks: createTask, listTasks, listMissedTasks, updateTask, completeTask, rescheduleTask,
-deleteTask, suggestTasks
-Mood & journal: logMood, getMoodHistory, addJournalEntry, searchJournals, reflectOnJournal
-Time & stats: startTimer, getTodayStats, getWeeklySummary, getActivityStats, getStreakInfo,
-suggestActivity, getLevelInfo, getLeaderboard
-Tide's Quest: suggestTideQuest, generateDailyQuests, getQuestStreak
-Other: getWeather (ask which location if the user doesn't say one and hasn't got a usual
-city from context — otherwise it defaults to Manila)
+const TOOLS_DELETE_NOTE = `DELETE CONFIRMATION — deleteTask is destructive:
+1. First call it with confirm omitted/false. It deletes nothing and returns a confirmation
+   question; relay it and stop (don't call the tool again in the same reply).
+2. Only on the user's NEXT message, if they clearly confirm, call it again for the same task
+   with confirm:true. If they decline or change the subject, don't.
+Never pass confirm:true on a first attempt, and never delete through any other tool.`;
 
-You already know the current date and time (see below) and don't need a tool for "what
-time is it" or "what's the date today" — just answer directly from that fact.
+const TOOLS_QUEST_NOTE = `TIDE'S QUEST — suggestTideQuest is two-step:
+1. First call (confirm omitted/false) only suggests 1-3 options; relay them with tier and
+   XP and ask which to add.
+2. Only on a clear yes, call again with confirm:true AND the exact title, description,
+   tier, icon and category of the one they picked (they aren't remembered between calls).
+generateDailyQuests replaces today's non-custom quests directly — only call it when the
+user explicitly asks to regenerate/refresh/reroll their quests.`;
 
-DELETE CONFIRMATION — deleteTask is destructive and has a required two-step flow:
-1. First call deleteTask with confirm omitted/false. It will NOT delete anything — it just
-   returns a message asking the user to confirm. Relay that exact message to the user and
-   stop there; do not call the tool again in the same reply.
-2. Only on the user's NEXT message, if they clearly say yes/confirm/do it/go ahead (and are
-   replying to that same confirmation question), call deleteTask again for the same task
-   with confirm:true. If they decline or change the subject, do not call it again.
-Never pass confirm:true on a first attempt, and never delete anything via updateTask or any
-other tool as a workaround.
+const TOOLS_WEATHER_NOTE = `getWeather: ask which location if the user doesn't say one; otherwise it defaults to Manila.`;
 
-TIDE'S QUEST CONFIRMATION — suggestTideQuest follows the same two-step shape:
-1. First call with confirm omitted/false only analyzes and suggests 1-3 options — nothing is
-   created. Relay them (with tier and XP) and ask which, if any, they'd like added.
-2. Only on a clear yes, call it again with confirm:true AND the exact title, description,
-   tier, icon, and category of the ONE they picked (these aren't remembered between calls —
-   you have to pass them back).
-generateDailyQuests has no confirmation step — it directly replaces today's non-custom
-quests, so only call it when the user clearly asks to regenerate/refresh/reroll their quests
-(not as a side effect of answering some other question).
+// Tools grouped by what they're about, each with the words (English + Tagalog) that suggest
+// the user wants that group. selectTools sends only the matched groups' tools.
+const TOOL_GROUPS = {
+  tasks: {
+    tools: ['createTask', 'completeTask', 'listTasks', 'listMissedTasks', 'updateTask', 'deleteTask', 'rescheduleTask', 'suggestTasks'],
+    pattern: /\b(task|tasks|to-?do|todo|deadline|due|overdue|missed|remind|complete|completed|finish|finished|done|delete|remove|resched\w*|postpone|move|plan|planning|add|create|gawain|gagawin|tapos|tapusin|burahin|tanggalin|ilipat|idagdag|gumawa)\b/i,
+  },
+  journal: {
+    tools: ['logMood', 'getMoodHistory', 'addJournalEntry', 'searchJournals', 'reflectOnJournal'],
+    pattern: /\b(mood|moods|feel|feeling|feelings|felt|journal|journals|diary|entry|entries|reflect\w*|happy|sad|stressed?|anxious|tired|angry|wrote|write|pakiramdam|nararamdaman|malungkot|masaya|pagod|galit|isinulat|isulat|talaarawan)\b/i,
+  },
+  stats: {
+    tools: ['startTimer', 'getTodayStats', 'getWeeklySummary', 'getActivityStats', 'getStreakInfo', 'getLevelInfo', 'getLeaderboard', 'suggestActivity'],
+    pattern: /\b(week|weekly|today|focus|time|timer|session|sessions|stat|stats|progress|productiv\w*|streak|level|xp|leaderboard|rank\w*|activity|activities|summary|summari[sz]e|doing|how (am|was|did)|start|track\w*|kumusta|kamusta|oras|ngayon|linggo|simulan|sumulong)\b/i,
+  },
+  quests: {
+    tools: ['suggestTideQuest', 'generateDailyQuests', 'getQuestStreak'],
+    pattern: /\b(quest|quests|challenge|challenges|reroll|regenerate|refresh)\b/i,
+  },
+  weather: {
+    tools: ['getWeather'],
+    pattern: /\b(weather|rain|raining|sunny|temperature|forecast|ulan|umuulan|panahon|mainit|malamig|bagyo)\b/i,
+  },
+};
 
-Only call a tool when the user's intent is clear and unambiguous; if a detail is genuinely
-ambiguous (for example, which of several similarly-named tasks they mean), ask a short
-clarifying question instead of guessing.`;
+// Sent when nothing in the conversation points at a specific group — a small, cheap set
+// that still covers the most common "how am I doing / what's on my plate" questions.
+const DEFAULT_TOOL_NAMES = ['getTodayStats', 'getWeeklySummary', 'listTasks', 'createTask'];
+
+/**
+ * Picks the tool groups this turn plausibly needs from the new message plus the last two
+ * history messages (so a bare "yes" answering "Delete 'X'?" still has deleteTask available,
+ * and "the first one" answering a quest suggestion still has suggestTideQuest). Returns the
+ * filtered tool schemas and the rule text for just those groups.
+ */
+function selectTools(userQuery, history = []) {
+  const recentText = [userQuery, ...history.slice(-2).map((m) => (typeof m.content === 'string' ? m.content : ''))].join('\n');
+  const groups = Object.keys(TOOL_GROUPS).filter((name) => TOOL_GROUPS[name].pattern.test(recentText));
+  const names = new Set(groups.length > 0 ? groups.flatMap((g) => TOOL_GROUPS[g].tools) : DEFAULT_TOOL_NAMES);
+  const selected = tools.filter((t) => names.has(t.function.name));
+
+  const notes = [TOOLS_BASE_NOTE];
+  if (names.has('deleteTask')) notes.push(TOOLS_DELETE_NOTE);
+  if (names.has('suggestTideQuest')) notes.push(TOOLS_QUEST_NOTE);
+  if (names.has('getWeather')) notes.push(TOOLS_WEATHER_NOTE);
+
+  return { tools: selected, note: notes.join('\n\n'), groups: groups.length > 0 ? groups : ['default'] };
+}
+
+// History sent to the model: the last few turns, each clipped — long pasted messages or a
+// long earlier reply otherwise re-cost their full length on every following request.
+const HISTORY_TURNS = 6;
+const HISTORY_CHARS = 600;
+
+function recentHistory(history = []) {
+  return history
+    .slice(-HISTORY_TURNS)
+    .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+    .map((m) => ({ role: m.role, content: m.content.length > HISTORY_CHARS ? `${m.content.slice(0, HISTORY_CHARS)}…` : m.content }));
+}
+
+/** Context + stats as one compact system message (no pretty-printed JSON indentation). */
+function contextMessage(context, stats) {
+  const parts = [];
+  if (context && context.trim()) parts.push(`Relevant context from the user's data:\n${context}`);
+  if (stats && Object.keys(stats).length > 0) parts.push(`Stats: ${JSON.stringify(stats)}`);
+  return parts.length > 0 ? { role: 'system', content: parts.join('\n\n') } : null;
+}
+
+function baseMessages({ context, stats, history, timezone, extraSystem }) {
+  const messages = [{ role: 'system', content: SYSTEM_PROMPT }];
+  if (extraSystem) messages.push({ role: 'system', content: extraSystem });
+  messages.push(buildDatetimeMessage(timezone));
+  const ctx = contextMessage(context, stats);
+  if (ctx) messages.push(ctx);
+  messages.push(...recentHistory(history));
+  return messages;
+}
 
 async function generateResponse({ userQuery, context, stats, history = [], timezone }) {
-  // Build messages array
-  const messages = [{ role: 'system', content: SYSTEM_PROMPT }, buildDatetimeMessage(timezone)];
-
-  // Add context as a system message if available
-  if (context && context.trim()) {
-    messages.push({
-      role: 'system',
-      content: `Here is the user's relevant context:\n\n${context}\n\nStats:\n${JSON.stringify(stats, null, 2)}`,
-    });
-  }
-
-  // Add conversation history (last 10 messages)
-  const recentHistory = history.slice(-10);
-  for (const msg of recentHistory) {
-    messages.push({
-      role: msg.role,
-      content: msg.content,
-    });
-  }
-
-  // Add current query
+  const messages = baseMessages({ context, stats, history, timezone });
   messages.push({ role: 'user', content: userQuery });
 
   const completion = await createCompletion({
@@ -190,20 +284,7 @@ async function generateResponse({ userQuery, context, stats, history = [], timez
 }
 
 async function* generateResponseStream({ userQuery, context, stats, history = [], timezone }) {
-  const messages = [{ role: 'system', content: SYSTEM_PROMPT }, buildDatetimeMessage(timezone)];
-
-  if (context && context.trim()) {
-    messages.push({
-      role: 'system',
-      content: `Here is the user's relevant context:\n\n${context}\n\nStats:\n${JSON.stringify(stats, null, 2)}`,
-    });
-  }
-
-  const recentHistory = history.slice(-10);
-  for (const msg of recentHistory) {
-    messages.push({ role: msg.role, content: msg.content });
-  }
-
+  const messages = baseMessages({ context, stats, history, timezone });
   messages.push({ role: 'user', content: userQuery });
 
   const stream = await createCompletion({
@@ -222,108 +303,91 @@ async function* generateResponseStream({ userQuery, context, stats, history = []
   }
 }
 
+/** Runs one tool call and returns the `tool` message for it, never throwing. */
+async function runToolCall(toolCall, userId, toolsUsed, toolResults) {
+  const fnName = toolCall.function.name;
+  toolsUsed.push(fnName);
+
+  let args;
+  try {
+    args = JSON.parse(toolCall.function.arguments || '{}');
+  } catch (err) {
+    args = {};
+  }
+
+  const handler = toolHandlers[fnName];
+  let result;
+  if (!handler) {
+    result = { error: `Unknown tool: ${fnName}` };
+  } else {
+    try {
+      result = await handler({ userId, ...args });
+    } catch (err) {
+      // The model reads this and may repeat it to the user, so it only ever sees a safe,
+      // generic reason; the real one is logged here.
+      console.error(`[llmService] Tool "${fnName}" failed:`, err.message);
+      result = { error: `The ${fnName} action couldn't be completed right now. Let the user know and suggest trying again shortly — don't repeat this raw message.` };
+    }
+  }
+
+  if (result && !result.error) {
+    toolResults.push({ name: fnName, args, result });
+  }
+
+  return { role: 'tool', tool_call_id: toolCall.id, content: JSON.stringify(result) };
+}
+
 // Agentic variant (Phase 11.5) — same context/history assembly as generateResponse, plus
-// Groq's function-calling tools. `userId` isn't part of the LLM conversation at all; it's
-// threaded through purely so each executed tool call knows whose data to touch, since
-// toolHandlers.* all take { userId, ...args }.
+// Groq's function-calling tools, limited to the groups this turn needs (selectTools).
+// `userId` isn't part of the LLM conversation; it's threaded through so each executed tool
+// call knows whose data to touch, since toolHandlers.* all take { userId, ...args }.
 async function generateWithTools({ userId, userQuery, context, stats, history = [], timezone }) {
-  const messages = [
-    { role: 'system', content: SYSTEM_PROMPT },
-    { role: 'system', content: TOOLS_SAFETY_NOTE },
-    buildDatetimeMessage(timezone),
-  ];
-
-  if (context && context.trim()) {
-    messages.push({
-      role: 'system',
-      content: `Here is the user's relevant context:\n\n${context}\n\nStats:\n${JSON.stringify(stats, null, 2)}`,
-    });
-  }
-
-  const recentHistory = history.slice(-10);
-  for (const msg of recentHistory) {
-    messages.push({ role: msg.role, content: msg.content });
-  }
-
+  const selection = selectTools(userQuery, history);
+  const messages = baseMessages({ context, stats, history, timezone, extraSystem: selection.note });
   messages.push({ role: 'user', content: userQuery });
 
   const toolsUsed = [];
-  // One entry per executed tool call that didn't error — chat.js turns these into the
-  // chat UI's "action" chips (a short summary + a button to the relevant screen), using
-  // each handler's own existing `result.message` rather than re-deriving one here.
+  // One entry per executed tool call that didn't error — chat.js turns these into the chat
+  // UI's "action" chips, using each handler's own `result.message`.
   const toolResults = [];
-  let rounds = 0;
+  const usage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+  const addUsage = (u) => {
+    if (!u) return;
+    usage.prompt_tokens += u.prompt_tokens || 0;
+    usage.completion_tokens += u.completion_tokens || 0;
+    usage.total_tokens += u.total_tokens || 0;
+  };
 
-  // Capped at 3 rounds of tool calls — a well-behaved conversation resolves in 1 (call a
-  // tool, get a result, answer), so 3 is headroom for a multi-step request, not a budget
-  // meant to be exhausted; if it is, something's looping and the fallback message below fires.
-  while (rounds < 3) {
+  // Capped at 3 rounds — a normal conversation resolves in 1 (call a tool, get a result,
+  // answer); if all 3 are used something is looping and the fallback message below fires.
+  for (let round = 0; round < 3; round += 1) {
     const response = await createCompletion({
       model: MODEL,
       messages,
-      tools,
+      tools: selection.tools,
       tool_choice: 'auto',
       temperature: 0.7,
       max_tokens: 500,
     });
+    addUsage(response.usage);
 
     const message = response.choices[0]?.message;
     if (!message) {
-      return { content: '', usage: response.usage, toolsUsed, toolResults };
+      return { content: '', usage, toolsUsed, toolResults, toolGroups: selection.groups };
     }
 
     messages.push(message);
 
     if (!message.tool_calls || message.tool_calls.length === 0) {
-      return { content: message.content || '', usage: response.usage, toolsUsed, toolResults };
+      return { content: message.content || '', usage, toolsUsed, toolResults, toolGroups: selection.groups };
     }
 
-    for (const toolCall of message.tool_calls) {
-      const fnName = toolCall.function.name;
-      toolsUsed.push(fnName);
-
-      let args;
-      try {
-        args = JSON.parse(toolCall.function.arguments);
-      } catch (err) {
-        args = {};
-      }
-
-      const handler = toolHandlers[fnName];
-      let result;
-      if (!handler) {
-        result = { error: `Unknown tool: ${fnName}` };
-      } else {
-        try {
-          result = await handler({ userId, ...args });
-        } catch (err) {
-          // err.message here used to go straight into the 'tool' message below — which the
-          // model reads and will happily narrate back to the user verbatim in its reply. For
-          // most handler failures that's just an unhelpful Supabase/validation message, but a
-          // Groq-side failure inside a tool's own logic (rare, but tools.js's weather fetch
-          // and a couple others call out) could leak the exact raw "rate limit"/"tokens"
-          // wording this function's own retry logic exists to keep away from the user. Log
-          // the real reason server-side; the model only ever sees a safe, generic one.
-          console.error(`[llmService] Tool "${fnName}" failed:`, err.message);
-          result = { error: `The ${fnName} action couldn't be completed right now. Let the user know and suggest trying again shortly — don't repeat this raw message.` };
-        }
-      }
-
-      if (result && !result.error) {
-        toolResults.push({ name: fnName, args, result });
-      }
-
-      messages.push({
-        role: 'tool',
-        tool_call_id: toolCall.id,
-        content: JSON.stringify(result),
-      });
-    }
-
-    rounds += 1;
+    // Independent tool calls in one turn run in parallel rather than one after another.
+    const toolMessages = await Promise.all(message.tool_calls.map((call) => runToolCall(call, userId, toolsUsed, toolResults)));
+    messages.push(...toolMessages);
   }
 
-  return { content: "Something went wrong. Please try again.", usage: null, toolsUsed, toolResults };
+  return { content: 'Something went wrong. Please try again.', usage, toolsUsed, toolResults, toolGroups: selection.groups };
 }
 
 const VALID_INSIGHT_TYPES = ['priority', 'balance', 'improvement', 'celebration'];
@@ -359,7 +423,7 @@ async function generateInsightSuggestions({ stats }) {
     model: MODEL,
     messages: [
       { role: 'system', content: INSIGHTS_SYSTEM_PROMPT },
-      { role: 'user', content: `Here are the user's real stats:\n${JSON.stringify(stats, null, 2)}` },
+      { role: 'user', content: `Here are the user's real stats:\n${JSON.stringify(stats)}` },
     ],
     temperature: 0.5,
     max_tokens: 500,
@@ -388,6 +452,7 @@ async function generateInsightSuggestions({ stats }) {
 }
 
 module.exports = {
+  selectTools,
   generateResponse,
   generateResponseStream,
   generateWithTools,

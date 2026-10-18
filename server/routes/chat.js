@@ -81,6 +81,34 @@ function buildChatActions(toolResults) {
 // while keeping worst-case prompt size predictable.
 const MAX_MESSAGE_LENGTH = 2000;
 
+// Semantic search over the user's own records only helps for messages with some substance.
+// "yes", "ok thanks", "the first one" — confirmations and short follow-ups — get nothing
+// useful from it, so they skip the embedding + vector search entirely.
+const MIN_WORDS_FOR_RAG = 3;
+// Upper bound on how long a reply waits for that search. The local embedding model takes a
+// few seconds to load on a cold serverless instance; rather than make the user wait for it,
+// the reply goes ahead without the extra context (stats are still included) while the model
+// keeps loading in the background for the next message.
+const RAG_TIMEOUT_MS = 2500;
+
+function retrieveContextFast(userId, message) {
+  if (message.trim().split(/\s+/).length < MIN_WORDS_FOR_RAG) return Promise.resolve([]);
+  const search = retrieveRelevantContext(userId, message, { limit: 5, threshold: 0.2 }).catch((err) => {
+    console.error('[chat] context retrieval failed:', err.message);
+    return [];
+  });
+  const timeout = new Promise((resolve) => {
+    setTimeout(() => resolve(null), RAG_TIMEOUT_MS);
+  });
+  return Promise.race([search, timeout]).then((result) => {
+    if (result === null) {
+      console.log(`[chat] context retrieval exceeded ${RAG_TIMEOUT_MS}ms — answering without it`);
+      return [];
+    }
+    return result;
+  });
+}
+
 // POST /api/chat — non-streaming response
 router.post('/', async (req, res) => {
   try {
@@ -96,11 +124,14 @@ router.post('/', async (req, res) => {
 
     console.log(`[chat] user ${req.user.id.slice(0, 8)}: "${message.slice(0, 50)}..."`);
 
-    // Retrieve context (Phase 11.3)
+    // Retrieve context (Phase 11.3) — the vector search is skipped for short messages and
+    // time-boxed otherwise (see retrieveContextFast); stats always run in parallel with it.
+    const retrievalStart = Date.now();
     const [context, stats] = await Promise.all([
-      retrieveRelevantContext(req.user.id, message, { limit: 5, threshold: 0.2 }),
+      retrieveContextFast(req.user.id, message),
       retrieveStats(req.user.id, { days: 7 }),
     ]);
+    const retrievalMs = Date.now() - retrievalStart;
 
     // buildContextString (ragService.js, Phase 11.3) — not the raw `[TYPE]\ncontent` dump,
     // it groups by source_type into readable sections (dates formatted, durations converted
@@ -122,7 +153,7 @@ router.post('/', async (req, res) => {
     const duration = Date.now() - startTime;
 
     console.log(
-      `[chat] response in ${duration}ms, tokens: ${response.usage?.total_tokens}, tools: ${response.toolsUsed.join(', ') || 'none'}`,
+      `[chat] retrieval ${retrievalMs}ms, llm ${duration}ms, tokens: ${response.usage?.total_tokens}, tool groups: ${(response.toolGroups || []).join(',')}, tools used: ${response.toolsUsed.join(', ') || 'none'}`,
     );
 
     res.json({
@@ -159,9 +190,9 @@ router.post('/stream', async (req, res) => {
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
 
-    // Retrieve context
+    // Retrieve context (skipped for short messages, time-boxed otherwise)
     const [context, stats] = await Promise.all([
-      retrieveRelevantContext(req.user.id, message, { limit: 5, threshold: 0.2 }),
+      retrieveContextFast(req.user.id, message),
       retrieveStats(req.user.id, { days: 7 }),
     ]);
 

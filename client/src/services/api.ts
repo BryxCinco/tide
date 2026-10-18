@@ -1,13 +1,19 @@
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 
 import { showToast } from '../store/toastStore';
 import { storage } from '../utils/storage';
 
 export const AUTH_TOKEN_KEY = 'tide_auth_token';
 export const AUTH_USER_KEY = 'tide_auth_user';
+/** Supabase refresh token for email/password sessions — see refreshAccessToken below. Google
+ * sessions don't use it: supabase-js refreshes those itself (googleAuth.service.ts), and two
+ * parties rotating the same refresh token would revoke the session. */
+export const AUTH_REFRESH_KEY = 'tide_refresh_token';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
 
 export const api = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000',
+  baseURL: API_BASE_URL,
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -16,7 +22,7 @@ type TokenGetter = () => string | null;
 let getInMemoryToken: TokenGetter = () => null;
 
 // The only two endpoints that are ever legitimately called with no token yet.
-const PUBLIC_AUTH_PATHS = ['/api/auth/login', '/api/auth/signup'];
+const PUBLIC_AUTH_PATHS = ['/api/auth/login', '/api/auth/signup', '/api/auth/refresh'];
 
 function isPublicAuthRequest(url?: string): boolean {
   if (!url) return false;
@@ -76,6 +82,60 @@ export function onUnauthorized(listener: UnauthorizedListener): void {
   unauthorizedListener = listener;
 }
 
+type TokenRefreshedListener = (accessToken: string) => void;
+let tokenRefreshedListener: TokenRefreshedListener | null = null;
+
+/** authStore registers itself here so a refreshed token also lands in its in-memory state
+ * (the request interceptor reads that first). Listener, not import — same reason as
+ * onUnauthorized below. */
+export function onTokenRefreshed(listener: TokenRefreshedListener): void {
+  tokenRefreshedListener = listener;
+}
+
+let refreshInFlight: Promise<string | null> | null = null;
+
+/**
+ * Trades the stored refresh token for a new session via POST /api/auth/refresh and stores
+ * the new pair. Single-flight: when several requests 401 at once (a screen firing 4 fetches
+ * after the token expired), they all await the same refresh instead of each spending — and
+ * rotating away — the refresh token. Resolves to the new access token, or null when there's
+ * no refresh token or the refresh itself was rejected (a genuine sign-out case).
+ */
+export function refreshAccessToken(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    try {
+      const refreshToken = await storage.getItem(AUTH_REFRESH_KEY);
+      if (!refreshToken) return null;
+
+      // Plain axios, not `api` — this must not go through the interceptors it's called from.
+      const { data } = await axios.post<{ session?: { access_token: string; refresh_token?: string } }>(
+        `${API_BASE_URL}/api/auth/refresh`,
+        { refresh_token: refreshToken },
+        { timeout: 15000, headers: { 'Content-Type': 'application/json' } },
+      );
+      const session = data?.session;
+      if (!session?.access_token) return null;
+
+      await storage.setItem(AUTH_TOKEN_KEY, session.access_token);
+      if (session.refresh_token) await storage.setItem(AUTH_REFRESH_KEY, session.refresh_token);
+      tokenRefreshedListener?.(session.access_token);
+      console.log('[api] Access token refreshed.');
+      return session.access_token;
+    } catch (err) {
+      console.log('[api] Token refresh failed:', err);
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
+
+type RetriableConfig = InternalAxiosRequestConfig & { _retriedAfterRefresh?: boolean };
+
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError | SkippedRequestError) => {
@@ -97,10 +157,23 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      // A real "Invalid or expired token" — the session itself is no good, so clear it and
-      // sign the user out.
+      // An expired access token: refresh once and replay the original request, so the user
+      // never notices the hourly expiry (this used to sign everyone out after ~1 hour).
+      const original = error.config as RetriableConfig | undefined;
+      if (original && !original._retriedAfterRefresh && !isPublicAuthRequest(original.url)) {
+        original._retriedAfterRefresh = true;
+        const freshToken = await refreshAccessToken();
+        if (freshToken) {
+          original.headers.Authorization = `Bearer ${freshToken}`;
+          return api(original);
+        }
+      }
+
+      // The refresh failed too (or there was nothing to refresh with) — the session really is
+      // over, so clear it and sign the user out.
       await storage.removeItem(AUTH_TOKEN_KEY);
       await storage.removeItem(AUTH_USER_KEY);
+      await storage.removeItem(AUTH_REFRESH_KEY);
       unauthorizedListener?.();
     } else if (!error.response && error.code !== 'ECONNABORTED') {
       // No response at all means the request never reached the server (offline, DNS, server

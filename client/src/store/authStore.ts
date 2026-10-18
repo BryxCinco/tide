@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import { AUTH_TOKEN_KEY, AUTH_USER_KEY, getApiErrorMessage, onUnauthorized, registerTokenGetter } from '../services/api';
+import { AUTH_REFRESH_KEY, AUTH_TOKEN_KEY, AUTH_USER_KEY, getApiErrorMessage, onTokenRefreshed, onUnauthorized, registerTokenGetter } from '../services/api';
 import { authService, mapProfileToUser } from '../services/auth.service';
 import {
   hasOnlyGoogleIdentity,
@@ -109,6 +109,13 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Stores (or, when the session didn't include one, clears) the email/password refresh
+ * token — see AUTH_REFRESH_KEY in api.ts. */
+async function storeRefreshToken(refreshToken: string | undefined): Promise<void> {
+  if (refreshToken) await storage.setItem(AUTH_REFRESH_KEY, refreshToken);
+  else await storage.removeItem(AUTH_REFRESH_KEY);
+}
+
 async function persistSession(user: User, token: string): Promise<void> {
   await storage.setItem(TOKEN_KEY, token);
   await storage.setItem(USER_KEY, JSON.stringify(user));
@@ -139,8 +146,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       }
 
       // Persisted before the /me call below so the request interceptor (which reads the
-      // token from storage, not from this store) attaches the fresh token to it.
+      // token from storage, not from this store) attaches the fresh token to it. The refresh
+      // token is what lets api.ts renew the session when the access token expires (~1 hour).
       await storage.setItem(TOKEN_KEY, session.access_token);
+      await storeRefreshToken(session.refresh_token);
       const { profile } = await authService.me();
       const user = mapProfileToUser(profile);
       await storage.setItem(USER_KEY, JSON.stringify(user));
@@ -169,6 +178,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       }
 
       await storage.setItem(TOKEN_KEY, session.access_token);
+      await storeRefreshToken(session.refresh_token);
       const { profile } = await authService.me();
       const user = mapProfileToUser(profile);
       await storage.setItem(USER_KEY, JSON.stringify(user));
@@ -223,6 +233,9 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       // token from storage, not from this store) attaches the fresh token to it — same
       // ordering login() uses above.
       await storage.setItem(TOKEN_KEY, tokens.accessToken);
+      // supabase-js owns refreshing Google sessions (onGoogleTokenRefresh below); a leftover
+      // email/password refresh token must not be used against this session.
+      await storage.removeItem(AUTH_REFRESH_KEY);
       console.log('[OAuth Debug] token persisted to storage, calling /api/auth/me...');
       const { profile } = await authService.me();
       console.log('[OAuth Debug] /api/auth/me succeeded:', profile);
@@ -337,6 +350,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
     await storage.removeItem(TOKEN_KEY);
     await storage.removeItem(USER_KEY);
+    await storage.removeItem(AUTH_REFRESH_KEY);
     if (wasGuest) {
       await guestStorage.clearGuestData();
     }
@@ -453,6 +467,13 @@ onGoogleTokenRefresh((accessToken) => {
   }
   console.log('[OAuth Debug] authStore: persisting refreshed token from Supabase.');
   storage.setItem(TOKEN_KEY, accessToken);
+  useAuthStore.setState({ token: accessToken });
+});
+
+// api.ts refreshed an expired email/password session — adopt the new access token so the
+// request interceptor (which reads this store first) uses it from now on.
+onTokenRefreshed((accessToken) => {
+  if (!useAuthStore.getState().isAuthenticated) return;
   useAuthStore.setState({ token: accessToken });
 });
 

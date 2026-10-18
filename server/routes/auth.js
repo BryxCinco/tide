@@ -91,6 +91,28 @@ router.post('/login', async (req, res) => {
   });
 });
 
+// POST /api/auth/refresh — trades a refresh token for a new session. Supabase access tokens
+// expire after about an hour; without this, an email/password user's every request (the AI
+// Coach included) started failing with "Invalid or expired token" an hour after signing in
+// and the app logged them out. The client calls this once when a request comes back 401,
+// then retries the request with the new access token. Public (no requireAuth): the access
+// token is the thing that has expired — the refresh token itself is the credential here.
+router.post('/refresh', async (req, res) => {
+  const { refresh_token: refreshToken } = req.body || {};
+
+  if (!refreshToken || typeof refreshToken !== 'string') {
+    return res.status(400).json({ error: 'refresh_token is required' });
+  }
+
+  const { data, error } = await supabaseAuth.auth.refreshSession({ refresh_token: refreshToken });
+
+  if (error || !data?.session) {
+    return res.status(401).json({ error: 'Session expired. Please sign in again.', code: 'refresh_failed' });
+  }
+
+  res.json({ session: data.session });
+});
+
 // PATCH /api/auth/password — changes the signed-in user's password. Verifies currentPassword
 // via signInWithPassword (same call login uses) before applying the change via the admin API,
 // so a left-open session alone isn't enough to lock the real owner out. For a Google-only

@@ -25,8 +25,12 @@ export interface InsightSuggestion {
   type: InsightSuggestionType;
 }
 
+// The server only ever uses the last few turns (see llmService.js's recentHistory) — sending
+// the whole persisted conversation just made every request bigger and slower to upload.
+const HISTORY_SENT = 8;
+
 function toApiHistory(history: ChatMessage[]) {
-  return history.map((m) => ({ role: m.role, content: m.content }));
+  return history.slice(-HISTORY_SENT).map((m) => ({ role: m.role, content: m.content }));
 }
 
 // api.ts's shared 15s default is tuned for ordinary CRUD calls — too tight for an LLM round
