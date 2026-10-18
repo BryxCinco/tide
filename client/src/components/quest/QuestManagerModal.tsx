@@ -133,11 +133,16 @@ export function QuestManagerModal({ visible, onClose }: QuestManagerModalProps) 
             <Icon name="ChevronDown" size={16} />
           </Pressable>
 
-          <Pressable onPress={() => openEdit(quest)} hitSlop={6}>
-            <Icon name="Pencil" size={16} color={themeColors.text.muted} />
-          </Pressable>
+          {quest.isCompleted ? (
+            // Completed quests are locked — no edit, delete or pause (the server rejects them too).
+            <Icon name="Lock" size={15} color={themeColors.text.disabled} />
+          ) : (
+            <Pressable onPress={() => openEdit(quest)} hitSlop={6}>
+              <Icon name="Pencil" size={16} color={themeColors.text.muted} />
+            </Pressable>
+          )}
 
-          {quest.isCustom && (
+          {quest.isCustom && !quest.isCompleted && (
             <Pressable onPress={() => handleDelete(quest)} hitSlop={6}>
               <Icon name="Trash2" size={16} color={themeColors.status.error} />
             </Pressable>
@@ -145,8 +150,9 @@ export function QuestManagerModal({ visible, onClose }: QuestManagerModalProps) 
 
           <Pressable
             onPress={() => updateQuest(quest.id, { isActive: !quest.isActive })}
+            disabled={quest.isCompleted}
             hitSlop={6}
-            className={cn('ml-1 h-6 w-11 justify-center rounded-full px-0.5', quest.isActive ? 'bg-tide-teal' : 'bg-hover')}
+            className={cn('ml-1 h-6 w-11 justify-center rounded-full px-0.5', quest.isActive ? 'bg-tide-teal' : 'bg-hover', quest.isCompleted && 'opacity-40')}
           >
             <View className={cn('h-5 w-5 rounded-full bg-base', quest.isActive ? 'self-end' : 'self-start')} />
           </Pressable>

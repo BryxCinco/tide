@@ -145,6 +145,21 @@ async function generateDailyQuestsForUser(userId, dateKey) {
   const usedTitles = new Set();
   const picks = [];
 
+  // Completed generated quests for this day stay (they're locked and already paid out XP);
+  // only the remaining slots are refilled.
+  const { data: keptRows, error: keptError } = await supabaseAdmin
+    .from('quests')
+    .select('title')
+    .eq('user_id', userId)
+    .eq('date', dateKey)
+    .eq('is_custom', false)
+    .eq('is_completed', true);
+  if (keptError) throw new Error(keptError.message);
+  const kept = keptRows || [];
+  for (const q of kept) usedTitles.add(q.title);
+  const slots = Math.max(0, 5 - kept.length);
+  if (slots === 0) return [];
+
   const weakCategory = weakestMeasurableCategory(signals);
   const weakTemplate = pickTemplate(weakCategory, usedTitles);
   picks.push({ ...weakTemplate, category: weakCategory, reason: weaknessReason(weakCategory, signals) });
@@ -179,7 +194,7 @@ async function generateDailyQuestsForUser(userId, dateKey) {
     usedTitles.add(template.title);
   }
 
-  const rows = picks.slice(0, 5).map((pick) => ({
+  const rows = picks.filter((pick) => !kept.some((q) => q.title === pick.title)).slice(0, slots).map((pick) => ({
     user_id: userId,
     title: pick.title,
     description: pick.description,
@@ -205,6 +220,7 @@ async function generateDailyQuestsForUser(userId, dateKey) {
     .eq('user_id', userId)
     .eq('date', dateKey)
     .eq('is_custom', false)
+    .eq('is_completed', false)
     .not('id', 'in', `(${newIds.join(',')})`);
   // Non-fatal: the user now has today's new quests either way, just possibly alongside a
   // stale duplicate batch instead of a clean swap — logged for follow-up, not worth failing

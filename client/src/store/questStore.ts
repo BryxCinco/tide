@@ -158,9 +158,10 @@ export const useQuestStore = create<QuestState>()(
       toggleQuest: (id) => {
         const previous = get().todayQuests;
         const quest = previous.find((q) => q.id === id);
-        if (!quest) return;
+        // Completed quests are locked — only ever not-done -> done.
+        if (!quest || quest.isCompleted) return;
 
-        const isCompleted = !quest.isCompleted;
+        const isCompleted = true;
         set((state) => ({
           todayQuests: state.todayQuests.map((q) =>
             q.id === id ? { ...q, isCompleted, completedAt: isCompleted ? new Date().toISOString() : undefined } : q,

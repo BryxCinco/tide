@@ -167,6 +167,20 @@ router.post('/', async (req, res) => {
 // (title/description/icon/category/xp/recurring/active), since both are just partial
 // updates to the same row. Only fields actually present in the body are touched.
 router.patch('/:id', async (req, res) => {
+  // A completed quest is locked: its XP is already awarded, and un-checking it would let it
+  // be completed (and awarded) again. Nothing about it can change after that.
+  const { data: current, error: currentError } = await supabaseAdmin
+    .from('quests')
+    .select('is_completed')
+    .eq('id', req.params.id)
+    .eq('user_id', req.user.id)
+    .maybeSingle();
+  if (currentError) return res.status(500).json({ error: currentError.message });
+  if (!current) return res.status(404).json({ error: 'Quest not found' });
+  if (current.is_completed) {
+    return res.status(409).json({ error: 'This quest is already completed and can no longer be changed.', code: 'quest_locked' });
+  }
+
   const update = {};
   let togglingCompletion = false;
 
@@ -189,10 +203,7 @@ router.patch('/:id', async (req, res) => {
     update.is_completed = Boolean(req.body.is_completed);
     update.completed_at = update.is_completed ? new Date().toISOString() : null;
 
-    // Fetched up front so completion XP only fires on the not-completed -> completed
-    // transition, not on every resend of is_completed: true for an already-completed quest.
-    const { data: existing } = await supabaseAdmin.from('quests').select('is_completed').eq('id', req.params.id).eq('user_id', req.user.id).single();
-    wasCompleted = Boolean(existing?.is_completed);
+    wasCompleted = false; // a completed quest never reaches this point (see the lock above)
   }
 
   const { data: quest, error } = await supabaseAdmin
@@ -249,13 +260,14 @@ router.patch('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   const { data: quest, error: fetchError } = await supabaseAdmin
     .from('quests')
-    .select('is_custom')
+    .select('is_custom, is_completed')
     .eq('id', req.params.id)
     .eq('user_id', req.user.id)
     .single();
 
   if (fetchError || !quest) return res.status(404).json({ error: 'Quest not found' });
   if (!quest.is_custom) return res.status(403).json({ error: 'Only custom quests can be deleted — pause it instead' });
+  if (quest.is_completed) return res.status(409).json({ error: 'This quest is already completed and can no longer be changed.', code: 'quest_locked' });
 
   const { error } = await supabaseAdmin.from('quests').delete().eq('id', req.params.id).eq('user_id', req.user.id);
 

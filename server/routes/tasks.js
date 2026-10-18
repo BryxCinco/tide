@@ -4,6 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 const { upsertEmbedding, deleteEmbedding, buildTaskContent } = require('../lib/embeddingPipeline');
 const { awardXp } = require('../lib/xpService');
 const { bumpDailyStreak, requestTimezone } = require('../lib/dailyStreak');
+const { claimTaskXp } = require('../lib/taskXp');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -60,7 +61,7 @@ router.patch('/:id', async (req, res) => {
   // Fetched up front so completion XP only fires on the todo/in-progress -> done
   // transition, not on every subsequent edit of an already-done task (which would otherwise
   // resend status: 'done' and double-award).
-  const { data: existing } = await supabaseAdmin.from('tasks').select('status').eq('id', req.params.id).eq('user_id', req.user.id).single();
+  const { data: existing } = await supabaseAdmin.from('tasks').select('*').eq('id', req.params.id).eq('user_id', req.user.id).single();
 
   const update = { title, description, status, priority, activity_type, due_date, tags };
   // completed_at follows status unless the caller passes it explicitly.
@@ -94,10 +95,12 @@ router.patch('/:id', async (req, res) => {
   let xp = null;
   let taskStreak = null;
   if (existing && existing.status !== 'done' && data.status === 'done') {
-    xp = await awardXp(req.user.id, TASK_COMPLETE_XP[data.priority] || TASK_COMPLETE_XP.medium, 'task completed').catch((err) => {
-      console.error('[tasks] XP award failed:', err.message);
-      return null;
-    });
+    if (await claimTaskXp(existing)) {
+      xp = await awardXp(req.user.id, TASK_COMPLETE_XP[data.priority] || TASK_COMPLETE_XP.medium, 'task completed').catch((err) => {
+        console.error('[tasks] XP award failed:', err.message);
+        return null;
+      });
+    }
     taskStreak = await bumpDailyStreak(req.user.id, requestTimezone(req));
   }
 

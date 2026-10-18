@@ -11,6 +11,7 @@ const { awardXp, xpForLevel } = require('./xpService');
 const { isActivityScheduledToday } = require('./activityRecurrence');
 const { computeQuestXp, questTierMeta } = require('./questXp');
 const { bumpDailyStreak } = require('./dailyStreak');
+const { claimTaskXp } = require('./taskXp');
 const { generateDailyQuestsForUser, getQuestStreakInfo, gatherSignals, weakestMeasurableCategory, weaknessReason, pickTemplate, STRETCH_TEMPLATES } = require('./questGenerator');
 
 const TASK_COMPLETE_XP = { low: 10, medium: 20, high: 30, critical: 50 };
@@ -546,9 +547,9 @@ toolHandlers.completeTask = async ({ userId, timezone, taskTitle }) => {
   if (error) throw new Error(error.message);
 
   embedTaskInBackground(userId, data);
-  // findTaskByTitle's onlyOpen:true guarantees this was a not-done -> done transition, so
-  // no extra guard is needed here (unlike updateTask below).
-  await awardXp(userId, TASK_COMPLETE_XP[data.priority] || TASK_COMPLETE_XP.medium, 'task completed via AI').catch((err) =>
+  // findTaskByTitle's onlyOpen:true guarantees a not-done -> done transition; claimTaskXp
+  // still skips XP for a task that was completed (and paid) once before.
+  if (await claimTaskXp(match)) await awardXp(userId, TASK_COMPLETE_XP[data.priority] || TASK_COMPLETE_XP.medium, 'task completed via AI').catch((err) =>
     console.error('[tools] completeTask XP award failed:', err.message),
   );
   await bumpDailyStreak(userId, timezone);
@@ -611,7 +612,7 @@ toolHandlers.updateTask = async ({ userId, timezone, taskTitle, updates = {} }) 
   // match (fetched before the patch) carries the pre-update status — only award XP on the
   // not-done -> done transition, not on every edit of an already-done task.
   if (patch.status === 'done' && match.status !== 'done') {
-    await awardXp(userId, TASK_COMPLETE_XP[data.priority] || TASK_COMPLETE_XP.medium, 'task completed via AI').catch((err) =>
+    if (await claimTaskXp(match)) await awardXp(userId, TASK_COMPLETE_XP[data.priority] || TASK_COMPLETE_XP.medium, 'task completed via AI').catch((err) =>
       console.error('[tools] updateTask XP award failed:', err.message),
     );
     await bumpDailyStreak(userId, timezone);

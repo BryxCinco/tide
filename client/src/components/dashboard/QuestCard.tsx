@@ -17,11 +17,14 @@ function QuestRow({ quest, onToggle, onEdit, onDelete }: { quest: Quest; onToggl
   const color = QUEST_CATEGORY_COLOR[quest.category];
   const tierMeta = QUEST_TIER_META[quest.tier];
 
+  // A completed quest is locked (its XP is paid out) — it can't be un-checked, edited or
+  // deleted; the server enforces the same.
+  const locked = quest.isCompleted;
+
   const handleToggle = () => {
-    if (!quest.isCompleted) {
-      soundManager.play('success');
-      checkScale.value = withSequence(withTiming(1.3, { duration: 120 }), withTiming(1, { duration: 150 }));
-    }
+    if (locked) return;
+    soundManager.play('success');
+    checkScale.value = withSequence(withTiming(1.3, { duration: 120 }), withTiming(1, { duration: 150 }));
     onToggle();
   };
 
@@ -29,7 +32,13 @@ function QuestRow({ quest, onToggle, onEdit, onDelete }: { quest: Quest; onToggl
 
   return (
     <View className="flex-row items-center gap-1.5 rounded-xl px-1 py-1 hover:bg-elevated">
-      <Pressable onPress={handleToggle} className="flex-1 flex-row items-center gap-3 rounded-xl px-1 py-1.5">
+      <Pressable
+        onPress={handleToggle}
+        disabled={locked}
+        accessibilityState={{ checked: quest.isCompleted, disabled: locked }}
+        accessibilityHint={locked ? 'Completed quests are locked' : undefined}
+        className="flex-1 flex-row items-center gap-3 rounded-xl px-1 py-1.5"
+      >
         <View className="h-9 w-9 items-center justify-center rounded-full" style={{ backgroundColor: hexToRgba(color, 0.12) }}>
           <Icon name={quest.icon as IconName} size={17} color={color} />
         </View>
@@ -60,11 +69,17 @@ function QuestRow({ quest, onToggle, onEdit, onDelete }: { quest: Quest; onToggl
         </Animated.View>
       </Pressable>
 
-      <Pressable onPress={onEdit} hitSlop={4} className="h-10 w-10 items-center justify-center">
-        <Icon name="Pencil" size={14} color={hexToRgba(color, 0.6)} />
-      </Pressable>
+      {locked ? (
+        <View className="h-10 w-10 items-center justify-center" accessibilityLabel="Completed — locked">
+          <Icon name="Lock" size={13} color={hexToRgba(color, 0.45)} />
+        </View>
+      ) : (
+        <Pressable onPress={onEdit} hitSlop={4} className="h-10 w-10 items-center justify-center">
+          <Icon name="Pencil" size={14} color={hexToRgba(color, 0.6)} />
+        </Pressable>
+      )}
 
-      {quest.isCustom && (
+      {quest.isCustom && !locked && (
         <Pressable onPress={onDelete} hitSlop={4} className="h-10 w-10 items-center justify-center">
           <Icon name="Trash2" size={14} color="#EF4444" />
         </Pressable>
