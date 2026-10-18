@@ -44,6 +44,9 @@ const TRANSIENT_STATUS = new Set([500, 502, 503]);
 // A 429 whose retry-after is at most this long is worth one short wait on the same model;
 // anything longer goes straight to the fallback model.
 const MAX_INLINE_WAIT_MS = 2500;
+// When the fallback is rate-limited too, a wait up to this long is still better than an
+// error message (the API function is allowed 60s; the app waits up to 60s).
+const MAX_BOTH_LIMITED_WAIT_MS = 10000;
 
 function retryAfterMs(err) {
   const raw = err?.headers?.get ? err.headers.get('retry-after') : err?.headers?.['retry-after'];
@@ -102,7 +105,17 @@ async function createCompletion(params) {
 
     if (primary === FALLBACK_MODEL) throw err;
     console.log(`[llmService] ${primary} unavailable (${err?.status}), using fallback ${FALLBACK_MODEL}`);
-    return callOnce(params, FALLBACK_MODEL);
+    try {
+      return await callOnce(params, FALLBACK_MODEL);
+    } catch (fallbackErr) {
+      // Both models' per-minute budgets are spent (seen under back-to-back use). If the
+      // fallback frees up within a few seconds, wait once rather than show an error.
+      const wait = fallbackErr?.status === 429 ? retryAfterMs(fallbackErr) : null;
+      if (wait == null || wait > MAX_BOTH_LIMITED_WAIT_MS) throw fallbackErr;
+      console.log(`[llmService] both models rate-limited, waiting ${wait}ms for ${FALLBACK_MODEL}`);
+      await new Promise((r) => setTimeout(r, wait));
+      return callOnce(params, FALLBACK_MODEL);
+    }
   }
 }
 
@@ -164,15 +177,34 @@ const DEFAULT_TIMEZONE = 'Asia/Manila';
  * for whenever the request happens to land. */
 function buildDatetimeMessage(timezone) {
   const tz = timezone || DEFAULT_TIMEZONE;
-  const currentDateTime = new Date().toLocaleString('en-US', {
+  const now = new Date();
+  const currentDateTime = now.toLocaleString('en-US', {
     timeZone: tz,
     dateStyle: 'full',
     timeStyle: 'short',
   });
   return {
     role: 'system',
-    content: `The current date and time is: ${currentDateTime}. The user's timezone is: ${tz}.`,
+    content:
+      `The current date and time is: ${currentDateTime}. The user's timezone is: ${tz}.\n` +
+      `Use this calendar for "tomorrow", "on Friday", "next week" and similar — never count days yourself:\n` +
+      upcomingCalendar(now, tz),
   };
+}
+
+/** The next 8 days as "Mon 2026-10-19 (today)" lines in the user's timezone. Models are
+ * unreliable at weekday arithmetic ("on Friday" came back as a Wednesday's date in testing),
+ * so relative dates are looked up here instead of computed by the model. */
+function upcomingCalendar(now, tz) {
+  const lines = [];
+  for (let i = 0; i < 8; i += 1) {
+    const day = new Date(now.getTime() + i * 86400000);
+    const weekday = day.toLocaleDateString('en-US', { timeZone: tz, weekday: 'long' });
+    const iso = day.toLocaleDateString('en-CA', { timeZone: tz }); // YYYY-MM-DD
+    const tag = i === 0 ? ' (today)' : i === 1 ? ' (tomorrow)' : '';
+    lines.push(`${weekday} ${iso}${tag}`);
+  }
+  return lines.join('\n');
 }
 
 // Tool-use rules for generateWithTools. Only the parts relevant to the tools actually sent
