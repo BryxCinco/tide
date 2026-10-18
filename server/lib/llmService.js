@@ -206,7 +206,7 @@ const TOOLS_WEATHER_NOTE = `getWeather: ask which location if the user doesn't s
 const TOOL_GROUPS = {
   tasks: {
     tools: ['createTask', 'completeTask', 'listTasks', 'listMissedTasks', 'updateTask', 'deleteTask', 'rescheduleTask', 'suggestTasks'],
-    pattern: /\b(task|tasks|to-?do|todo|deadline|due|overdue|missed|remind|complete|completed|finish|finished|done|delete|remove|resched\w*|postpone|move|plan|planning|add|create|gawain|gagawin|tapos|tapusin|burahin|tanggalin|ilipat|idagdag|gumawa)\b/i,
+    pattern: /\b(task|tasks|to-?do|to do|todo|deadline|due|overdue|miss|missed|remind|complete|completed|finish|finished|done|delete|remove|resched\w*|postpone|move|plan|planning|add|create|priority|pending|work on|gawain|gagawin|gawin|kailangan|tapos|natapos|tinapos|tapusin|burahin|tanggalin|ilipat|idagdag|ilagay|listahan|gumawa|gawan|plano)\b/i,
   },
   journal: {
     tools: ['logMood', 'getMoodHistory', 'addJournalEntry', 'searchJournals', 'reflectOnJournal'],
@@ -214,7 +214,7 @@ const TOOL_GROUPS = {
   },
   stats: {
     tools: ['startTimer', 'getTodayStats', 'getWeeklySummary', 'getActivityStats', 'getStreakInfo', 'getLevelInfo', 'getLeaderboard', 'suggestActivity'],
-    pattern: /\b(week|weekly|today|focus|time|timer|session|sessions|stat|stats|progress|productiv\w*|streak|level|xp|leaderboard|rank\w*|activity|activities|summary|summari[sz]e|doing|how (am|was|did)|start|track\w*|kumusta|kamusta|oras|ngayon|linggo|simulan|sumulong)\b/i,
+    pattern: /\b(week|weekly|today|focus|time|timer|pomodoro|session|sessions|stat|stats|progress|productiv\w*|streak|level|xp|leaderboard|rank\w*|activity|activities|summary|summari[sz]e|doing|how (am|was|did)|start|track\w*|bored|what should i do|kumusta|kamusta|oras|ngayon|linggo|simulan|sumulong|nababagot|gawin)\b/i,
   },
   quests: {
     tools: ['suggestTideQuest', 'generateDailyQuests', 'getQuestStreak'],
@@ -222,24 +222,39 @@ const TOOL_GROUPS = {
   },
   weather: {
     tools: ['getWeather'],
-    pattern: /\b(weather|rain|raining|sunny|temperature|forecast|ulan|umuulan|panahon|mainit|malamig|bagyo)\b/i,
+    pattern: /\b(weather|rain|raining|sunny|temperature|forecast|ulan|uulan|umuulan|panahon|mainit|malamig|bagyo|init|lamig)\b/i,
   },
 };
 
-// Sent when nothing in the conversation points at a specific group — a small, cheap set
-// that still covers the most common "how am I doing / what's on my plate" questions.
-const DEFAULT_TOOL_NAMES = ['getTodayStats', 'getWeeklySummary', 'listTasks', 'createTask'];
+// Always sent, whatever the message says — the tools people reach for most (add/list/finish
+// a task, what's overdue, today's and this week's numbers, log a mood, "what should I do").
+// Keyword matching then adds the rest of whichever groups the conversation is about. This
+// keeps a request the keywords didn't anticipate ("I need to buy groceries later", "What did
+// I miss?") working, at ~1,300 tokens instead of the full ~3,500.
+const CORE_TOOL_NAMES = [
+  'createTask',
+  'listTasks',
+  'listMissedTasks',
+  'completeTask',
+  'updateTask',
+  'suggestTasks',
+  'getTodayStats',
+  'getWeeklySummary',
+  'suggestActivity',
+  'logMood',
+];
 
 /**
- * Picks the tool groups this turn plausibly needs from the new message plus the last two
- * history messages (so a bare "yes" answering "Delete 'X'?" still has deleteTask available,
- * and "the first one" answering a quest suggestion still has suggestTideQuest). Returns the
- * filtered tool schemas and the rule text for just those groups.
+ * Picks the tools this turn plausibly needs: the always-on core set, plus every group whose
+ * keywords appear in the new message or the last two history messages (so a bare "yes"
+ * answering "Delete 'X'?" still has deleteTask, and "the first one" answering a quest
+ * suggestion still has suggestTideQuest). Returns the tool schemas and the rule text for
+ * just those tools.
  */
 function selectTools(userQuery, history = []) {
   const recentText = [userQuery, ...history.slice(-2).map((m) => (typeof m.content === 'string' ? m.content : ''))].join('\n');
   const groups = Object.keys(TOOL_GROUPS).filter((name) => TOOL_GROUPS[name].pattern.test(recentText));
-  const names = new Set(groups.length > 0 ? groups.flatMap((g) => TOOL_GROUPS[g].tools) : DEFAULT_TOOL_NAMES);
+  const names = new Set([...CORE_TOOL_NAMES, ...groups.flatMap((g) => TOOL_GROUPS[g].tools)]);
   const selected = tools.filter((t) => names.has(t.function.name));
 
   const notes = [TOOLS_BASE_NOTE];
@@ -247,7 +262,7 @@ function selectTools(userQuery, history = []) {
   if (names.has('suggestTideQuest')) notes.push(TOOLS_QUEST_NOTE);
   if (names.has('getWeather')) notes.push(TOOLS_WEATHER_NOTE);
 
-  return { tools: selected, note: notes.join('\n\n'), groups: groups.length > 0 ? groups : ['default'] };
+  return { tools: selected, note: notes.join('\n\n'), groups: groups.length > 0 ? groups : ['core'] };
 }
 
 // History sent to the model: the last few turns, each clipped — long pasted messages or a
