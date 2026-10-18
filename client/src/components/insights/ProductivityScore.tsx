@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { Pressable } from '../ui/SoundPressable';
 
-import { useQuestStore } from '../../store/questStore';
 import type { ProductivityScoreBreakdown } from '../../types/insights';
 import { BentoRing, Text } from '../ui';
 import { useChartTheme } from './chartTheme';
@@ -22,19 +21,16 @@ function verdict(score: number): string {
 }
 
 /**
- * The score as an aurora gauge with a one-word verdict, then the three components that
- * feed it as labelled meters (each meter's track is a lighter step of its own fill). The
- * overall number is computed here from the weighted formula — focusTime*0.4 +
- * consistency*0.3 + taskCompletion*0.2 + today's quest completion*0.1 — so finishing daily
- * quests moves it. Hover (web) or tap reveals the per-component points.
+ * The score as an aurora gauge with a one-word verdict, then the four components that feed
+ * it as labelled meters (each meter's track is a lighter step of its own fill): focusTime*0.4
+ * + consistency*0.3 + taskCompletion*0.2 + questCompletion*0.1, all for the selected period
+ * (server-computed, see insightsService.js). Hover (web) or tap reveals the points.
  */
 export function ProductivityScore({ score }: ProductivityScoreProps) {
   const theme = useChartTheme();
-  const todayQuests = useQuestStore((s) => s.todayQuests);
   const [showBreakdown, setShowBreakdown] = useState(false);
 
-  const questsCompletedPercent =
-    todayQuests.length > 0 ? (todayQuests.filter((q) => q.isCompleted).length / todayQuests.length) * 100 : 0;
+  const questsCompletedPercent = score.questCompletion ?? 0;
 
   const focusPoints = score.focusTime * WEIGHTS.focusTime;
   const consistencyPoints = score.consistency * WEIGHTS.consistency;
@@ -46,6 +42,7 @@ export function ProductivityScore({ score }: ProductivityScoreProps) {
     { label: 'Focus time', value: score.focusTime, points: focusPoints, weight: '40%', color: '#14B8A6' },
     { label: 'Consistency', value: score.consistency, points: consistencyPoints, weight: '30%', color: '#6366F1' },
     { label: 'Task completion', value: score.taskCompletion, points: taskPoints, weight: '20%', color: '#0EA5E9' },
+    { label: 'Quests', value: questsCompletedPercent, points: questPoints, weight: '10%', color: '#8B5CF6' },
   ];
 
   return (
@@ -69,7 +66,7 @@ export function ProductivityScore({ score }: ProductivityScoreProps) {
             {verdict(overall)}
           </Text>
           <Text variant="body" color="muted" className="text-[12px] leading-[17px]">
-            Weighted from focus time, consistency, tasks and today&apos;s quests.
+            Weighted from focus time, consistency, tasks and quests.
           </Text>
           {questPoints >= 0.5 && (
             <View className="mt-1 self-start rounded-full bg-tide-teal/10 px-2 py-0.5">

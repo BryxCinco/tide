@@ -11,6 +11,7 @@ import {
   HistoryView,
   MoodTrend,
   ProductivityScore,
+  QuestStats,
   SummaryCard,
   TaskStats,
   TimeChart,
@@ -25,7 +26,7 @@ import { useQuestStore } from '@/store/questStore';
 import { useStreakStore } from '@/store/streakStore';
 import { useTaskStore } from '@/store/taskStore';
 import { useTimerStore } from '@/store/timerStore';
-import type { ActivityBreakdownSlice, CustomInsightsRange, DayTimeEntry, HeatmapDay, InsightsRange, MonthYearRange } from '@/types/insights';
+import type { ActivityBreakdownSlice, CustomInsightsRange, DayTimeEntry, HeatmapDay, InsightsRange, MonthYearRange, QuestInsights } from '@/types/insights';
 import { formatDuration } from '@/utils/formatTime';
 import { formatMonthYear, fromDateKey, toDateKey } from '@/utils/formatDate';
 
@@ -170,6 +171,7 @@ export default function InsightsScreen() {
   const [summary, setSummary] = useState<InsightsSummary | null>(null);
   const [rangeData, setRangeData] = useState<InsightsRangeData>({ time: [], mood: [] });
   const [activityBreakdown, setActivityBreakdown] = useState<ActivityBreakdownSlice[]>([]);
+  const [questInsights, setQuestInsights] = useState<QuestInsights | null>(null);
   const [rangeLoading, setRangeLoading] = useState(true);
   const [rangeError, setRangeError] = useState<string | null>(null);
 
@@ -181,14 +183,16 @@ export default function InsightsScreen() {
     setRangeLoading(true);
     setRangeError(null);
     try {
-      const [summaryRes, rangeRes, activityRes] = await Promise.all([
+      const [summaryRes, rangeRes, activityRes, questsRes] = await Promise.all([
         insightsService.getSummary(days, endKey),
         insightsService.getRange(days, endKey),
         insightsService.getActivityBreakdown(days, endKey),
+        insightsService.getQuests(days, endKey),
       ]);
       setSummary(summaryRes);
       setRangeData(rangeRes);
       setActivityBreakdown(activityRes);
+      setQuestInsights(questsRes);
     } catch (err) {
       setRangeError(getApiErrorMessage(err));
     } finally {
@@ -352,8 +356,15 @@ export default function InsightsScreen() {
             </View>
           </BentoTile>
 
+          <BentoTile index={8}>
+            <View className="gap-4">
+              <BentoHeader title="Tide's Quests" icon="Swords" color="#8B5CF6" />
+              {rangeLoading || !questInsights ? <SkeletonChart /> : <QuestStats data={questInsights} />}
+            </View>
+          </BentoTile>
+
           <View className="gap-3 lg:flex-row lg:items-start lg:gap-4">
-            <BentoTile index={8} className="lg:flex-[1.5]">
+            <BentoTile index={9} className="lg:flex-[1.5]">
               <View className="gap-4">
                 <BentoHeader title="Task stats" icon="CheckSquare" color="#14B8A6" />
                 {tasksError ? (
@@ -371,7 +382,7 @@ export default function InsightsScreen() {
                 )}
               </View>
             </BentoTile>
-            <BentoTile index={9} className="lg:flex-1">
+            <BentoTile index={10} className="lg:flex-1">
               <View className="gap-4">
                 <BentoHeader title="AI suggestions" icon="Sparkles" color="#6366F1" />
                 <AiSuggestions />
@@ -379,7 +390,7 @@ export default function InsightsScreen() {
             </BentoTile>
           </View>
 
-          <BentoTile index={10}>
+          <BentoTile index={11}>
             <View className="gap-4">
               <BentoHeader title="History" icon="History" color="#64748B" />
               <HistoryView />

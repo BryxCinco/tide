@@ -6,6 +6,7 @@ export * from './HexagonStats';
 export * from './HistoryView';
 export * from './MoodTrend';
 export * from './ProductivityScore';
+export * from './QuestStats';
 export * from './SummaryCard';
 export * from './TaskStats';
 export * from './TimeChart';

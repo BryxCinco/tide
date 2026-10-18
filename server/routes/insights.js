@@ -1,6 +1,6 @@
 const express = require('express');
 const { requireAuth } = require('../middleware/auth');
-const { getProductivitySummary, getTimeSeries, getHeatmap, getActivityBreakdown } = require('../lib/insightsService');
+const { getProductivitySummary, getTimeSeries, getHeatmap, getActivityBreakdown, getQuestStats } = require('../lib/insightsService');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -58,6 +58,17 @@ router.get('/activity-breakdown', async (req, res) => {
     const days = parseDays(req.query.days, 7);
     const end = parseEndKey(req.query.end);
     res.json({ activityBreakdown: await getActivityBreakdown(req.user.id, days, end) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/insights/quests?days=N&end=YYYY-MM-DD — Tide's Quest stats for the window.
+router.get('/quests', async (req, res) => {
+  try {
+    const days = parseDays(req.query.days, 7);
+    const end = parseEndKey(req.query.end);
+    res.json({ quests: await getQuestStats(req.user.id, days, end) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

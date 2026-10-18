@@ -64,6 +64,21 @@ export interface ProductivityScoreBreakdown {
   consistency: number;
   focusTime: number;
   taskCompletion: number;
+  /** % of the period's quests completed. Optional for older cached responses. */
+  questCompletion?: number;
+}
+
+/** Tide's Quests over one Insights window (GET /api/insights/quests). */
+export interface QuestInsights {
+  completed: number;
+  total: number;
+  completionRate: number;
+  xpEarned: number;
+  /** Days where every quest issued that day was completed. */
+  perfectDays: number;
+  byDay: { date: string; label: string; completed: number; total: number }[];
+  byCategory: { category: string; completed: number; total: number }[];
+  byTier: { tier: number; completed: number }[];
 }
 
 export interface WeeklySummaryItem {
@@ -80,6 +95,10 @@ export interface HeatmapDay {
   date: string;
   level: 0 | 1 | 2 | 3 | 4;
   seconds: number;
+  /** Tasks and quests completed that day — a day with these but no tracked time still
+   * counts as active. */
+  tasks?: number;
+  quests?: number;
 }
 
 export interface InsightsData {

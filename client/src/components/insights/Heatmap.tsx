@@ -94,15 +94,16 @@ export function Heatmap({ days }: HeatmapProps) {
 
   const columns = useMemo(() => buildWeekColumns(days), [days]);
   const gridWidth = columns.length > 0 ? columns.length * CELL_SIZE + (columns.length - 1) * CELL_GAP : 0;
-  const activeDays = useMemo(() => days.filter((d) => d.seconds > 0), [days]);
+  const activeDays = useMemo(() => days.filter((d) => d.level > 0), [days]);
   const totalSeconds = useMemo(() => activeDays.reduce((sum, d) => sum + d.seconds, 0), [activeDays]);
+  const totalDone = useMemo(() => activeDays.reduce((sum, d) => sum + (d.tasks ?? 0) + (d.quests ?? 0), 0), [activeDays]);
   const sortedActiveDays = useMemo(() => [...activeDays].sort((a, b) => (a.date < b.date ? 1 : -1)), [activeDays]);
 
   return (
     <View>
       <View className="mb-3 flex-row items-center justify-between gap-3">
         <Text variant="caption" color="muted" className="flex-1 normal-case tracking-normal">
-          {activeDays.length} active {activeDays.length === 1 ? 'day' : 'days'} · {formatDuration(totalSeconds)} tracked
+          {activeDays.length} active {activeDays.length === 1 ? 'day' : 'days'} · {formatDuration(totalSeconds)} tracked · {totalDone} done
         </Text>
         <Pressable
           onPress={() => setDetailsOpen(true)}
@@ -197,14 +198,14 @@ export function Heatmap({ days }: HeatmapProps) {
       <Modal
         visible={detailsOpen}
         onClose={() => setDetailsOpen(false)}
-        title="Tracked Days"
+        title="Active Days"
         subtitle={`${activeDays.length} of the last ${days.length} days`}
         icon="CalendarDays"
       >
         <View className="gap-1 py-2">
           {sortedActiveDays.length === 0 ? (
             <Text variant="body" color="muted" className="py-6 text-center normal-case tracking-normal">
-              No tracked time in this window yet.
+              No tracked time, tasks or quests in this window yet.
             </Text>
           ) : (
             sortedActiveDays.map((day) => (
@@ -213,7 +214,13 @@ export function Heatmap({ days }: HeatmapProps) {
                   {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                 </Text>
                 <Text variant="body" color="muted">
-                  {formatDuration(day.seconds)}
+                  {[
+                    day.seconds > 0 ? formatDuration(day.seconds) : null,
+                    day.tasks ? `${day.tasks} task${day.tasks === 1 ? '' : 's'}` : null,
+                    day.quests ? `${day.quests} quest${day.quests === 1 ? '' : 's'}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </Text>
               </View>
             ))

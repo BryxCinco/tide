@@ -834,7 +834,7 @@ toolHandlers.getWeeklySummary = async ({ userId }) => {
   const stats = await retrieveStats(userId, { days: 7 });
   return {
     stats,
-    message: `This week: ${stats.focusTimeLast7DaysMinutes}m focus time, ${stats.completedTasks} task(s) completed, current streak ${stats.currentStreak} day(s).`,
+    message: `This week: ${stats.focusTimeLast7DaysMinutes}m focus time, ${stats.completedTasks} task(s) completed in total, ${stats.questsCompletedLast7Days} of ${stats.questsIssuedLast7Days} quest(s) completed (${stats.questXpLast7Days} XP), day streak ${stats.currentStreak} day(s).`,
   };
 };
 

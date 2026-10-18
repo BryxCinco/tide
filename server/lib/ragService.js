@@ -190,7 +190,7 @@ async function retrieveStats(userId, options = {}) {
   const sevenDaysAgoIso = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
   const thirtyDaysAgoIso = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [sessions30dRes, sessionsCountRes, journalCountRes, completedTasksCountRes, streakRes] = await Promise.all([
+  const [sessions30dRes, sessionsCountRes, journalCountRes, completedTasksCountRes, streakRes, quests7dRes] = await Promise.all([
     supabaseAdmin
       .from('time_logs')
       .select('duration_seconds, ended_at, activity_name')
@@ -199,7 +199,10 @@ async function retrieveStats(userId, options = {}) {
     supabaseAdmin.from('time_logs').select('id', { count: 'exact', head: true }).eq('user_id', userId),
     supabaseAdmin.from('journal_entries').select('id', { count: 'exact', head: true }).eq('user_id', userId),
     supabaseAdmin.from('tasks').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'done'),
-    supabaseAdmin.from('streaks').select('current_streak').eq('user_id', userId).single(),
+    // '*' rather than naming the day-streak columns, so this still works on a database
+    // where migration 012 hasn't been applied yet.
+    supabaseAdmin.from('streaks').select('*').eq('user_id', userId).single(),
+    supabaseAdmin.from('quests').select('is_completed, xp').eq('user_id', userId).eq('is_active', true).gte('date', sevenDaysAgoIso.slice(0, 10)),
   ]);
 
   if (sessions30dRes.error) console.error('[ragService] retrieveStats: 30-day sessions fetch failed:', sessions30dRes.error.message);
@@ -244,7 +247,13 @@ async function retrieveStats(userId, options = {}) {
     totalSessions: sessionsCountRes.count || 0,
     totalJournalEntries: journalCountRes.count || 0,
     completedTasks: completedTasksCountRes.count || 0,
-    currentStreak: streakRes.data ? streakRes.data.current_streak : 0,
+    // The day streak shown on the Dashboard (a task or quest completed each day); the
+    // quest streak (every quest done each day) separately.
+    currentStreak: streakRes.data ? streakRes.data.task_current_streak ?? 0 : 0,
+    questStreak: streakRes.data ? streakRes.data.current_streak : 0,
+    questsCompletedLast7Days: (quests7dRes.data || []).filter((q) => q.is_completed).length,
+    questsIssuedLast7Days: (quests7dRes.data || []).length,
+    questXpLast7Days: (quests7dRes.data || []).filter((q) => q.is_completed).reduce((sum, q) => sum + (q.xp || 0), 0),
     mostProductiveDay,
     topActivity,
     // Real per-activity minutes over the last 30 days — was already computed above for

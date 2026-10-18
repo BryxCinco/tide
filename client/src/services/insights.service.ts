@@ -1,4 +1,4 @@
-import type { ActivityBreakdownSlice, DayTimeEntry, HeatmapDay, MoodTrendPoint, ProductivityScoreBreakdown, WeeklySummaryItem } from '../types/insights';
+import type { ActivityBreakdownSlice, DayTimeEntry, HeatmapDay, MoodTrendPoint, ProductivityScoreBreakdown, QuestInsights, WeeklySummaryItem } from '../types/insights';
 import { api } from './api';
 
 export interface InsightsSummary {
@@ -32,5 +32,10 @@ export const insightsService = {
   async getActivityBreakdown(days: number, end: string): Promise<ActivityBreakdownSlice[]> {
     const { data } = await api.get<{ activityBreakdown: ActivityBreakdownSlice[] }>('/api/insights/activity-breakdown', { params: { days, end } });
     return data.activityBreakdown;
+  },
+
+  async getQuests(days: number, end: string): Promise<QuestInsights> {
+    const { data } = await api.get<{ quests: QuestInsights }>('/api/insights/quests', { params: { days, end } });
+    return data.quests;
   },
 };
