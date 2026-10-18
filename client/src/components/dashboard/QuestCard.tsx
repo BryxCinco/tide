@@ -17,8 +17,8 @@ function QuestRow({ quest, onToggle, onEdit, onDelete }: { quest: Quest; onToggl
   const color = QUEST_CATEGORY_COLOR[quest.category];
   const tierMeta = QUEST_TIER_META[quest.tier];
 
-  // A completed quest is locked (its XP is paid out) — it can't be un-checked, edited or
-  // deleted; the server enforces the same.
+  // A completed quest is locked (its XP is paid out) — it can't be un-checked or edited (a
+  // custom one can still be deleted); the server enforces the same.
   const locked = quest.isCompleted;
 
   const handleToggle = () => {
@@ -79,7 +79,7 @@ function QuestRow({ quest, onToggle, onEdit, onDelete }: { quest: Quest; onToggl
         </Pressable>
       )}
 
-      {quest.isCustom && !locked && (
+      {quest.isCustom && (
         <Pressable onPress={onDelete} hitSlop={4} className="h-10 w-10 items-center justify-center">
           <Icon name="Trash2" size={14} color="#EF4444" />
         </Pressable>

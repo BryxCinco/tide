@@ -63,7 +63,8 @@ router.patch('/:id', async (req, res) => {
   // resend status: 'done' and double-award).
   const { data: existing } = await supabaseAdmin.from('tasks').select('*').eq('id', req.params.id).eq('user_id', req.user.id).single();
   if (!existing) return res.status(404).json({ error: 'Task not found' });
-  // A completed task is locked — no un-checking, editing or deleting — same as quests.
+  // A completed task is locked — it can't be un-checked or edited (deleting is still allowed;
+  // its XP stays awarded either way). Same as quests.
   if (existing.status === 'done') return res.status(409).json({ error: 'This task is already completed and can no longer be changed.', code: 'task_locked' });
 
   const update = { title, description, status, priority, activity_type, due_date, tags };
@@ -111,9 +112,6 @@ router.patch('/:id', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
-  const { data: existing } = await supabaseAdmin.from('tasks').select('status').eq('id', req.params.id).eq('user_id', req.user.id).maybeSingle();
-  if (existing?.status === 'done') return res.status(409).json({ error: 'This task is already completed and can no longer be changed.', code: 'task_locked' });
-
   const { error } = await supabaseAdmin.from('tasks').delete().eq('id', req.params.id).eq('user_id', req.user.id);
 
   if (error) return res.status(500).json({ error: error.message });

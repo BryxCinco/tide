@@ -111,13 +111,14 @@ export function TaskCard({ task, activityName, onToggle, onView, onEdit, onDelet
           </View>
         </Pressable>
 
-        {isDone ? (
-          // Completed tasks are locked — no un-check, edit or delete (the server enforces it too).
-          <View className="h-8 w-8 items-center justify-center" accessibilityLabel="Completed — locked">
-            <Icon name="Lock" size={14} color={themeColors.text.disabled} />
-          </View>
-        ) : (
-          <View className="flex-row items-center">
+        <View className="flex-row items-center">
+          {isDone ? (
+            // Completed tasks are locked — no un-check or edit (the server enforces it too) —
+            // but can still be deleted.
+            <View className="h-8 w-8 items-center justify-center" accessibilityLabel="Completed — locked">
+              <Icon name="Lock" size={14} color={themeColors.text.disabled} />
+            </View>
+          ) : (
             <Pressable
               onPress={onEdit}
               hitSlop={6}
@@ -126,13 +127,13 @@ export function TaskCard({ task, activityName, onToggle, onView, onEdit, onDelet
             >
               <Icon name="Pencil" size={15} />
             </Pressable>
-            <VisibleDeleteButton
-              onConfirm={onDelete}
-              confirmTitle="Delete task?"
-              confirmMessage={`"${task.title}" will be removed. This can't be undone.`}
-            />
-          </View>
-        )}
+          )}
+          <VisibleDeleteButton
+            onConfirm={onDelete}
+            confirmTitle="Delete task?"
+            confirmMessage={`"${task.title}" will be removed. This can't be undone.`}
+          />
+        </View>
       </View>
     </View>
   );

@@ -97,11 +97,16 @@ export function TaskInfoModal({ visible, onClose, task, activityName, onToggle, 
         </View>
 
         {isDone ? (
-          <View className="flex-row items-center justify-center gap-2 rounded-xl bg-base py-3">
-            <Icon name="Lock" size={14} />
-            <Text variant="body" color="muted" className="text-[13px] normal-case tracking-normal">
-              Completed tasks are locked and can&apos;t be changed.
-            </Text>
+          <View className="gap-2">
+            <View className="flex-row items-center justify-center gap-2 rounded-xl bg-base py-3">
+              <Icon name="Lock" size={14} />
+              <Text variant="body" color="muted" className="text-[13px] normal-case tracking-normal">
+                Completed — can&apos;t be un-checked or edited.
+              </Text>
+            </View>
+            <View className="items-center pt-1">
+              <Button title="Delete Task" variant="ghost" size="sm" icon="Trash2" onPress={handleDelete} />
+            </View>
           </View>
         ) : (
           <View className="gap-2">

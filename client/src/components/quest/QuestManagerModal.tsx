@@ -134,7 +134,8 @@ export function QuestManagerModal({ visible, onClose }: QuestManagerModalProps) 
           </Pressable>
 
           {quest.isCompleted ? (
-            // Completed quests are locked — no edit, delete or pause (the server rejects them too).
+            // Completed quests are locked — no edit or pause (the server rejects them too); a
+            // custom one can still be deleted.
             <Icon name="Lock" size={15} color={themeColors.text.disabled} />
           ) : (
             <Pressable onPress={() => openEdit(quest)} hitSlop={6}>
@@ -142,7 +143,7 @@ export function QuestManagerModal({ visible, onClose }: QuestManagerModalProps) 
             </Pressable>
           )}
 
-          {quest.isCustom && !quest.isCompleted && (
+          {quest.isCustom && (
             <Pressable onPress={() => handleDelete(quest)} hitSlop={6}>
               <Icon name="Trash2" size={16} color={themeColors.status.error} />
             </Pressable>

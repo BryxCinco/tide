@@ -168,7 +168,8 @@ router.post('/', async (req, res) => {
 // updates to the same row. Only fields actually present in the body are touched.
 router.patch('/:id', async (req, res) => {
   // A completed quest is locked: its XP is already awarded, and un-checking it would let it
-  // be completed (and awarded) again. Nothing about it can change after that.
+  // be completed (and awarded) again, so it can't be un-checked or edited after that. A
+  // custom one can still be deleted (DELETE below) — the XP stays awarded.
   const { data: current, error: currentError } = await supabaseAdmin
     .from('quests')
     .select('is_completed')
@@ -260,14 +261,13 @@ router.patch('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   const { data: quest, error: fetchError } = await supabaseAdmin
     .from('quests')
-    .select('is_custom, is_completed')
+    .select('is_custom')
     .eq('id', req.params.id)
     .eq('user_id', req.user.id)
     .single();
 
   if (fetchError || !quest) return res.status(404).json({ error: 'Quest not found' });
   if (!quest.is_custom) return res.status(403).json({ error: 'Only custom quests can be deleted — pause it instead' });
-  if (quest.is_completed) return res.status(409).json({ error: 'This quest is already completed and can no longer be changed.', code: 'quest_locked' });
 
   const { error } = await supabaseAdmin.from('quests').delete().eq('id', req.params.id).eq('user_id', req.user.id);
 

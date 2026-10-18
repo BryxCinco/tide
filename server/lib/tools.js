@@ -637,7 +637,6 @@ toolHandlers.deleteTask = async ({ userId, taskTitle, confirm }) => {
   if (!match) {
     return { matched: false, message: `I couldn't find a task matching "${taskTitle}".` };
   }
-  if (match.status === 'done') return { matched: true, locked: true, message: `"${match.title}" is already completed, so it's locked and can't be changed.` };
 
   // The model's raw JSON arg isn't guaranteed to be an actual boolean (a weaker tool-calling
   // model can emit the string "false") — `!confirm` alone would treat that truthy string as

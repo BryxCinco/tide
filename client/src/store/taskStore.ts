@@ -137,8 +137,8 @@ export const useTaskStore = create<TaskState>()(
       deleteTask: (id) => {
         const previous = get().tasks;
         const task = previous.find((t) => t.id === id);
-        if (task?.status === 'done') return; // locked
-        const wasWithdrawn = task != null;
+        // Completed tasks can't be un-checked or edited, but can still be deleted.
+        const wasWithdrawn = task != null && task.status !== 'done';
 
         set((state) => ({
           tasks: state.tasks.filter((t) => t.id !== id),
