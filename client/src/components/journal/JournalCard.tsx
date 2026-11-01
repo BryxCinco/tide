@@ -47,8 +47,25 @@ export function JournalCard({ entry, onPress, onToggleFavorite, onDelete, index 
           style={{ position: 'absolute', top: -70, right: -70, width: 150, height: 150, borderRadius: 75, backgroundColor: hexToRgba(accent, 0.07) }}
         />
 
-        {featured && photo && (
-          <Image source={{ uri: photo }} style={{ width: '100%', height: 160 }} resizeMode="cover" />
+        {/* Photo thumbnail for ANY entry that has one, not just the featured tile — a
+            journal with a picture should actually show it on the card, not hide it behind a
+            small "1" count badge. Multiple photos get a "+N" overlay in the corner instead
+            of the old separate bottom badge. */}
+        {photo && (
+          <View>
+            <Image source={{ uri: photo }} style={{ width: '100%', height: featured ? 180 : 140 }} resizeMode="cover" />
+            {entry.photoUrls.length > 1 && (
+              <View
+                className="absolute bottom-2 right-2 flex-row items-center gap-1 rounded-full px-2 py-1"
+                style={{ backgroundColor: 'rgba(2, 6, 23, 0.6)' }}
+              >
+                <Icon name="Image" size={11} color="#FFFFFF" />
+                <Text variant="body" className="text-[11px] font-semibold" style={{ color: '#FFFFFF' }}>
+                  {entry.photoUrls.length}
+                </Text>
+              </View>
+            )}
+          </View>
         )}
 
         <View className={cn('flex-1 gap-3', featured ? 'p-6' : 'p-5')}>
@@ -109,14 +126,6 @@ export function JournalCard({ entry, onPress, onToggleFavorite, onDelete, index 
                 </Text>
               </View>
             ))}
-            {entry.photoUrls?.length > 0 && !(featured && photo) && (
-              <View className="flex-row items-center gap-1 rounded-full border border-subtle bg-base px-2.5 py-1">
-                <Icon name="Image" size={11} />
-                <Text variant="body" color="muted" className="text-[11px] font-medium">
-                  {entry.photoUrls.length}
-                </Text>
-              </View>
-            )}
             {entry.wordCount > 0 && (
               <Text variant="body" color="muted" className="ml-auto text-[11px]">
                 {entry.wordCount} words
