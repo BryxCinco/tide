@@ -41,7 +41,10 @@ function LanguageOptionsList({ language, onSelect }: { language: Language; onSel
     <View className="gap-3">
       <SearchBar value={query} onChangeText={setQuery} placeholder="Search languages..." />
 
-      <ScrollView style={{ maxHeight: listMaxHeight }} showsVerticalScrollIndicator={false}>
+      {/* Visible scrollbar (unlike most lists in this app) — with 15+ languages and no
+          other affordance hinting there's more below the fold, a hidden scrollbar made the
+          list feel like it simply stopped at Korean instead of continuing to scroll. */}
+      <ScrollView style={{ maxHeight: listMaxHeight }} showsVerticalScrollIndicator persistentScrollbar>
         <View className="gap-1">
           {filtered.map((option) => {
             const selected = option.code === language;

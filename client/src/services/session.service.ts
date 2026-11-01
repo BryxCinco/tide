@@ -17,7 +17,12 @@ export interface ApiSession {
 }
 
 export interface CreateSessionPayload {
-  activityId: string;
+  /** Null for a session started with no activity picked (the Timer's client-only
+   * DEFAULT_FOCUS_ACTIVITY placeholder, id `'focus-session'`) — that id was never created
+   * as a real row in the activities table, so sending it straight through as activity_id
+   * failed Postgres's uuid column check ("invalid input syntax for type uuid"). `null`
+   * stores cleanly; activityName below still carries the "Focus Session" label either way. */
+  activityId: string | null;
   activityName: string;
   durationSeconds: number;
   notes?: string;

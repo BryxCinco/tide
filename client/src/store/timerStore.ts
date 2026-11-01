@@ -218,7 +218,11 @@ export const useTimerStore = create<TimerState>()((set, get) => ({
     // even if this particular sync attempt didn't land.
     sessionService
       .create({
-        activityId: session.activityId,
+        // The placeholder's id ('focus-session') only exists client-side (see
+        // DEFAULT_FOCUS_ACTIVITY's own comment) — sending it as activity_id fails the
+        // column's uuid check server-side, so a session logged under it syncs with no
+        // activity reference instead. activityName still carries "Focus Session" either way.
+        activityId: session.activityId === DEFAULT_FOCUS_ACTIVITY.id ? null : session.activityId,
         activityName: session.activityLabel,
         durationSeconds: session.durationSeconds,
         notes: session.notes,
