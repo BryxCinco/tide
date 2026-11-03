@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { useSettingsStore } from '../../../store/settingsStore';
-import { Card, Icon, Text } from '../../ui';
+import { ocean } from '../../../utils/theme';
+import { BentoTile, Icon, Text } from '../../ui';
 
 /** IANA zone name (e.g. "Asia/Manila") — there's no free-text "friendly" timezone name
  * without a lookup table, and this is at least always accurate for wherever the device
@@ -46,19 +47,23 @@ export function TimeWidget() {
   const dateLabel = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
   return (
-    <Card variant="default" padding="md" className="rounded-[24px] min-h-[150px] gap-1">
-      <View className="flex-row items-center justify-between">
-        <Text variant="caption" color="muted" className="normal-case tracking-normal">
-          {currentTimeZone()}
-        </Text>
-        <Icon name="Clock" size={15} color="#14B8A6" />
+    <BentoTile tone="glass" dense>
+      <View className="flex-1 justify-between gap-2">
+        <View className="flex-row items-center gap-1.5">
+          <Icon name="Clock" size={13} color={ocean.lagoon} strokeWidth={2.2} />
+          <Text variant="label" color="muted" className="flex-1 text-[10.5px] tracking-[0.6px]" numberOfLines={1}>
+            {currentTimeZone() || 'Local time'}
+          </Text>
+        </View>
+        <View>
+          <Text variant="h1" color="primary" className="text-[28px] leading-[32px]" style={{ fontVariant: ['tabular-nums'] }}>
+            {timeLabel}
+          </Text>
+          <Text variant="body" color="muted" className="text-[12px]">
+            {dateLabel}
+          </Text>
+        </View>
       </View>
-      <Text variant="h1" color="primary" className="mt-2 font-bold" style={{ fontSize: 32 }}>
-        {timeLabel}
-      </Text>
-      <Text variant="caption" color="muted" className="normal-case tracking-normal">
-        {dateLabel}
-      </Text>
-    </Card>
+    </BentoTile>
   );
 }

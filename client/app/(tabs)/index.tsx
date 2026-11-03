@@ -23,7 +23,8 @@ import {
 } from '@/components/dashboard';
 import { CalendarWidget, StreakWidget, TimeWidget, TodaysRoutineWidget, WeatherWidget, WeeklyProgressWidget } from '@/components/dashboard/widgets';
 import { TaskFormModal } from '@/components/tasks';
-import { BentoStat, Button, EmptyState, FadeInView, ResponsiveContainer } from '@/components/ui';
+import { BentoStat, Button, EmptyState, FadeInView, OceanBackdrop, ResponsiveContainer } from '@/components/ui';
+import { ocean } from '@/utils/theme';
 import { MOOD_ICON_MAP } from '@/components/journal/MoodIcon';
 import { mockHeroFocus, mockQuickActions } from '@/mocks/mockDashboard';
 import { BENTO_COVERED_WIDGETS, getVisibleWidgets, useDashboardStore } from '@/store/dashboardStore';
@@ -209,15 +210,16 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-base" edges={['top']}>
+      <OceanBackdrop />
       <ScrollView
         className="flex-1"
         contentContainerClassName="pb-24"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <ResponsiveContainer className="gap-3 pt-14 md:gap-4 md:pt-6">
+        <ResponsiveContainer className="gap-2.5 pt-14 md:gap-3 md:pt-5">
           {/* BENTO OVERVIEW — greeting (2/3) + today's focus (1/3) on wide screens, stacked on
               phone; then four stat tiles, 2x2 on phone and one row on wide screens. */}
-          <View className="gap-3 md:flex-row md:gap-4">
+          <View className="gap-2.5 md:flex-row md:gap-3">
             <GreetingTile className="md:flex-[2]" index={0} />
             <FocusTodayTile
               className="md:flex-1"
@@ -229,47 +231,51 @@ export default function DashboardScreen() {
             />
           </View>
 
-          <View className="flex-row flex-wrap gap-3 md:flex-nowrap md:gap-4">
+          <View className="flex-row flex-wrap gap-2.5 md:flex-nowrap md:gap-3">
             <BentoStat
+              dense
               className="basis-[47%] grow md:basis-0"
               index={2}
               icon="Flame"
-              color="#F97316"
+              color={ocean.coral}
               value={`${streak}`}
-              label="day streak"
+              label="Day streak"
               onPress={() => router.push('/(tabs)/insights')}
             />
             <BentoStat
+              dense
               className="basis-[47%] grow md:basis-0"
               index={3}
               icon="Trophy"
-              color="#6366F1"
+              color={ocean.lavender}
               value={`Lv ${level}`}
-              label="Level progress"
+              label="Level"
               progress={progressToNextLevel(totalXp)}
               onPress={() => router.push('/(tabs)/profile')}
             />
             <BentoStat
+              dense
               className="basis-[47%] grow md:basis-0"
               index={4}
               icon="ListChecks"
-              color="#14B8A6"
+              color={ocean.lagoon}
               value={`${openTasksCount}`}
-              label={missedTasksCount > 0 ? `open · ${missedTasksCount} overdue` : 'open tasks'}
+              label={missedTasksCount > 0 ? `Open · ${missedTasksCount} overdue` : 'Open tasks'}
               onPress={() => router.push('/tasks')}
             />
             <BentoStat
+              dense
               className="basis-[47%] grow md:basis-0"
               index={5}
               icon="BookOpen"
-              color="#0EA5E9"
+              color={ocean.surf}
               value={`${journalCount}`}
-              label={journalCount === 1 ? 'journal entry' : 'journal entries'}
+              label="Journal"
               onPress={() => router.push('/(tabs)/journal')}
             />
           </View>
 
-          <FadeInView index={6} className="mt-1">
+          <FadeInView index={6}>
             <QuestCard />
           </FadeInView>
 
@@ -277,8 +283,9 @@ export default function DashboardScreen() {
 
           <FadeInView index={2}>
             <Button
-              title="Customize Dashboard"
-              variant="secondary"
+              title="Customize dashboard"
+              variant="ghost"
+              size="sm"
               icon="Settings"
               onPress={() => setCustomizeVisible(true)}
               className="mb-2 self-center"

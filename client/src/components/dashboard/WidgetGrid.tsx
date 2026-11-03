@@ -11,12 +11,12 @@ export interface WidgetGridProps {
   renderWidget: (type: WidgetId, instance: WidgetInstance) => ReactNode;
 }
 
-/** phone 1-col, tablet 2-col, desktop 3-col (Phase 13 Fix 5) — a widget's `size` spans up to
- * that many of the row's columns ('full' always spans every column, i.e. the whole row,
- * regardless of size). On phone every size collapses to a single column since there's only
- * ever 1 to span. */
+/** phone 2-col, tablet 2-col, desktop 3-col — a widget's `size` spans up to that many of the
+ * row's columns ('full' always spans every column, i.e. the whole row, regardless of size). */
 function columnsFor(isPhone: boolean, isTablet: boolean): number {
-  if (isPhone) return 1;
+  // 2 on phone so 'sm' widgets (time, streak) pair up instead of each taking a whole row;
+  // 'md' / 'lg' / 'full' still span both.
+  if (isPhone) return 2;
   if (isTablet) return 2;
   return 3;
 }
@@ -37,15 +37,18 @@ export function WidgetGrid({ widgets, renderWidget }: WidgetGridProps) {
   const columns = columnsFor(isPhone, isTablet);
 
   return (
-    <View className="flex-row flex-wrap" style={{ gap: 16 }}>
+    <View className="flex-row flex-wrap" style={{ gap: isPhone ? 10 : 12 }}>
       {widgets.map((widget, index) => {
         const span = spanFor(widget.size, columns);
         const basisPercent = (span / columns) * 100;
+        // Partial-width widgets grow to fill their row, so two small widgets share it instead
+        // of leaving an empty third. The basis is shaved a little so the gaps still fit and
+        // the widgets that should share a row don't wrap.
         return (
           <FadeInView
             key={widget.id}
             index={index + 7}
-            style={{ flexBasis: `${basisPercent}%`, flexGrow: basisPercent >= 100 ? 1 : 0 }}
+            style={{ flexBasis: basisPercent >= 100 ? '100%' : `${basisPercent - 2}%`, flexGrow: 1 }}
           >
             {renderWidget(widget.type, widget)}
           </FadeInView>

@@ -95,6 +95,27 @@ export const darkColors: ColorPalette = {
   },
 };
 
+/**
+ * "Tide Ocean" — the iOS-widget, ocean-inspired palette the bento kit's `glass` / `deep`
+ * tones and OceanBackdrop are built from. Lagoon teal stays dominant; the rest are accents
+ * taken from the same seascape (shallow water, surf, coral reef, sand), each used for one
+ * kind of thing so colors keep meaning something.
+ */
+export const ocean = {
+  lagoon: '#14B8A6',
+  seafoam: '#5EEAD4',
+  aqua: '#22D3EE',
+  surf: '#38BDF8',
+  coral: '#FB923C',
+  sand: '#F6C177',
+  lavender: '#A78BFA',
+  /** Page backgrounds: a faint aqua tint (light) and the "abyss" (dark). */
+  shallows: '#F2F8F8',
+  abyss: '#03141A',
+  /** Deep-sea statement tile, for light and dark themes. */
+  deep: { light: '#052A30', dark: '#082129' },
+} as const;
+
 export const spacing = {
   xs: 4,
   sm: 8,

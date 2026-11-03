@@ -44,9 +44,29 @@ const colorClasses: Record<TextColor, string> = {
   error: 'text-error',
 };
 
+// Plain (unprefixed) arbitrary sizes like `text-[12px]` / `leading-[16px]` in className.
+const ARBITRARY_FONT_SIZE = /(?:^|\s)text-\[(\d+(?:\.\d+)?)px\](?=\s|$)/;
+const ARBITRARY_LINE_HEIGHT = /(?:^|\s)leading-\[(\d+(?:\.\d+)?)px\](?=\s|$)/;
+
 /** Pre-styled typography primitive covering every Tide Light text variant. */
-export function Text({ variant = 'body', color = 'secondary', className, ...rest }: TextProps) {
+export function Text({ variant = 'body', color = 'secondary', className, style, ...rest }: TextProps) {
+  // `cn` only joins, so a `text-[12px]` override sat next to the variant's own size class
+  // (`text-body` etc.) and whichever Tailwind happened to emit later won — usually the
+  // variant, so most size overrides were silently ignored (and with numberOfLines the class
+  // didn't reach the text at all). Applying it as an inline style makes it always win; an
+  // explicit `style` from the caller still overrides it.
+  const sizeMatch = className ? ARBITRARY_FONT_SIZE.exec(className) : null;
+  const leadingMatch = className ? ARBITRARY_LINE_HEIGHT.exec(className) : null;
+  const sizeStyle =
+    sizeMatch || leadingMatch
+      ? { ...(sizeMatch && { fontSize: Number(sizeMatch[1]) }), ...(leadingMatch && { lineHeight: Number(leadingMatch[1]) }) }
+      : undefined;
+
   return (
-    <RNText className={cn(variantClasses[variant], colorClasses[color], className)} {...rest} />
+    <RNText
+      className={cn(variantClasses[variant], colorClasses[color], className)}
+      style={sizeStyle ? [sizeStyle, style] : style}
+      {...rest}
+    />
   );
 }

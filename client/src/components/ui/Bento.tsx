@@ -6,7 +6,8 @@ import { useThemeStore } from '../../store/themeStore';
 import { cn } from '../../utils/cn';
 import { hexToRgba } from '../../utils/color';
 import { gradientDirections, gradients } from '../../utils/gradients';
-import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
+import { ocean } from '../../utils/theme';
+import Svg,{ Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 
 import { Icon, type IconName } from './Icon';
 import { Pressable } from './SoundPressable';
@@ -19,8 +20,12 @@ import { Text } from './Text';
  * - `aurora`: TIDE's teal -> cyan -> indigo gradient, white content.
  * - `glow`: a surface tile with two soft aurora glows in its corners, for a screen's
  *   centerpiece (the timer stage, the journal prompt).
+ * - `glass` ("Tide Ocean"): a translucent, blurred iOS-widget tile meant to sit on
+ *   OceanBackdrop. Same text colors as `surface`.
+ * - `deep` ("Tide Ocean"): the deep-sea statement tile — teal-navy with lagoon/aqua light
+ *   in its corners. Light-on-dark content, like `ink` (use `BENTO_INK_TEXT`).
  */
-export type BentoTone = 'surface' | 'ink' | 'aurora' | 'glow';
+export type BentoTone = 'surface' | 'ink' | 'aurora' | 'glow' | 'glass' | 'deep';
 
 /** Text colors for content placed on `ink` / `aurora` tiles. */
 export const BENTO_INK_TEXT = {
@@ -40,9 +45,16 @@ export interface BentoTileProps {
   style?: StyleProp<ViewStyle>;
   /** Accessible label when the tile itself is pressable. */
   accessibilityLabel?: string;
+  /** Tighter padding and a 20px iOS-widget radius ("Tide Ocean" density). */
+  dense?: boolean;
 }
 
 const ENTRANCE_STAGGER_MS = 40;
+
+// backdrop-filter only exists on web (react-native-web passes it through); native gets the
+// translucent fill without the blur.
+const GLASS_BLUR: ViewStyle =
+  Platform.OS === 'web' ? ({ backdropFilter: 'blur(18px) saturate(160%)', WebkitBackdropFilter: 'blur(18px) saturate(160%)' } as unknown as ViewStyle) : {};
 
 export interface FadeInViewProps {
   children: ReactNode;
@@ -89,33 +101,57 @@ export function FadeInView({ children, index = 0, className, style, animate = tr
  * instead of jumping into place. Layout (spans, rows) is left to the screen via flex
  * classes, which works the same on web and native — unlike CSS grid, which Yoga lacks.
  */
-export function BentoTile({ children, tone = 'surface', onPress, index = 0, className, style, accessibilityLabel }: BentoTileProps) {
+export function BentoTile({ children, tone = 'surface', onPress, index = 0, className, style, accessibilityLabel, dense = false }: BentoTileProps) {
   const isDark = useThemeStore((s) => s.theme === 'dark');
 
   const toneStyle: ViewStyle =
     tone === 'ink'
       ? { backgroundColor: isDark ? '#111A2B' : '#0B1220', borderColor: 'rgba(255, 255, 255, 0.06)' }
-      : tone === 'aurora'
-        ? { borderColor: 'transparent' }
-        : {};
+      : tone === 'deep'
+        ? { backgroundColor: isDark ? ocean.deep.dark : ocean.deep.light, borderColor: 'rgba(94, 234, 212, 0.12)' }
+        : tone === 'glass'
+          ? {
+              backgroundColor: isDark ? 'rgba(12, 30, 36, 0.62)' : 'rgba(255, 255, 255, 0.72)',
+              borderColor: isDark ? 'rgba(94, 234, 212, 0.09)' : 'rgba(5, 42, 48, 0.07)',
+              ...GLASS_BLUR,
+            }
+          : tone === 'aurora'
+            ? { borderColor: 'transparent' }
+            : {};
 
-  const shadow: ViewStyle = {
-    shadowColor: tone === 'aurora' ? '#06B6D4' : '#0F172A',
-    shadowOffset: { width: 0, height: tone === 'aurora' ? 12 : 4 },
-    shadowOpacity: tone === 'aurora' ? 0.25 : isDark ? 0.3 : 0.04,
-    shadowRadius: tone === 'aurora' ? 24 : 16,
-    elevation: 2,
-  };
+  const isOcean = tone === 'glass' || tone === 'deep';
+  const shadow: ViewStyle = isOcean
+    ? {
+        shadowColor: '#052A30',
+        shadowOffset: { width: 0, height: tone === 'deep' ? 10 : 6 },
+        shadowOpacity: isDark ? 0.4 : tone === 'deep' ? 0.18 : 0.05,
+        shadowRadius: tone === 'deep' ? 26 : 20,
+        elevation: 2,
+      }
+    : {
+        shadowColor: tone === 'aurora' ? '#06B6D4' : '#0F172A',
+        shadowOffset: { width: 0, height: tone === 'aurora' ? 12 : 4 },
+        shadowOpacity: tone === 'aurora' ? 0.25 : isDark ? 0.3 : 0.04,
+        shadowRadius: tone === 'aurora' ? 24 : 16,
+        elevation: 2,
+      };
 
   const body = (
     <View
       className={cn(
-        'flex-1 overflow-hidden rounded-[24px] border p-5',
+        'flex-1 overflow-hidden border',
+        dense ? 'rounded-[20px] p-3.5' : 'rounded-[24px] p-5',
         (tone === 'surface' || tone === 'glow') && 'border-subtle bg-surface',
         onPress && 'hover:border-tide-teal/40',
       )}
       style={[toneStyle, shadow]}
     >
+      {tone === 'deep' && (
+        <View style={[FILL, { overflow: 'hidden' }]} pointerEvents="none">
+          <View style={{ position: 'absolute', top: -90, right: -70, width: 240, height: 240, borderRadius: 120, backgroundColor: hexToRgba(ocean.lagoon, 0.22) }} />
+          <View style={{ position: 'absolute', bottom: -110, left: -60, width: 220, height: 220, borderRadius: 110, backgroundColor: hexToRgba(ocean.aqua, 0.12) }} />
+        </View>
+      )}
       {tone === 'aurora' && (
         <LinearGradient colors={[...gradients.aurora]} {...gradientDirections.diagonal} style={FILL} pointerEvents="none" />
       )}
@@ -150,6 +186,38 @@ export function BentoTile({ children, tone = 'surface', onPress, index = 0, clas
 
 const FILL: ViewStyle = { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 };
 
+// Soft-edged light pools on web; native has no CSS blur, so it gets the gradient only (a
+// hard-edged translucent circle would read as a shape, not light).
+const BLUR_POOL: ViewStyle = Platform.OS === 'web' ? ({ filter: 'blur(80px)' } as unknown as ViewStyle) : {};
+
+/**
+ * "Tide Ocean" page background: a faint aqua-tinted base (light) or the abyss (dark), with
+ * light coming down from the surface — a teal wash at the top and, on web, two blurred pools
+ * of lagoon/aqua. Render as the first child of a screen; it fills the screen behind content
+ * and never takes touches. Glass tiles are tuned to sit on it.
+ */
+export function OceanBackdrop() {
+  const isDark = useThemeStore((s) => s.theme === 'dark');
+
+  return (
+    <View style={FILL} pointerEvents="none">
+      <View style={[FILL, { backgroundColor: isDark ? ocean.abyss : ocean.shallows }]} />
+      <LinearGradient
+        colors={isDark ? ['rgba(20, 184, 166, 0.16)', 'rgba(3, 20, 26, 0)'] : ['rgba(94, 234, 212, 0.30)', 'rgba(242, 248, 248, 0)']}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 460 }}
+      />
+      {Platform.OS === 'web' && (
+        <>
+          <View style={[{ position: 'absolute', top: -160, right: -120, width: 520, height: 520, borderRadius: 260, backgroundColor: hexToRgba(ocean.aqua, isDark ? 0.1 : 0.14) }, BLUR_POOL]} />
+          <View style={[{ position: 'absolute', top: 260, left: -200, width: 480, height: 480, borderRadius: 240, backgroundColor: hexToRgba(ocean.lagoon, isDark ? 0.08 : 0.1) }, BLUR_POOL]} />
+        </>
+      )}
+    </View>
+  );
+}
+
 export interface BentoHeaderProps {
   title: string;
   icon?: IconName;
@@ -159,25 +227,27 @@ export interface BentoHeaderProps {
   right?: ReactNode;
   /** Use light text for `ink` / `aurora` tiles. */
   onDark?: boolean;
+  /** Smaller chip and 13px title, for `dense` tiles. */
+  dense?: boolean;
   className?: string;
 }
 
 /** Small icon chip + title row that opens most tiles. */
-export function BentoHeader({ title, icon, color = '#14B8A6', right, onDark = false, className }: BentoHeaderProps) {
+export function BentoHeader({ title, icon, color = '#14B8A6', right, onDark = false, dense = false, className }: BentoHeaderProps) {
   return (
-    <View className={cn('flex-row items-center gap-2.5', className)}>
+    <View className={cn('flex-row items-center', dense ? 'gap-2' : 'gap-2.5', className)}>
       {icon && (
         <View
-          className="h-8 w-8 items-center justify-center rounded-[10px]"
+          className={cn('items-center justify-center', dense ? 'h-6 w-6 rounded-[8px]' : 'h-8 w-8 rounded-[10px]')}
           style={{ backgroundColor: onDark ? 'rgba(255, 255, 255, 0.12)' : hexToRgba(color, 0.12) }}
         >
-          <Icon name={icon} size={16} color={onDark ? '#FFFFFF' : color} />
+          <Icon name={icon} size={dense ? 13 : 16} color={onDark ? '#FFFFFF' : color} strokeWidth={dense ? 2.2 : undefined} />
         </View>
       )}
       <Text
         variant="body"
         color="primary"
-        className="flex-1 text-[15px] font-semibold"
+        className={cn('flex-1 font-semibold', dense ? 'text-[13px]' : 'text-[15px]')}
         style={onDark ? { color: BENTO_INK_TEXT.primary } : undefined}
         numberOfLines={1}
       >
@@ -198,10 +268,40 @@ export interface BentoStatProps {
   onPress?: () => void;
   index?: number;
   className?: string;
+  /** "Tide Ocean" iOS-widget layout: glass tile, micro label on top, value below. */
+  dense?: boolean;
 }
 
 /** Compact number tile: tinted icon chip, big value, small label. */
-export function BentoStat({ icon, color, value, label, progress, onPress, index, className }: BentoStatProps) {
+export function BentoStat({ icon, color, value, label, progress, onPress, index, className, dense = false }: BentoStatProps) {
+  if (dense) {
+    return (
+      <BentoTile tone="glass" dense onPress={onPress} index={index} className={className} accessibilityLabel={`${label}: ${value}`}>
+        <View className="flex-1 justify-between gap-2.5">
+          <View className="flex-row items-center gap-1.5">
+            <View className="h-6 w-6 items-center justify-center rounded-[8px]" style={{ backgroundColor: hexToRgba(color, 0.14) }}>
+              <Icon name={icon} size={13} color={color} strokeWidth={2.2} />
+            </View>
+            <Text variant="label" color="muted" className="flex-1 text-[10.5px] tracking-[0.6px]" numberOfLines={1}>
+              {label}
+            </Text>
+            {onPress && <Icon name="ChevronRight" size={13} />}
+          </View>
+          <View>
+            <Text variant="h2" color="primary" className="text-[24px] leading-[28px]" numberOfLines={1} style={{ fontVariant: ['tabular-nums'] }}>
+              {value}
+            </Text>
+            {progress !== undefined && (
+              <View className="mt-2 h-1 overflow-hidden rounded-full bg-hover">
+                <View style={{ width: `${Math.max(0, Math.min(100, progress))}%`, height: '100%', borderRadius: 999, backgroundColor: color }} />
+              </View>
+            )}
+          </View>
+        </View>
+      </BentoTile>
+    );
+  }
+
   return (
     <BentoTile onPress={onPress} index={index} className={className} accessibilityLabel={`${label}: ${value}`}>
       <View className="flex-1 justify-between gap-4">

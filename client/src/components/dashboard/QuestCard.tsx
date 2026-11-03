@@ -5,12 +5,13 @@ import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } 
 import { QuestFormModal, QuestManagerModal } from '../quest';
 import { useQuestStore } from '../../store/questStore';
 import { useDayStreak } from '../../store/streakStore';
-import { QUEST_CATEGORY_COLOR, QUEST_CATEGORY_ICON, QUEST_CATEGORY_LABEL, QUEST_TIER_META, type Quest, type QuestCategory } from '../../types/quest';
+import { QUEST_CATEGORY_COLOR, QUEST_CATEGORY_LABEL, QUEST_TIER_META, type Quest, type QuestCategory } from '../../types/quest';
 import { confirmAsync } from '../../utils/confirm';
 import { hexToRgba } from '../../utils/color';
 import { soundManager } from '../../utils/soundManager';
 import { formatWeekdayMonthDay } from '../../utils/formatDate';
-import { Badge, Button, Card, Icon, ProgressBar, Text, type IconName } from '../ui';
+import { ocean } from '../../utils/theme';
+import { BentoHeader, BentoTile, Button, Icon, Text, type IconName } from '../ui';
 import { Pressable } from '../ui/SoundPressable';
 
 function QuestRow({ quest, onToggle, onEdit, onDelete }: { quest: Quest; onToggle: () => void; onEdit: () => void; onDelete: () => void }) {
@@ -32,57 +33,62 @@ function QuestRow({ quest, onToggle, onEdit, onDelete }: { quest: Quest; onToggl
   const checkStyle = useAnimatedStyle(() => ({ transform: [{ scale: checkScale.value }] }));
 
   return (
-    <View className="flex-row items-center gap-1.5 rounded-xl px-1 py-1 hover:bg-elevated">
+    <View className="flex-row items-center gap-0.5 rounded-xl hover:bg-hover">
       <Pressable
         onPress={handleToggle}
         disabled={locked}
         accessibilityState={{ checked: quest.isCompleted, disabled: locked }}
         accessibilityHint={locked ? 'Completed quests are locked' : undefined}
-        className="flex-1 flex-row items-center gap-3 rounded-xl px-1 py-1.5"
+        className="flex-1 flex-row items-center gap-2.5 rounded-xl px-1.5 py-1.5"
       >
-        <View className="h-9 w-9 items-center justify-center rounded-full" style={{ backgroundColor: hexToRgba(color, 0.12) }}>
-          <Icon name={quest.icon as IconName} size={17} color={color} />
-        </View>
-        <View className="flex-1">
-          <View className="flex-row flex-wrap items-center gap-1.5">
-            <Text variant="body" color={quest.isCompleted ? 'muted' : 'primary'} className={quest.isCompleted ? 'font-medium line-through' : 'font-medium'}>
-              {quest.title}
-            </Text>
-            <View className="rounded-full px-1.5 py-0.5" style={{ backgroundColor: hexToRgba(tierMeta.color, 0.15) }}>
-              <RNText className="text-[10px] font-semibold" style={{ color: tierMeta.color }}>
-                {tierMeta.name}
-              </RNText>
-            </View>
-          </View>
-          <Text variant="caption" color="muted" className="mt-0.5 normal-case tracking-normal" numberOfLines={1}>
-            {quest.generationReason || quest.description} · +{quest.xp} XP
-          </Text>
-        </View>
         <Animated.View
           style={checkStyle}
           className={
             quest.isCompleted
-              ? 'h-6 w-6 items-center justify-center rounded-full bg-tide-teal'
-              : 'h-6 w-6 items-center justify-center rounded-full border-2 border-subtle'
+              ? 'h-[18px] w-[18px] items-center justify-center rounded-full bg-tide-teal'
+              : 'h-[18px] w-[18px] items-center justify-center rounded-full border-[1.5px] border-hover'
           }
         >
-          {quest.isCompleted && <Icon name="Check" size={14} color="#FFFFFF" />}
+          {quest.isCompleted && <Icon name="Check" size={11} color="#FFFFFF" strokeWidth={3} />}
         </Animated.View>
+        <View className="h-7 w-7 items-center justify-center rounded-[9px]" style={{ backgroundColor: hexToRgba(color, 0.13) }}>
+          <Icon name={quest.icon as IconName} size={14} color={color} strokeWidth={2.2} />
+        </View>
+        <View className="min-w-0 flex-1">
+          <View className="flex-row items-center gap-1.5">
+            <Text
+              variant="body"
+              color={quest.isCompleted ? 'muted' : 'primary'}
+              className={quest.isCompleted ? 'shrink text-[13px] font-medium line-through' : 'shrink text-[13px] font-semibold'}
+              numberOfLines={1}
+            >
+              {quest.title}
+            </Text>
+            <View className="rounded-full px-1.5 py-px" style={{ backgroundColor: hexToRgba(tierMeta.color, 0.14) }}>
+              <RNText className="text-[9.5px] font-semibold" style={{ color: tierMeta.color }}>
+                {tierMeta.name}
+              </RNText>
+            </View>
+          </View>
+          <Text variant="body" color="muted" className="text-[11.5px] leading-[15px]" numberOfLines={1}>
+            {quest.generationReason || quest.description} · +{quest.xp} XP
+          </Text>
+        </View>
       </Pressable>
 
       {locked ? (
-        <View className="h-10 w-10 items-center justify-center" accessibilityLabel="Completed — locked">
-          <Icon name="Lock" size={13} color={hexToRgba(color, 0.45)} />
+        <View className="h-8 w-8 items-center justify-center" accessibilityLabel="Completed — locked">
+          <Icon name="Lock" size={12} color={hexToRgba(color, 0.45)} />
         </View>
       ) : (
-        <Pressable onPress={onEdit} hitSlop={4} className="h-10 w-10 items-center justify-center">
-          <Icon name="Pencil" size={14} color={hexToRgba(color, 0.6)} />
+        <Pressable onPress={onEdit} hitSlop={6} accessibilityLabel={`Edit ${quest.title}`} className="h-8 w-8 items-center justify-center rounded-lg">
+          <Icon name="Pencil" size={13} color={hexToRgba(color, 0.65)} />
         </Pressable>
       )}
 
       {quest.isCustom && (
-        <Pressable onPress={onDelete} hitSlop={4} className="h-10 w-10 items-center justify-center">
-          <Icon name="Trash2" size={14} color="#EF4444" />
+        <Pressable onPress={onDelete} hitSlop={6} accessibilityLabel={`Delete ${quest.title}`} className="h-8 w-8 items-center justify-center rounded-lg">
+          <Icon name="Trash2" size={13} color="#EF4444" />
         </Pressable>
       )}
     </View>
@@ -92,10 +98,10 @@ function QuestRow({ quest, onToggle, onEdit, onDelete }: { quest: Quest; onToggl
 function CategoryGroup({ category, quests, onToggle, onEdit, onDelete }: { category: QuestCategory; quests: Quest[]; onToggle: (q: Quest) => void; onEdit: (q: Quest) => void; onDelete: (q: Quest) => void }) {
   const color = QUEST_CATEGORY_COLOR[category];
   return (
-    <View className="gap-1.5 rounded-2xl border border-subtle p-2">
-      <View className="flex-row items-center gap-2 px-1.5 pt-1">
-        <Icon name={QUEST_CATEGORY_ICON[category] as IconName} size={14} color={color} />
-        <Text variant="label" style={{ color }}>
+    <View className="min-w-0 gap-0.5 md:flex-1">
+      <View className="flex-row items-center gap-1.5 px-1.5 pb-0.5">
+        <View className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+        <Text variant="label" className="text-[10px] tracking-[0.8px]" style={{ color }}>
           {QUEST_CATEGORY_LABEL[category]}
         </Text>
       </View>
@@ -176,71 +182,72 @@ export function QuestCard() {
   };
 
   return (
-    <Card variant="default" padding="lg" className="gap-4 rounded-[24px]">
-      <View className="flex-row items-center justify-between">
-        <View className="flex-row items-center gap-2">
-          <Icon name="Sparkles" size={18} color="#14B8A6" />
-          <View>
-            <Text variant="h3" color="primary">
-              Tide's Quest
-            </Text>
-            <Text variant="caption" color="muted" className="normal-case tracking-normal">
-              {formatWeekdayMonthDay(new Date().toISOString())}
+    <BentoTile tone="glass" dense>
+      <View className="gap-3">
+        <BentoHeader
+          dense
+          title="Tide's Quest"
+          icon="Sparkles"
+          color={ocean.lagoon}
+          right={
+            <View className="flex-row items-center gap-1.5">
+              <Text variant="body" color="muted" className="hidden text-[11.5px] md:flex">
+                {formatWeekdayMonthDay(new Date().toISOString())}
+              </Text>
+              {streak > 0 && (
+                <View className="flex-row items-center gap-1 rounded-full px-2 py-0.5" style={{ backgroundColor: hexToRgba(ocean.coral, 0.14) }}>
+                  <Icon name="Flame" size={11} color={ocean.coral} />
+                  <RNText className="text-[11px] font-bold" style={{ color: ocean.coral }}>
+                    {streak}d
+                  </RNText>
+                </View>
+              )}
+              <Pressable onPress={() => setManagerVisible(true)} hitSlop={6} accessibilityLabel="Manage quests" className="h-7 w-7 items-center justify-center rounded-lg hover:bg-hover">
+                <Icon name="Settings2" size={14} />
+              </Pressable>
+            </View>
+          }
+        />
+
+        {visibleQuests.length > 0 && (
+          <View className="gap-1">
+            <View className="h-1 overflow-hidden rounded-full bg-hover">
+              <View style={{ width: `${progress}%`, height: '100%', borderRadius: 999, backgroundColor: ocean.lagoon }} />
+            </View>
+            <Text variant="body" color="muted" className="text-[11px]">
+              {completedCount}/{visibleQuests.length} done today
+              {questStreak && questStreak.weeklyCompletionRate > 0 ? ` · ${questStreak.weeklyCompletionRate}% of days fully completed this week` : ''}
             </Text>
           </View>
-        </View>
-        <View className="flex-row items-center gap-2">
-          {streak > 0 && (
-            <View className="flex-row items-center gap-1.5 rounded-full bg-orange-500/10 px-3 py-1">
-              <Icon name="Flame" size={14} color="#F97316" />
-              <RNText className="text-caption font-bold text-orange-500">
-                {streak} day{streak === 1 ? '' : 's'}
-              </RNText>
-            </View>
-          )}
-          <Pressable onPress={() => setManagerVisible(true)} hitSlop={4} className="h-10 w-10 items-center justify-center">
-            <Icon name="Settings2" size={16} />
-          </Pressable>
-        </View>
-      </View>
+        )}
 
-      {visibleQuests.length > 0 && (
-        <View className="gap-1">
-          <ProgressBar value={progress} variant="teal" showLabel label={`${completedCount}/${visibleQuests.length} completed today`} />
-          {questStreak && questStreak.weeklyCompletionRate > 0 && (
-            <Text variant="caption" color="muted" className="normal-case tracking-normal">
-              {questStreak.weeklyCompletionRate}% of days fully completed this week
-            </Text>
-          )}
-        </View>
-      )}
+        {visibleQuests.length === 0 ? (
+          <Text variant="body" color="muted" className="py-1 text-[12.5px]">
+            No active quests — generate a set, add one below, or unpause one from Manage.
+          </Text>
+        ) : (
+          <View className="gap-2.5 md:flex-row md:gap-3">
+            {categoriesInOrder.map((category) => (
+              <CategoryGroup
+                key={category}
+                category={category}
+                quests={grouped[category] || []}
+                onToggle={(q) => toggleQuest(q.id)}
+                onEdit={openEdit}
+                onDelete={handleDelete}
+              />
+            ))}
+          </View>
+        )}
 
-      {visibleQuests.length === 0 ? (
-        <Text variant="body" color="muted" className="py-2 text-center">
-          No active quests — generate a set, add one below, or unpause one from Manage.
-        </Text>
-      ) : (
-        <View className="gap-3">
-          {categoriesInOrder.map((category) => (
-            <CategoryGroup
-              key={category}
-              category={category}
-              quests={grouped[category] || []}
-              onToggle={(q) => toggleQuest(q.id)}
-              onEdit={openEdit}
-              onDelete={handleDelete}
-            />
-          ))}
+        <View className="flex-row items-center justify-end gap-1.5 border-t border-subtle pt-2.5">
+          <Button title="Add quest" variant="ghost" size="sm" icon="Plus" onPress={openCreate} />
+          <Button title="Generate today's" variant="secondary" size="sm" icon="Sparkles" loading={isGenerating} onPress={handleGenerate} />
         </View>
-      )}
-
-      <View className="flex-row gap-2">
-        <Button title="+ Add Quest" variant="ghost" size="sm" onPress={openCreate} className="flex-1" />
-        <Button title="Generate Today's Quests" variant="secondary" size="sm" icon="Sparkles" loading={isGenerating} onPress={handleGenerate} className="flex-1" />
       </View>
 
       <QuestFormModal visible={formVisible} onClose={() => setFormVisible(false)} quest={editingQuest} />
       <QuestManagerModal visible={managerVisible} onClose={() => setManagerVisible(false)} />
-    </Card>
+    </BentoTile>
   );
 }
