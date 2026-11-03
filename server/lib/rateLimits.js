@@ -10,6 +10,14 @@ const { rateLimit } = require('express-rate-limit');
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
 const ONE_MINUTE = 60 * 1000;
 
+const LIMITS = {
+  // Per IP — one school/office Wi-Fi is one IP, and a dashboard load alone is ~5 requests, so
+  // this is sized for a room of people using the app at once, not for one person.
+  global: { windowMs: FIFTEEN_MINUTES, limit: 1000 },
+  login: { windowMs: FIFTEEN_MINUTES, limit: 5 },
+  chat: { windowMs: ONE_MINUTE, limit: 20 },
+};
+
 // Same `{ error }` shape as every other API error, so the client's getApiErrorMessage shows it.
 function tooMany(message) {
   return (req, res, next, options) => res.status(options.statusCode).json({ error: message });
@@ -21,8 +29,7 @@ const common = { standardHeaders: 'draft-8', legacyHeaders: false };
  * they're counted, and so a 429 still carries the CORS headers the browser needs to read it. */
 const globalLimiter = rateLimit({
   ...common,
-  windowMs: FIFTEEN_MINUTES,
-  limit: 100,
+  ...LIMITS.global,
   handler: tooMany('Too many requests. Please wait a few minutes and try again.'),
 });
 
@@ -31,8 +38,7 @@ const globalLimiter = rateLimit({
  * from the same Wi-Fi. */
 const loginLimiter = rateLimit({
   ...common,
-  windowMs: FIFTEEN_MINUTES,
-  limit: 5,
+  ...LIMITS.login,
   skipSuccessfulRequests: true,
   handler: tooMany('Too many failed sign-in attempts. Please wait 15 minutes and try again.'),
 });
@@ -41,10 +47,9 @@ const loginLimiter = rateLimit({
  * requireAuth, which sets req.user. */
 const chatLimiter = rateLimit({
   ...common,
-  windowMs: ONE_MINUTE,
-  limit: 20,
+  ...LIMITS.chat,
   keyGenerator: (req) => req.user.id,
   handler: tooMany('TIDE Coach is getting a lot of messages from you right now. Please wait a minute and try again.'),
 });
 
-module.exports = { globalLimiter, loginLimiter, chatLimiter };
+module.exports = { LIMITS, globalLimiter, loginLimiter, chatLimiter };

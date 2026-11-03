@@ -21,6 +21,17 @@ jest.mock('../../lib/ragService', () => ({
 
 const request = require('supertest');
 const app = require('../../app');
+const { LIMITS } = require('../../lib/rateLimits');
+
+// One listening server for the whole file — request(app) would start a new one per request,
+// which is what makes a 1000-request test slow.
+let server;
+beforeAll(() => {
+  server = app.listen(0);
+});
+afterAll(() => new Promise((resolve) => server.close(resolve)));
+// The global-limit tests send 1000+ requests each.
+jest.setTimeout(60000);
 
 const ORIGIN = 'https://tide-rust.vercel.app';
 let ipCounter = 0;
@@ -34,7 +45,7 @@ async function hit(n, fn) {
 
 describe('security headers (helmet)', () => {
   test('responses carry helmet headers and no X-Powered-By', async () => {
-    const res = await request(app).get('/').set('X-Forwarded-For', freshIp());
+    const res = await request(server).get('/').set('X-Forwarded-For', freshIp());
     expect(res.headers['x-content-type-options']).toBe('nosniff');
     expect(res.headers['x-frame-options']).toBe('SAMEORIGIN');
     expect(res.headers['strict-transport-security']).toBeDefined();
@@ -42,13 +53,19 @@ describe('security headers (helmet)', () => {
   });
 });
 
-describe('global limit: 100 requests / 15 min per IP', () => {
-  test('the 101st request from one IP is 429 — as JSON, with CORS headers the browser can read', async () => {
+describe('global limit: 1000 requests / 15 min per IP', () => {
+  const GLOBAL = LIMITS.global.limit;
+
+  test('is sized for a shared Wi-Fi (thesis demo): 1000 per 15 minutes', () => {
+    expect(LIMITS.global).toEqual({ windowMs: 15 * 60 * 1000, limit: 1000 });
+  });
+
+  test('the request after the limit from one IP is 429 — as JSON, with CORS headers the browser can read', async () => {
     const ip = freshIp();
-    const ok = await hit(100, () => request(app).get('/').set('X-Forwarded-For', ip).set('Origin', ORIGIN));
+    const ok = await hit(GLOBAL, () => request(server).get('/').set('X-Forwarded-For', ip).set('Origin', ORIGIN));
     expect(ok.every((r) => r.status === 200)).toBe(true);
 
-    const limited = await request(app).get('/').set('X-Forwarded-For', ip).set('Origin', ORIGIN);
+    const limited = await request(server).get('/').set('X-Forwarded-For', ip).set('Origin', ORIGIN);
     expect(limited.status).toBe(429);
     expect(limited.body.error).toEqual(expect.any(String));
     expect(limited.headers['access-control-allow-origin']).toBe(ORIGIN);
@@ -57,29 +74,29 @@ describe('global limit: 100 requests / 15 min per IP', () => {
 
   test('another IP is unaffected', async () => {
     const busy = freshIp();
-    await hit(101, () => request(app).get('/').set('X-Forwarded-For', busy));
-    const other = await request(app).get('/').set('X-Forwarded-For', freshIp());
+    await hit(GLOBAL + 1, () => request(server).get('/').set('X-Forwarded-For', busy));
+    const other = await request(server).get('/').set('X-Forwarded-For', freshIp());
     expect(other.status).toBe(200);
   });
 
   test('CORS preflights do not use up the limit', async () => {
     const ip = freshIp();
-    await hit(150, () =>
-      request(app)
+    await hit(GLOBAL + 50, () =>
+      request(server)
         .options('/api/tasks')
         .set('X-Forwarded-For', ip)
         .set('Origin', ORIGIN)
         .set('Access-Control-Request-Method', 'GET')
         .set('Access-Control-Request-Headers', 'authorization'),
     );
-    const res = await request(app).get('/').set('X-Forwarded-For', ip);
+    const res = await request(server).get('/').set('X-Forwarded-For', ip);
     expect(res.status).toBe(200);
   });
 });
 
 describe('login limit: 5 failed attempts / 15 min per IP', () => {
   const login = (ip, password) =>
-    request(app).post('/api/auth/login').set('X-Forwarded-For', ip).send({ email: 'someone@test.local', password });
+    request(server).post('/api/auth/login').set('X-Forwarded-For', ip).send({ email: 'someone@test.local', password });
 
   test('the 6th failed attempt is 429, even with the right password', async () => {
     const ip = freshIp();
@@ -100,7 +117,7 @@ describe('login limit: 5 failed attempts / 15 min per IP', () => {
 describe('AI Coach limit: 20 requests / minute per user', () => {
   // An empty body is rejected by the handler with 400 before any LLM call — still a request
   // the limiter has to count.
-  const chat = (ip, user) => request(app).post('/api/chat').set('X-Forwarded-For', ip).set('Authorization', `Bearer ${user}`).send({});
+  const chat = (ip, user) => request(server).post('/api/chat').set('X-Forwarded-For', ip).set('Authorization', `Bearer ${user}`).send({});
 
   test('the 21st request from one user is 429', async () => {
     const ip = freshIp();
