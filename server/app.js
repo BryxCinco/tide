@@ -21,7 +21,7 @@ const profileRoutes = require('./routes/profile');
 const debugRagRoutes = require('./routes/debugRag');
 const chatRoutes = require('./routes/chat');
 const insightsRoutes = require('./routes/insights');
-const { globalLimiter, loginLimiter } = require('./lib/rateLimits');
+const { globalLimiter, loginLimiter, signupLimiter } = require('./lib/rateLimits');
 
 const app = express();
 
@@ -135,6 +135,7 @@ app.get('/api/debug', (req, res) => {
 });
 
 app.use('/api/auth/login', loginLimiter);
+app.use('/api/auth/signup', signupLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/activities', activitiesRoutes);
 app.use('/api/sessions', sessionsRoutes);

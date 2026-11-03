@@ -254,6 +254,14 @@ const supabaseAdmin = {
     async getClaims(token) {
       return { data: { claims: { sub: token, email: `${token}@test.local` } }, error: null };
     },
+    async signUp({ email }) {
+      return { data: { user: { id: `id-${email}`, email }, session: null }, error: null };
+    },
+    admin: {
+      async updateUserById() {
+        return { data: {}, error: null };
+      },
+    },
     // Any email signs in with the password "correct-password"; anything else is rejected.
     async signInWithPassword({ email, password }) {
       if (password !== 'correct-password') return { data: {}, error: { message: 'Invalid login credentials' } };

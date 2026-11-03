@@ -2,6 +2,7 @@ const express = require('express');
 const { supabaseAuth, supabaseAdmin } = require('../lib/supabaseClient');
 const { requireAuth } = require('../middleware/auth');
 const { deleteAllUserFiles } = require('../lib/storage');
+const { passwordChangeLimiter } = require('../lib/rateLimits');
 
 const router = express.Router();
 
@@ -119,7 +120,7 @@ router.post('/refresh', async (req, res) => {
 // account (no password set yet), that verify step always fails — SetPasswordModal (the Google
 // post-sign-in flow, see authStore's completeGoogleSignIn) is the correct path for them, not
 // this route.
-router.patch('/password', requireAuth, async (req, res) => {
+router.patch('/password', requireAuth, passwordChangeLimiter, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
 
   if (!currentPassword || !newPassword) {

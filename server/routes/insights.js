@@ -2,8 +2,12 @@ const express = require('express');
 const { requireAuth } = require('../middleware/auth');
 const { getProductivitySummary, getTimeSeries, getHeatmap, getActivityBreakdown, getQuestStats } = require('../lib/insightsService');
 
+const { insightsLimiter } = require('../lib/rateLimits');
+
 const router = express.Router();
 router.use(requireAuth);
+// After requireAuth: the limit is per signed-in user (req.user.id), not per IP.
+router.use(insightsLimiter);
 
 function parseDays(raw, fallback, max = 366) {
   const n = parseInt(raw, 10);

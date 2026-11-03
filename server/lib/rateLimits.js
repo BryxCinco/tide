@@ -9,14 +9,25 @@ const { rateLimit } = require('express-rate-limit');
 
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
 const ONE_MINUTE = 60 * 1000;
+const ONE_HOUR = 60 * ONE_MINUTE;
 
 const LIMITS = {
   // Per IP — one school/office Wi-Fi is one IP, and a dashboard load alone is ~5 requests, so
   // this is sized for a room of people using the app at once, not for one person.
   global: { windowMs: FIFTEEN_MINUTES, limit: 1000 },
   login: { windowMs: FIFTEEN_MINUTES, limit: 5 },
+  // Per IP, every signup counts — a successful one is exactly the abuse (account spam). 20 an
+  // hour still lets a classroom on one Wi-Fi sign up during a demo.
+  signup: { windowMs: ONE_HOUR, limit: 20 },
+  // Per user, failed attempts only — stops guessing the current password on a left-open session.
+  passwordChange: { windowMs: FIFTEEN_MINUTES, limit: 5 },
   chat: { windowMs: ONE_MINUTE, limit: 20 },
+  // Per user. DB aggregation only (the AI suggestions are /api/chat/insights, under `chat`);
+  // the Insights screen loads 5 of these at once, so this allows ~12 screen loads a minute.
+  insights: { windowMs: ONE_MINUTE, limit: 60 },
 };
+
+const byUser = (req) => req.user.id;
 
 // Same `{ error }` shape as every other API error, so the client's getApiErrorMessage shows it.
 function tooMany(message) {
@@ -48,8 +59,34 @@ const loginLimiter = rateLimit({
 const chatLimiter = rateLimit({
   ...common,
   ...LIMITS.chat,
-  keyGenerator: (req) => req.user.id,
+  keyGenerator: byUser,
   handler: tooMany('TIDE Coach is getting a lot of messages from you right now. Please wait a minute and try again.'),
 });
 
-module.exports = { LIMITS, globalLimiter, loginLimiter, chatLimiter };
+/** POST /api/auth/signup, per client IP. */
+const signupLimiter = rateLimit({
+  ...common,
+  ...LIMITS.signup,
+  handler: tooMany('Too many accounts created from this network. Please try again later.'),
+});
+
+/** PATCH /api/auth/password, per signed-in user, failed attempts only. Must run after
+ * requireAuth. (Forgot-password emails don't come through this server — the client calls
+ * Supabase Auth directly — so those are limited in the Supabase dashboard, not here.) */
+const passwordChangeLimiter = rateLimit({
+  ...common,
+  ...LIMITS.passwordChange,
+  skipSuccessfulRequests: true,
+  keyGenerator: byUser,
+  handler: tooMany('Too many incorrect password attempts. Please wait 15 minutes and try again.'),
+});
+
+/** /api/insights/*, per signed-in user. Must run after requireAuth. */
+const insightsLimiter = rateLimit({
+  ...common,
+  ...LIMITS.insights,
+  keyGenerator: byUser,
+  handler: tooMany('Too many requests for your stats right now. Please wait a minute and try again.'),
+});
+
+module.exports = { LIMITS, globalLimiter, loginLimiter, signupLimiter, passwordChangeLimiter, chatLimiter, insightsLimiter };

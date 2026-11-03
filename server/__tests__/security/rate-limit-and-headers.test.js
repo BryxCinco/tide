@@ -114,6 +114,59 @@ describe('login limit: 5 failed attempts / 15 min per IP', () => {
   });
 });
 
+describe('signup limit: 20 accounts / hour per IP', () => {
+  const signup = (ip, i) =>
+    request(server).post('/api/auth/signup').set('X-Forwarded-For', ip).send({ email: `new${i}@test.local`, password: 'pass1234', name: 'n' });
+
+  test('the 21st signup from one IP is 429 — successful signups count (they are the abuse)', async () => {
+    const ip = freshIp();
+    const ok = await hit(20, (i) => signup(ip, i));
+    expect(ok.every((r) => r.status === 201)).toBe(true);
+    expect((await signup(ip, 999)).status).toBe(429);
+  });
+
+  test('another IP can still sign up', async () => {
+    const busy = freshIp();
+    await hit(21, (i) => signup(busy, i));
+    expect((await signup(freshIp(), 0)).status).toBe(201);
+  });
+});
+
+describe('password change limit: 5 failed attempts / 15 min per user', () => {
+  const change = (ip, user, currentPassword) =>
+    request(server)
+      .patch('/api/auth/password')
+      .set('X-Forwarded-For', ip)
+      .set('Authorization', `Bearer ${user}`)
+      .send({ currentPassword, newPassword: 'newpass123' });
+
+  test('guessing the current password on a left-open session is stopped after 5 tries', async () => {
+    const wrong = await hit(5, () => change(freshIp(), 'open-session', 'guess'));
+    expect(wrong.every((r) => r.status === 401)).toBe(true);
+    // Keyed by user: switching IPs doesn't help, and even the right password waits it out.
+    expect((await change(freshIp(), 'open-session', 'correct-password')).status).toBe(429);
+  });
+
+  test('successful changes do not count, and other users are unaffected', async () => {
+    const ip = freshIp();
+    const ok = await hit(7, () => change(ip, 'careful-user', 'correct-password'));
+    expect(ok.every((r) => r.status === 200)).toBe(true);
+    expect((await change(ip, 'someone-else', 'guess')).status).toBe(401);
+  });
+});
+
+describe('insights limit: 60 requests / minute per user', () => {
+  const insights = (ip, user) => request(server).get('/api/insights/summary').set('X-Forwarded-For', ip).set('Authorization', `Bearer ${user}`);
+
+  test('the 61st request from one user is 429; another user is unaffected', async () => {
+    const ip = freshIp();
+    const first = await hit(60, () => insights(ip, 'stats-fan'));
+    expect(first.every((r) => r.status !== 429)).toBe(true);
+    expect((await insights(ip, 'stats-fan')).status).toBe(429);
+    expect((await insights(ip, 'other-user')).status).not.toBe(429);
+  });
+});
+
 describe('AI Coach limit: 20 requests / minute per user', () => {
   // An empty body is rejected by the handler with 400 before any LLM call — still a request
   // the limiter has to count.
