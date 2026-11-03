@@ -3,9 +3,12 @@ const { requireAuth } = require('../middleware/auth');
 const { retrieveRelevantContext, retrieveStats, buildContextString } = require('../lib/ragService');
 const { generateResponse, generateResponseStream, generateWithTools, generateInsightSuggestions } = require('../lib/llmService');
 const { toolHandlers } = require('../lib/tools');
+const { chatLimiter } = require('../lib/rateLimits');
 
 const router = express.Router();
 router.use(requireAuth);
+// After requireAuth: the limit is per signed-in user (req.user.id), not per IP.
+router.use(chatLimiter);
 
 // Turns a Groq/llmService failure into exactly one of a few hand-written, friendly messages
 // — never `err.message` itself, which for a Groq APIError is literally things like "Rate

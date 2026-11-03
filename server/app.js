@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 // A no-op on Vercel (no .env file is deployed — real values come from the dashboard's
 // Environment Variables, injected straight into process.env before this module even
 // loads). Kept only so local dev (`node index.js`) still picks up server/.env.
@@ -20,8 +21,15 @@ const profileRoutes = require('./routes/profile');
 const debugRagRoutes = require('./routes/debugRag');
 const chatRoutes = require('./routes/chat');
 const insightsRoutes = require('./routes/insights');
+const { globalLimiter, loginLimiter } = require('./lib/rateLimits');
 
 const app = express();
+
+// Vercel sits one proxy hop in front of this app and sets X-Forwarded-For to the real client
+// IP. Without this, req.ip is the proxy's address and every user would share one rate-limit
+// bucket.
+app.set('trust proxy', 1);
+app.use(helmet());
 
 // Which env vars this app actually needs to function, checked for PRESENCE only — never
 // logs or exposes a value, just whether process.env picked it up at all. Vercel gotcha
@@ -73,6 +81,10 @@ app.use(
     },
   })
 );
+// After cors() on purpose: preflight OPTIONS requests are answered by cors() and never
+// counted, and a 429 still carries the CORS headers the browser needs to read it (otherwise
+// it surfaces as an opaque CORS error instead of "too many requests").
+app.use(globalLimiter);
 // Default is 100kb — a 2MB avatar/cover photo picked as a base64 data: URI (see
 // imageUpload.ts) runs ~2.7MB once encoded, which the default limit was rejecting with a
 // 413. profile.js decodes and uploads it to Storage rather than storing the base64 itself,
@@ -122,6 +134,7 @@ app.get('/api/debug', (req, res) => {
   });
 });
 
+app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/activities', activitiesRoutes);
 app.use('/api/sessions', sessionsRoutes);
