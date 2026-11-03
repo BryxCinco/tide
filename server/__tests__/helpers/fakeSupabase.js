@@ -193,8 +193,52 @@ function bucket(name) {
   };
 }
 
+// Postgres functions the server calls through .rpc(). Each runs synchronously inside one
+// macrotask — i.e. atomically, like the single SQL statement it stands in for.
+const rpcs = {
+  // migrations/014_atomic_xp.sql: INSERT ... ON CONFLICT (user_id) DO UPDATE total_xp + amount.
+  award_xp({ p_user_id, p_amount }) {
+    if (!Number.isInteger(p_amount) || p_amount <= 0) {
+      return { data: null, error: { code: 'P0001', message: 'award_xp: p_amount must be a positive integer' } };
+    }
+    const rows = table('user_levels');
+    let row = rows.find((r) => r.user_id === p_user_id);
+    if (!row) {
+      row = { user_id: p_user_id, total_xp: 0, level: 1 };
+      rows.push(row);
+    }
+    row.total_xp += p_amount;
+    row.level = Math.floor(Math.sqrt(Math.max(0, row.total_xp) / 100)) + 1;
+    row.updated_at = new Date().toISOString();
+    return { data: [{ new_total_xp: row.total_xp, new_level: row.level }], error: null };
+  },
+};
+
+class RpcCall {
+  constructor(name, params) {
+    this.name = name;
+    this.params = params;
+    this.mode = 'many';
+  }
+  single() {
+    this.mode = 'single';
+    return this;
+  }
+  execute() {
+    const fn = rpcs[this.name];
+    if (!fn) return { data: null, error: { code: 'PGRST202', message: `Could not find the function public.${this.name}` } };
+    const result = fn(this.params || {});
+    if (result.error || this.mode !== 'single') return result;
+    return result.data.length === 1 ? { data: result.data[0], error: null } : { data: null, error: notFound() };
+  }
+  then(resolve, reject) {
+    return new Promise((r) => setImmediate(r)).then(() => this.execute()).then(resolve, reject);
+  }
+}
+
 const supabaseAdmin = {
   from: (name) => new Query(name),
+  rpc: (name, params) => new RpcCall(name, params),
   storage: {
     from: bucket,
     async listBuckets() {

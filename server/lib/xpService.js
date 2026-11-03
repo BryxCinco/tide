@@ -17,37 +17,29 @@ function xpForLevel(level) {
  * XP from something that can legitimately be zero (e.g. a sub-minute timer session), and
  * this keeps them from needing to guard that themselves.
  *
- * Upserts rather than requiring a pre-existing row: `user_levels` rows are normally created
- * by the signup trigger (see migrations/008_levels_xp.sql), but an account that predates
- * this feature and somehow missed the migration's backfill would otherwise 404 here instead
- * of just starting from 0.
+ * The increment happens in one SQL statement (award_xp, migrations/014_atomic_xp.sql), not a
+ * read here followed by a write — two awards in flight at once (a quest completion and its
+ * streak bonus) used to both read the same total, and the later write erased the earlier
+ * one. It also creates the row if it's missing: `user_levels` rows normally come from the
+ * signup trigger (migrations/008_levels_xp.sql), but an account that predates this feature
+ * and somehow missed the backfill starts from 0 instead of failing.
  */
 async function awardXp(userId, amount, reason) {
   if (!amount || amount <= 0) return null;
 
-  const { data: existing, error: fetchError } = await supabaseAdmin
-    .from('user_levels')
-    .select('total_xp, level')
-    .eq('user_id', userId)
-    .single();
-
-  if (fetchError && fetchError.code !== 'PGRST116') throw new Error(fetchError.message);
-
-  const previousLevel = existing?.level ?? 1;
-  const totalXp = (existing?.total_xp ?? 0) + amount;
-  const level = levelFromXp(totalXp);
-
-  const { data, error } = await supabaseAdmin
-    .from('user_levels')
-    .upsert({ user_id: userId, total_xp: totalXp, level, updated_at: new Date().toISOString() })
-    .select('total_xp, level')
-    .single();
+  const { data, error } = await supabaseAdmin.rpc('award_xp', { p_user_id: userId, p_amount: amount }).single();
 
   if (error) throw new Error(error.message);
 
-  console.log(`[xp] +${amount} XP for ${userId} (${reason}) -> ${data.total_xp} total, level ${data.level}`);
+  const totalXp = data.new_total_xp;
+  const level = data.new_level;
+  // The total before this award is exactly totalXp - amount (the increment was atomic), so
+  // the previous level comes from that rather than from a separate, possibly stale, read.
+  const previousLevel = levelFromXp(totalXp - amount);
 
-  return { totalXp: data.total_xp, level: data.level, leveledUp: data.level > previousLevel, xpGained: amount };
+  console.log(`[xp] +${amount} XP for ${userId} (${reason}) -> ${totalXp} total, level ${level}`);
+
+  return { totalXp, level, leveledUp: level > previousLevel, xpGained: amount };
 }
 
 module.exports = { awardXp, levelFromXp, xpForLevel };
