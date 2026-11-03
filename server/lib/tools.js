@@ -4,7 +4,6 @@ const {
   deleteEmbedding,
   buildTaskContent,
   buildJournalContent,
-  buildSessionContent,
 } = require('./embeddingPipeline');
 const { retrieveStats, retrieveRelevantContext } = require('./ragService');
 const { awardXp, xpForLevel } = require('./xpService');
@@ -741,55 +740,23 @@ toolHandlers.getMoodHistory = async ({ userId, days }) => {
   };
 };
 
-// There's no live "running timer" state tracked server-side in this codebase (the frontend's
-// timer is client-only Zustand state; POST /api/sessions only ever records a session after
-// it ends). This handler can't start or sync a live client timer — it records the intent as
-// a time_logs row instead: an open-ended row (duration_seconds: 0, ended_at: null) if no
-// duration was given, or a pre-filled row spanning now..now+duration if one was.
-toolHandlers.startTimer = async ({ userId, activityName, durationMinutes }) => {
+// The timer is client-only state, and POST /api/sessions (called by the Timer screen on stop)
+// is the single place a session is logged and its XP awarded. So this tool writes nothing and
+// awards nothing — it only tells the client to open the Timer screen. It used to insert a row
+// spanning now..now+planned and award the planned minutes as XP up front, which let one chat
+// message ("start a 100000-minute timer") buy any level.
+toolHandlers.startTimer = async ({ activityName, durationMinutes }) => {
   if (!activityName || !activityName.trim()) {
     return { error: 'activityName is required', message: 'What activity should I start timing?' };
   }
 
-  const startedAt = new Date();
   const hasDuration = typeof durationMinutes === 'number' && durationMinutes > 0;
-  const endedAt = hasDuration ? new Date(startedAt.getTime() + durationMinutes * 60000) : null;
-  const durationSeconds = hasDuration ? Math.round(durationMinutes * 60) : 0;
-
-  const { data, error } = await supabaseAdmin
-    .from('time_logs')
-    .insert({
-      user_id: userId,
-      activity_name: activityName,
-      duration_seconds: durationSeconds,
-      started_at: startedAt.toISOString(),
-      ended_at: endedAt ? endedAt.toISOString() : null,
-      notes: 'Started via AI Coach',
-    })
-    .select()
-    .single();
-
-  if (error) throw new Error(error.message);
-
-  upsertEmbedding({
-    userId,
-    sourceType: 'session',
-    sourceId: data.id,
-    content: buildSessionContent(data),
-    metadata: { activity_name: data.activity_name, date: data.ended_at || data.started_at },
-  }).catch((err) => console.error('[tools] startTimer embedding failed:', err.message));
-
-  if (durationSeconds > 0) {
-    await awardXp(userId, Math.round(durationSeconds / 60), 'session logged via AI').catch((err) =>
-      console.error('[tools] startTimer XP award failed:', err.message),
-    );
-  }
 
   return {
-    session: data,
+    navigate: { route: '/timer', params: { activityName, durationMinutes: hasDuration ? durationMinutes : null } },
     message: hasDuration
-      ? `Started a ${durationMinutes}-minute focus session for "${activityName}".`
-      : `Started tracking "${activityName}". Let me know when you're done so I can log the duration.`,
+      ? `Opening the Timer for a ${durationMinutes}-minute "${activityName}" session — press start when you're ready.`
+      : `Opening the Timer for "${activityName}" — press start when you're ready.`,
   };
 };
 
