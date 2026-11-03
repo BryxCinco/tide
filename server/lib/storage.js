@@ -77,26 +77,71 @@ async function uploadIfDataUri(value, pathPrefix, bucket = AVATARS_BUCKET) {
   return data.publicUrl;
 }
 
+/** The object path inside `bucket` if `value` is one of that bucket's public URLs, else null. */
+function bucketPath(value, bucket) {
+  if (typeof value !== 'string' || !value.startsWith(publicUrlPrefix(bucket))) return null;
+  return value.slice(publicUrlPrefix(bucket).length);
+}
+
+/** True only for a path inside `${userId}/` — every upload is written there (see the
+ * pathPrefix callers). Decoded first and every segment checked, so "me/../them/x.png" and
+ * "me/%2e%2e/them/x.png" don't pass as "starts with me/". */
+function isOwnPath(path, userId) {
+  if (!userId) return false;
+  let segments;
+  try {
+    segments = decodeURIComponent(path).split('/');
+  } catch {
+    return false;
+  }
+  return segments.length > 1 && segments[0] === userId && !segments.some((s) => s === '' || s === '.' || s === '..');
+}
+
+/** Throws if `value` points into `bucket` but not into the caller's own folder. Anything that
+ * isn't one of this bucket's URLs (a data: URI, a Google avatar URL, a gradient id, a hex
+ * color, null) is not this check's concern and passes. */
+function assertNotOtherUsersFile(value, bucket, userId) {
+  const path = bucketPath(value, bucket);
+  if (path !== null && !isOwnPath(path, userId)) {
+    throw new Error('That image belongs to another account.');
+  }
+}
+
 /**
  * Best-effort cleanup for a value a field just got replaced with a new upload — deletes it
- * only if it's actually a file this bucket owns (matched by URL prefix); a gradient id, hex
- * color, or unrelated URL is silently left alone. Never throws — a failed cleanup is logged,
- * not allowed to fail the profile/journal update it's called after.
+ * only if it's a file in this bucket under `userId`'s own folder; a gradient id, hex color,
+ * unrelated URL, or another user's file is left alone. Runs with the service key, so the
+ * ownership check is the only thing stopping a planted URL from deleting someone else's
+ * file. Never throws — a failed cleanup is logged, not allowed to fail the profile/journal
+ * update it's called after.
  */
-async function deleteIfOwned(previousValue, bucket = AVATARS_BUCKET) {
-  if (typeof previousValue !== 'string' || !previousValue.startsWith(publicUrlPrefix(bucket))) return;
+async function deleteIfOwned(previousValue, bucket, userId) {
+  const path = bucketPath(previousValue, bucket);
+  if (path === null) return;
+  if (!isOwnPath(path, userId)) {
+    console.warn(`[storage] Refused to delete '${bucket}' file outside ${userId || '(no user)'}'s folder`);
+    return;
+  }
 
-  const path = previousValue.slice(publicUrlPrefix(bucket).length);
   const { error } = await supabaseAdmin.storage.from(bucket).remove([path]);
   if (error) console.error('[storage] Could not delete previous file:', error.message);
 }
 
 /** Uploads any data: URIs in `values` (what pickImage() produces client-side) to the
- * journal-photos bucket under `${userId}/`, passing through anything already a public URL
- * unchanged — an existing photo kept across an edit is re-sent as its own URL, not re-uploaded.
- * Caps at MAX_JOURNAL_PHOTOS defensively even though the route validates this too. */
+ * journal-photos bucket under `${userId}/`, passing through the caller's own existing photo
+ * URLs unchanged — an existing photo kept across an edit is re-sent as its own URL, not
+ * re-uploaded. Anything else (another user's photo, an external URL) is rejected: a journal
+ * photo is always an upload. Caps at MAX_JOURNAL_PHOTOS defensively even though the route
+ * validates this too. */
 async function uploadJournalPhotos(values, userId) {
   const capped = (values || []).slice(0, MAX_JOURNAL_PHOTOS);
+  for (const value of capped) {
+    const isDataUri = typeof value === 'string' && value.startsWith('data:');
+    const path = bucketPath(value, JOURNAL_PHOTOS_BUCKET);
+    if (!isDataUri && (path === null || !isOwnPath(path, userId))) {
+      throw new Error('Journal photos must be new uploads or photos already on this account.');
+    }
+  }
   const uploaded = [];
   for (let i = 0; i < capped.length; i++) {
     uploaded.push(await uploadIfDataUri(capped[i], `${userId}/${Date.now()}-${i}`, JOURNAL_PHOTOS_BUCKET));
@@ -107,10 +152,10 @@ async function uploadJournalPhotos(values, userId) {
 /** Deletes whichever journal photos were present before an edit but aren't in the new list —
  * i.e. ones the user removed. Never throws (delegates to deleteIfOwned's own try/catch-free
  * but logged-not-thrown behavior). */
-async function deleteRemovedJournalPhotos(previousUrls, newUrls) {
+async function deleteRemovedJournalPhotos(previousUrls, newUrls, userId) {
   const kept = new Set(newUrls || []);
   const removed = (previousUrls || []).filter((u) => !kept.has(u));
-  await Promise.all(removed.map((u) => deleteIfOwned(u, JOURNAL_PHOTOS_BUCKET)));
+  await Promise.all(removed.map((u) => deleteIfOwned(u, JOURNAL_PHOTOS_BUCKET, userId)));
 }
 
 /**
@@ -142,6 +187,7 @@ module.exports = {
   ensureAvatarsBucket,
   ensureJournalPhotosBucket,
   uploadIfDataUri,
+  assertNotOtherUsersFile,
   deleteIfOwned,
   uploadJournalPhotos,
   deleteRemovedJournalPhotos,

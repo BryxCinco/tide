@@ -102,7 +102,7 @@ router.patch('/:id', async (req, res) => {
   if (!data) return res.status(404).json({ error: 'Journal entry not found' });
 
   if (existingPhotoUrls) {
-    deleteRemovedJournalPhotos(existingPhotoUrls, data.photo_urls).catch((err) =>
+    deleteRemovedJournalPhotos(existingPhotoUrls, data.photo_urls, req.user.id).catch((err) =>
       console.error('[journals] removed-photo cleanup failed:', err.message),
     );
   }
@@ -134,7 +134,7 @@ router.delete('/:id', async (req, res) => {
   );
 
   for (const url of data?.photo_urls || []) {
-    deleteIfOwned(url, JOURNAL_PHOTOS_BUCKET).catch((err) => console.error('[journals] photo delete failed:', err.message));
+    deleteIfOwned(url, JOURNAL_PHOTOS_BUCKET, req.user.id).catch((err) => console.error('[journals] photo delete failed:', err.message));
   }
 
   res.status(204).send();

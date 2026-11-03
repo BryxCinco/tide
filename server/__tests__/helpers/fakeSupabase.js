@@ -148,6 +148,16 @@ class Query {
   }
 }
 
+// Resolves "a/../b" and percent-encoded dots the way a permissive object store could, so a
+// path-traversal attempt is tested against the worst case rather than a literal-key miss.
+function normalizeKey(p) {
+  try {
+    return require('path').posix.normalize(decodeURIComponent(p));
+  } catch {
+    return p;
+  }
+}
+
 function bucket(name) {
   if (!db.storage[name]) db.storage[name] = {};
   const files = db.storage[name];
@@ -155,7 +165,7 @@ function bucket(name) {
   return {
     async upload(path, buffer) {
       await tick();
-      files[path] = buffer;
+      files[normalizeKey(path)] = buffer;
       return { data: { path }, error: null };
     },
     getPublicUrl(path) {
@@ -163,7 +173,7 @@ function bucket(name) {
     },
     async remove(paths) {
       await tick();
-      for (const p of paths) delete files[p];
+      for (const p of paths) delete files[normalizeKey(p)];
       return { data: paths, error: null };
     },
     async list(prefix) {

@@ -1,7 +1,7 @@
 const express = require('express');
 const { supabaseAdmin } = require('../lib/supabaseClient');
 const { requireAuth } = require('../middleware/auth');
-const { uploadIfDataUri, deleteIfOwned } = require('../lib/storage');
+const { uploadIfDataUri, assertNotOtherUsersFile, deleteIfOwned, AVATARS_BUCKET } = require('../lib/storage');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -17,6 +17,11 @@ router.patch('/', async (req, res) => {
   const { name, bio, avatar_url, cover_url, cover_type, cover_value } = req.body;
 
   try {
+    // A storage URL is only accepted if it's in the caller's own folder — otherwise it could
+    // be planted here and then "cleaned up" (deleted) as the previous value on the next upload.
+    assertNotOtherUsersFile(avatar_url, AVATARS_BUCKET, req.user.id);
+    assertNotOtherUsersFile(cover_value, AVATARS_BUCKET, req.user.id);
+
     // Read the current values first so a replaced upload's old file can be deleted after —
     // only relevant when at least one field is actually a new upload, but cheap enough to
     // just always do.
@@ -46,8 +51,8 @@ router.patch('/', async (req, res) => {
 
     if (error) return res.status(500).json({ error: error.message });
 
-    if (previous && resolvedAvatarUrl !== previous.avatar_url) await deleteIfOwned(previous.avatar_url);
-    if (previous && resolvedCoverValue !== previous.cover_value) await deleteIfOwned(previous.cover_value);
+    if (previous && resolvedAvatarUrl !== previous.avatar_url) await deleteIfOwned(previous.avatar_url, AVATARS_BUCKET, req.user.id);
+    if (previous && resolvedCoverValue !== previous.cover_value) await deleteIfOwned(previous.cover_value, AVATARS_BUCKET, req.user.id);
 
     res.json({ profile: data });
   } catch (err) {
