@@ -71,6 +71,13 @@ class Query {
     this.filters.push((r) => r[col] === val);
     return this;
   }
+  // Only the `is` operator is used: .not(col, 'is', true) is SQL's `col IS NOT TRUE`, which
+  // matches both false and NULL (a column the insert never set reads as NULL here).
+  not(col, op, val) {
+    if (op !== 'is') throw new Error(`fakeSupabase: .not() operator '${op}' not supported`);
+    this.filters.push((r) => (r[col] ?? null) !== val);
+    return this;
+  }
   gte(col, val) {
     this.filters.push((r) => r[col] >= val);
     return this;

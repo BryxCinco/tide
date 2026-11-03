@@ -215,19 +215,28 @@ router.patch('/:id', async (req, res) => {
     update.is_completed = Boolean(req.body.is_completed);
     update.completed_at = update.is_completed ? new Date().toISOString() : null;
 
-    wasCompleted = false; // a completed quest never reaches this point (see the lock above)
+    wasCompleted = false; // a completed quest never reaches this point (see the lock below)
   }
 
+  // The lock check above is only a fast path. The update re-checks is_completed itself, so
+  // when two requests both pass that read (a double-tap), only one of them changes the row —
+  // the other matches 0 rows and gets the same 409, instead of awarding XP a second time.
+  // IS NOT TRUE rather than = false: inserts here and in questGenerator.js never set
+  // is_completed, and the base schema isn't in this repo, so a NULL must count as "open" —
+  // exactly like the truthy check above treats it.
   const { data: quest, error } = await supabaseAdmin
     .from('quests')
     .update(update)
     .eq('id', req.params.id)
     .eq('user_id', req.user.id)
+    .not('is_completed', 'is', true)
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) return res.status(500).json({ error: error.message });
-  if (!quest) return res.status(404).json({ error: 'Quest not found' });
+  if (!quest) {
+    return res.status(409).json({ error: 'This quest is already completed and can no longer be changed.', code: 'quest_locked' });
+  }
 
   const justCompleted = togglingCompletion && update.is_completed && !wasCompleted;
 
