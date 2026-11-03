@@ -7,6 +7,10 @@ const { awardXp } = require('../lib/xpService');
 const router = express.Router();
 router.use(requireAuth);
 
+const MAX_SESSION_SECONDS = 12 * 60 * 60;
+// A device clock a few minutes ahead of the server's shouldn't get a real session rejected.
+const CLOCK_SKEW_MS = 5 * 60 * 1000;
+
 // GET /api/sessions?from=ISO&to=ISO — optional range filter over ended_at, else all.
 router.get('/', async (req, res) => {
   let query = supabaseAdmin
@@ -27,7 +31,17 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const { activity_id, activity_name, duration_seconds, notes, tags, started_at, ended_at } = req.body;
 
-  if (!duration_seconds) return res.status(400).json({ error: 'duration_seconds is required' });
+  // XP is 1 per minute of duration, so both the duration and the timestamps have to be
+  // believable — otherwise one request can buy any level.
+  if (!Number.isInteger(duration_seconds) || duration_seconds <= 0 || duration_seconds > MAX_SESSION_SECONDS) {
+    return res.status(400).json({ error: `duration_seconds must be a whole number from 1 to ${MAX_SESSION_SECONDS} (12 hours)` });
+  }
+  for (const [field, value] of [['started_at', started_at], ['ended_at', ended_at]]) {
+    if (value === undefined || value === null) continue;
+    const time = Date.parse(value);
+    if (Number.isNaN(time)) return res.status(400).json({ error: `${field} is not a valid date` });
+    if (time > Date.now() + CLOCK_SKEW_MS) return res.status(400).json({ error: `${field} cannot be in the future` });
+  }
 
   const { data, error } = await supabaseAdmin
     .from('time_logs')

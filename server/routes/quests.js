@@ -12,6 +12,13 @@ router.use(requireAuth);
 // Streak lengths that earn a one-time bonus on top of the day's own quest XP.
 const STREAK_MILESTONES = [7, 30, 100];
 
+const VALID_TIERS = [1, 2, 3, 4, 5];
+
+// Out-of-range values are clamped by computeQuestXp itself; a non-number would make it NaN.
+function sanitizeDifficulty(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 1.0;
+}
+
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -120,7 +127,6 @@ router.post('/', async (req, res) => {
     category,
     tier,
     difficulty,
-    xp,
     date,
     is_recurring: isRecurring,
     recurrence_type: recurrenceType,
@@ -132,11 +138,12 @@ router.post('/', async (req, res) => {
 
   if (!title) return res.status(400).json({ error: 'title is required' });
 
-  // xp is auto-computed from tier+difficulty (the spec's whole point — no more hand-typed
-  // XP numbers) unless an explicit value is passed, kept only for the daily-generator's own
-  // insert path which already computes and sends its own final xp per pick.
-  const resolvedTier = tier || 1;
-  const resolvedXp = xp !== undefined ? xp : computeQuestXp(resolvedTier, difficulty ?? 1.0, 0, false);
+  // xp is always computed here from tier+difficulty — never taken from the body, or any
+  // client could award itself unlimited XP. (The daily generator inserts its own rows
+  // directly in questGenerator.js and never goes through this route.)
+  const resolvedTier = tier ?? 1;
+  if (!VALID_TIERS.includes(resolvedTier)) return res.status(400).json({ error: 'tier must be an integer from 1 to 5' });
+  const resolvedXp = computeQuestXp(resolvedTier, sanitizeDifficulty(difficulty), 0, false);
 
   const { data, error } = await supabaseAdmin
     .from('quests')
@@ -167,6 +174,10 @@ router.post('/', async (req, res) => {
 // (title/description/icon/category/xp/recurring/active), since both are just partial
 // updates to the same row. Only fields actually present in the body are touched.
 router.patch('/:id', async (req, res) => {
+  if ('tier' in req.body && !VALID_TIERS.includes(req.body.tier)) {
+    return res.status(400).json({ error: 'tier must be an integer from 1 to 5' });
+  }
+
   // A completed quest is locked: its XP is already awarded, and un-checking it would let it
   // be completed (and awarded) again, so it can't be un-checked or edited after that. A
   // custom one can still be deleted (DELETE below) — the XP stays awarded.
@@ -190,7 +201,7 @@ router.patch('/:id', async (req, res) => {
   if ('icon' in req.body) update.icon = req.body.icon;
   if ('category' in req.body) update.category = req.body.category;
   if ('tier' in req.body) update.tier = req.body.tier;
-  if ('xp' in req.body) update.xp = req.body.xp;
+  // `xp` is deliberately not editable — it's server-computed (see POST above).
   if ('is_active' in req.body) update.is_active = Boolean(req.body.is_active);
   if ('is_recurring' in req.body) {
     update.is_recurring = Boolean(req.body.is_recurring);
