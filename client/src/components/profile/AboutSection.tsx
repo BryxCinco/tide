@@ -17,7 +17,7 @@ export interface AboutSectionProps {
  * fabricate a store URL for `Linking.openURL`, it acknowledges the tap with a toast on
  * every platform; a real release would swap that for a real store link on mobile. */
 export function AboutSection({ onFeedbackPress, index, className }: AboutSectionProps) {
-  const version = Constants.expoConfig?.version ?? '1.0.0';
+  const version = Constants.expoConfig?.version ?? '1.1.0';
 
   return (
     <SettingsSection title="About" icon="Info" color="#64748B" index={index} className={className}>
