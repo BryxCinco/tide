@@ -9,7 +9,7 @@ interface ColorPalette {
 
 export const colors: ColorPalette = {
   background: {
-    base: '#F8FAFC',
+    base: '#F2F8F8', // ocean.shallows — keep in step with themeVars.ts
     elevated: '#F1F5F9',
     surface: '#FFFFFF',
     hover: '#E2E8F0',
@@ -61,7 +61,7 @@ export const colors: ColorPalette = {
  */
 export const darkColors: ColorPalette = {
   background: {
-    base: '#07090F',
+    base: '#03141A', // ocean.abyss — keep in step with themeVars.ts
     elevated: '#0E131C',
     surface: '#121823',
     hover: '#1B2230',

@@ -122,12 +122,13 @@ export function MobileDrawer() {
               borderColor: palette.borderColor,
             },
             palette.panelShadow,
+            palette.panelBlur,
             drawerStyle,
           ]}
         >
           <View className="absolute inset-x-0 top-0 h-40 overflow-hidden rounded-t-[24px]" pointerEvents="none">
             <LinearGradient
-              colors={[hexToRgba(teal, isDark ? 0.16 : 0.09), hexToRgba('#6366F1', isDark ? 0.06 : 0.03), 'transparent']}
+              colors={[hexToRgba(teal, isDark ? 0.16 : 0.09), hexToRgba('#22D3EE', isDark ? 0.06 : 0.04), 'transparent']}
               start={{ x: 0, y: 0 }}
               end={{ x: 0, y: 1 }}
               style={{ flex: 1 }}

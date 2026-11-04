@@ -9,7 +9,8 @@ import { useTimerStore } from '../../store/timerStore';
 import type { QuickSuggestion } from '../../types/chat';
 import { hexToRgba } from '../../utils/color';
 import { formatDuration } from '../../utils/formatTime';
-import { gradientDirections, gradients } from '../../utils/gradients';
+import { gradientDirections } from '../../utils/gradients';
+import { ocean } from '../../utils/theme';
 import { getGreeting } from '../../utils/greeting';
 import { BENTO_INK_TEXT, BentoTile, FadeInView, Icon, Text, type IconName } from '../ui';
 import { Pressable } from '../ui/SoundPressable';
@@ -22,7 +23,10 @@ function greetingFor(name?: string): string {
   return greeting.endsWith('?') ? `${greeting.slice(0, -1)}, ${name}?` : `${greeting}, ${name}`;
 }
 
-const SUGGESTION_COLORS = ['#14B8A6', '#0EA5E9', '#6366F1', '#F59E0B', '#EC4899', '#F97316', '#22C55E', '#8B5CF6'];
+const SUGGESTION_COLORS = [ocean.lagoon, ocean.surf, ocean.lavender, ocean.sand, '#F472B6', ocean.coral, ocean.aqua, ocean.seafoam];
+
+// The featured prompt — lagoon into open water, a deeper take on the aurora.
+const OCEAN_GRADIENT = [ocean.lagoon, '#0891B2', '#0E4F6B'] as const;
 
 export interface SnapshotItem {
   icon: IconName;
@@ -42,7 +46,7 @@ export function useTodaySnapshot(): SnapshotItem[] {
   const focusSeconds = Object.values(activityTotals).reduce((sum, v) => sum + v, 0);
 
   return [
-    { icon: 'Timer', color: '#5EEAD4', value: formatDuration(focusSeconds), label: 'focus today' },
+    { icon: 'Timer', color: ocean.seafoam, value: formatDuration(focusSeconds), label: 'focus today' },
     { icon: 'ListChecks', color: '#7DD3FC', value: `${openTasks}`, label: 'open tasks' },
     { icon: 'Flame', color: '#FDBA74', value: `${streak}`, label: 'day streak' },
     { icon: 'BookOpen', color: '#C4B5FD', value: `${journalCount}`, label: 'journal entries' },
@@ -68,16 +72,16 @@ export function ChatWelcome({ userFirstName, suggestions, onSelect }: ChatWelcom
   const others = isPhone ? rest.slice(0, 4) : rest.slice(0, 6);
 
   return (
-    <View className="gap-3 px-4 md:gap-4 md:px-6">
-      <View className="gap-3 md:flex-row md:gap-4">
-        <BentoTile tone="glow" index={0} className="md:flex-[1.4]">
-          <View className="flex-1 justify-between gap-5">
-            <AIAvatar size={52} pulse shape="squircle" />
-            <View className="gap-1.5">
-              <Text variant={isPhone ? 'h2' : 'h1'} color="primary">
+    <View className="gap-2.5 px-3 md:gap-3 md:px-6">
+      <View className="gap-2.5 md:flex-row md:gap-3">
+        <BentoTile tone="glass" dense index={0} className="md:flex-[1.4]">
+          <View className="flex-1 justify-between gap-4">
+            <AIAvatar size={40} pulse shape="squircle" />
+            <View className="gap-1">
+              <Text variant="h2" color="primary" className={isPhone ? 'text-[21px] leading-[26px]' : 'text-[26px] leading-[31px]'}>
                 {greetingFor(userFirstName)}
               </Text>
-              <Text variant="body" color="muted" className="leading-[22px]">
+              <Text variant="body" color="muted" className="text-[13px] leading-[19px]">
                 I&apos;m your TIDE Coach. I can see your focus time, tasks, streak and journal — ask me anything, or let me
                 plan your day.
               </Text>
@@ -85,23 +89,25 @@ export function ChatWelcome({ userFirstName, suggestions, onSelect }: ChatWelcom
           </View>
         </BentoTile>
 
-        <BentoTile tone="ink" index={1} className="md:flex-1">
-          <View className="gap-4">
-            <View className="flex-row items-center gap-2">
-              <View className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: '#22C55E' }} />
-              <Text variant="label" style={{ color: BENTO_INK_TEXT.muted, letterSpacing: 1.4 }}>
+        <BentoTile tone="deep" dense index={1} className="md:flex-1">
+          <View className="gap-3">
+            <View className="flex-row items-center gap-1.5">
+              <View className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ocean.seafoam }} />
+              <Text variant="label" className="text-[10.5px]" style={{ color: BENTO_INK_TEXT.muted, letterSpacing: 0.8 }}>
                 What I see today
               </Text>
             </View>
-            <View className="flex-row flex-wrap gap-y-4">
+            <View className="flex-row flex-wrap gap-y-3">
               {snapshot.map((item) => (
-                <View key={item.label} className="basis-1/2 gap-1.5">
-                  <Icon name={item.icon} size={16} color={item.color} />
-                  <View>
-                    <Text variant="h3" style={{ color: BENTO_INK_TEXT.primary, fontVariant: ['tabular-nums'] }} numberOfLines={1}>
+                <View key={item.label} className="basis-1/2 flex-row items-center gap-2">
+                  <View className="h-7 w-7 items-center justify-center rounded-[9px]" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
+                    <Icon name={item.icon} size={14} color={item.color} />
+                  </View>
+                  <View className="min-w-0 flex-1">
+                    <Text variant="h3" className="text-[17px] leading-[21px]" style={{ color: BENTO_INK_TEXT.primary, fontVariant: ['tabular-nums'] }} numberOfLines={1}>
                       {item.value}
                     </Text>
-                    <Text variant="body" className="text-[12px]" style={{ color: BENTO_INK_TEXT.muted }}>
+                    <Text variant="body" className="text-[11px]" style={{ color: BENTO_INK_TEXT.muted }} numberOfLines={1}>
                       {item.label}
                     </Text>
                   </View>
@@ -112,27 +118,27 @@ export function ChatWelcome({ userFirstName, suggestions, onSelect }: ChatWelcom
         </BentoTile>
       </View>
 
-      <View className="flex-row flex-wrap gap-3 md:gap-4">
+      <View className="flex-row flex-wrap gap-2.5 md:gap-3">
         {featured && (
           <FadeInView index={2} className="basis-full md:basis-[48%] md:grow">
             <Pressable
               onPress={() => onSelect(featured.label)}
-              className="min-h-[124px] flex-1 justify-between overflow-hidden rounded-[22px] p-4"
+              className="min-h-[92px] flex-1 justify-between overflow-hidden rounded-[20px] p-3.5"
             >
               <LinearGradient
-                colors={[...gradients.aurora]}
+                colors={[...OCEAN_GRADIENT]}
                 {...gradientDirections.diagonal}
                 style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
               />
               <View className="flex-row items-center justify-between">
-                <View className="h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
-                  <Icon name={(featured.icon as IconName) ?? 'Sparkles'} size={17} color="#FFFFFF" />
+                <View className="h-7 w-7 items-center justify-center rounded-[9px]" style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}>
+                  <Icon name={(featured.icon as IconName) ?? 'Sparkles'} size={14} color="#FFFFFF" />
                 </View>
                 <View>
-                  <Icon name="ArrowUpRight" size={18} color="#FFFFFF" />
+                  <Icon name="ArrowUpRight" size={16} color="#FFFFFF" />
                 </View>
               </View>
-              <Text variant="h3" style={{ color: '#FFFFFF' }}>
+              <Text variant="h3" className="text-[16px] leading-[21px]" style={{ color: '#FFFFFF' }}>
                 {featured.label}
               </Text>
             </Pressable>
@@ -142,19 +148,24 @@ export function ChatWelcome({ userFirstName, suggestions, onSelect }: ChatWelcom
         {others.map((suggestion, i) => {
           const color = SUGGESTION_COLORS[(i + 1) % SUGGESTION_COLORS.length];
           return (
-            <FadeInView key={suggestion.id} index={i + 3} className="basis-[46%] grow md:basis-[22%]">
-              <Pressable
-                onPress={() => onSelect(suggestion.label)}
-                className="min-h-[124px] flex-1 justify-between gap-3 rounded-[22px] border border-subtle bg-surface p-4 hover:border-tide-teal/40"
-              >
-                <View className="h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: hexToRgba(color, 0.12) }}>
-                  <Icon name={(suggestion.icon as IconName) ?? 'Sparkles'} size={17} color={color} />
+            <BentoTile
+              key={suggestion.id}
+              tone="glass"
+              dense
+              index={i + 3}
+              onPress={() => onSelect(suggestion.label)}
+              accessibilityLabel={suggestion.label}
+              className="basis-[46%] grow md:basis-[22%]"
+            >
+              <View className="min-h-[64px] flex-1 justify-between gap-2.5">
+                <View className="h-7 w-7 items-center justify-center rounded-[9px]" style={{ backgroundColor: hexToRgba(color, 0.13) }}>
+                  <Icon name={(suggestion.icon as IconName) ?? 'Sparkles'} size={14} color={color} />
                 </View>
-                <Text variant="body" color="primary" className="text-[14px] font-semibold leading-[19px]" numberOfLines={3}>
+                <Text variant="body" color="primary" className="text-[13px] font-semibold leading-[17px]" numberOfLines={3}>
                   {suggestion.label}
                 </Text>
-              </Pressable>
-            </FadeInView>
+              </View>
+            </BentoTile>
           );
         })}
       </View>

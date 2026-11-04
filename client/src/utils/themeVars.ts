@@ -9,7 +9,7 @@ import { vars } from 'nativewind';
  * because they're identical in both themes (see theme.ts's `colors`/`darkColors`).
  */
 export const lightVars = vars({
-  '--color-bg-base': '#F8FAFC',
+  '--color-bg-base': '#F2F8F8', // Tide Ocean "shallows" (theme.ts ocean.shallows)
   '--color-bg-elevated': '#F1F5F9',
   '--color-bg-surface': '#FFFFFF',
   '--color-bg-hover': '#E2E8F0',
@@ -28,7 +28,7 @@ export const lightVars = vars({
 });
 
 export const darkVars = vars({
-  '--color-bg-base': '#07090F',
+  '--color-bg-base': '#03141A', // Tide Ocean "abyss" (theme.ts ocean.abyss)
   '--color-bg-elevated': '#0E131C',
   '--color-bg-surface': '#121823',
   '--color-bg-hover': '#1B2230',

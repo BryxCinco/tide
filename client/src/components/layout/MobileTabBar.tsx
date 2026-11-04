@@ -53,6 +53,7 @@ export function MobileTabBar() {
       style={{
         backgroundColor: palette.background,
         borderTopColor: palette.borderColor,
+        ...palette.panelBlur,
         paddingBottom: Math.max(insets.bottom, 8),
       }}
     >

@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
-import { View } from 'react-native';
+import { Platform, View, type ViewStyle } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -15,10 +15,18 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import type { ChatAction, ChatMessage } from '../../types/chat';
 import { hexToRgba } from '../../utils/color';
 import { formatTime } from '../../utils/formatDate';
-import { gradientDirections, gradients } from '../../utils/gradients';
-import { colors } from '../../utils/theme';
+import { gradientDirections } from '../../utils/gradients';
+import { colors, ocean } from '../../utils/theme';
+import { useThemeStore } from '../../store/themeStore';
 import { FadeInView, Icon, Text, type IconName } from '../ui';
 import { AIAvatar } from './AIAvatar';
+
+// The user's own bubble and the coach card's edge rail: lagoon into open water.
+const USER_BUBBLE_GRADIENT = [ocean.lagoon, '#0891B2'] as const;
+
+// Frosted coach card over OceanBackdrop (web only — native has no backdrop-filter).
+const BUBBLE_BLUR: ViewStyle =
+  Platform.OS === 'web' ? ({ backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' } as unknown as ViewStyle) : {};
 
 /** The "View in Tasks"-style card(s) a reply can carry when the AI actually did something —
  * a one-line summary of what happened plus a button straight to the relevant screen. */
@@ -85,18 +93,19 @@ function StreamingCursor() {
 export function ChatBubble({ message, isStreamingCursor, isNewMessage }: ChatBubbleProps) {
   const isUser = message.role === 'user';
   const time = message.timestamp ? formatTime(message.timestamp) : '';
+  const isDark = useThemeStore((s) => s.theme === 'dark');
 
   if (isUser) {
     return (
-      <FadeInView animate={Boolean(isNewMessage)} className="px-4 md:px-6">
+      <FadeInView animate={Boolean(isNewMessage)} className="px-3 md:px-6">
         <View className="items-end">
-          <View className="max-w-[82%] overflow-hidden rounded-[20px] rounded-br-md md:max-w-[70%]">
+          <View className="max-w-[82%] overflow-hidden rounded-[18px] rounded-br-md md:max-w-[70%]">
             <LinearGradient
-              colors={[...gradients.aurora]}
+              colors={[...USER_BUBBLE_GRADIENT]}
               {...gradientDirections.diagonal}
               style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
             />
-            <Text variant="body" color="inverse" className="px-4 py-2.5 leading-[22px]" selectable>
+            <Text variant="body" color="inverse" className="px-3.5 py-2 text-[14px] leading-[20px]" selectable>
               {message.content}
             </Text>
           </View>
@@ -111,10 +120,10 @@ export function ChatBubble({ message, isStreamingCursor, isNewMessage }: ChatBub
   }
 
   return (
-    <FadeInView animate={Boolean(isNewMessage)} className="px-4 md:px-6">
-      <View className="flex-row items-center gap-2">
-        <AIAvatar size={24} />
-        <Text variant="body" color="primary" className="text-[13px] font-semibold">
+    <FadeInView animate={Boolean(isNewMessage)} className="px-3 md:px-6">
+      <View className="flex-row items-center gap-1.5">
+        <AIAvatar size={20} />
+        <Text variant="body" color="primary" className="text-[12px] font-semibold">
           TIDE Coach
         </Text>
         {time ? (
@@ -124,11 +133,18 @@ export function ChatBubble({ message, isStreamingCursor, isNewMessage }: ChatBub
         ) : null}
       </View>
 
-      <View className="ml-3 mt-2 max-w-[92%] flex-row overflow-hidden rounded-[20px] rounded-tl-md border border-subtle bg-surface md:max-w-[85%]">
-        <LinearGradient colors={[...gradients.aurora]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={{ width: 3 }} />
-        <View className="flex-1 px-4 py-3" style={{ minWidth: 0 }}>
+      <View
+        className="ml-2.5 mt-1.5 max-w-[92%] flex-row overflow-hidden rounded-[18px] rounded-tl-md border md:max-w-[85%]"
+        style={{
+          backgroundColor: isDark ? 'rgba(12, 30, 36, 0.62)' : 'rgba(255, 255, 255, 0.78)',
+          borderColor: isDark ? 'rgba(94, 234, 212, 0.09)' : 'rgba(5, 42, 48, 0.07)',
+          ...BUBBLE_BLUR,
+        }}
+      >
+        <LinearGradient colors={[...USER_BUBBLE_GRADIENT]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={{ width: 3 }} />
+        <View className="flex-1 px-3.5 py-2.5" style={{ minWidth: 0 }}>
           <View className="flex-row flex-wrap items-end">
-            <Text variant="body" color="secondary" className="leading-[23px]" selectable>
+            <Text variant="body" color="secondary" className="text-[14px] leading-[21px]" selectable>
               {message.content}
             </Text>
             {isStreamingCursor && <StreamingCursor />}

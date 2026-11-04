@@ -17,7 +17,7 @@ import {
   TimeChart,
   TimeFilter,
 } from '@/components/insights';
-import { BENTO_INK_TEXT, BentoHeader, BentoTile, ErrorState, ResponsiveContainer, SkeletonChart, Text } from '@/components/ui';
+import { BENTO_INK_TEXT, BentoHeader, BentoTile, ErrorState, Icon, ResponsiveContainer, SkeletonChart, Text } from '@/components/ui';
 import { useResponsive } from '@/hooks/useResponsive';
 import { getApiErrorMessage } from '@/services/api';
 import { insightsService, type InsightsRangeData, type InsightsSummary } from '@/services/insights.service';
@@ -29,6 +29,7 @@ import { useTimerStore } from '@/store/timerStore';
 import type { ActivityBreakdownSlice, CustomInsightsRange, DayTimeEntry, HeatmapDay, InsightsRange, MonthYearRange, QuestInsights } from '@/types/insights';
 import { formatDuration } from '@/utils/formatTime';
 import { formatMonthYear, fromDateKey, toDateKey } from '@/utils/formatDate';
+import { ocean } from '@/utils/theme';
 
 /** Heatmap always shows a fixed trailing window regardless of the selected range filter —
  * a full year (53 weeks) of GitHub-style, calendar-aligned week columns (see Heatmap.tsx). */
@@ -90,17 +91,20 @@ function TrackedTimeHero({ seconds, trend, series, rangeLabel }: { seconds: numb
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <View className="flex-1 justify-between gap-6">
+    <View className="flex-1 justify-between gap-3">
       <View className="flex-row items-center justify-between">
-        <Text variant="label" style={{ color: BENTO_INK_TEXT.muted, letterSpacing: 1.4 }}>
-          Tracked {rangeLabel}
-        </Text>
+        <View className="flex-row items-center gap-1.5">
+          <Icon name="Waves" size={13} color={ocean.seafoam} strokeWidth={2.2} />
+          <Text variant="label" className="text-[10.5px]" style={{ color: BENTO_INK_TEXT.muted, letterSpacing: 0.8 }}>
+            Tracked {rangeLabel}
+          </Text>
+        </View>
         {trend ? (
           <View
-            className="flex-row items-center rounded-full px-2.5 py-1"
-            style={{ backgroundColor: isDown ? 'rgba(239,68,68,0.18)' : 'rgba(20,184,166,0.18)' }}
+            className="flex-row items-center rounded-full px-2 py-0.5"
+            style={{ backgroundColor: isDown ? 'rgba(239,68,68,0.18)' : 'rgba(94,234,212,0.14)' }}
           >
-            <Text variant="body" className="text-[11px] font-semibold" style={{ color: isDown ? '#FCA5A5' : '#5EEAD4' }}>
+            <Text variant="body" className="text-[10.5px] font-semibold" style={{ color: isDown ? '#FCA5A5' : ocean.seafoam }}>
               {isUp ? '▲ ' : isDown ? '▼ ' : ''}
               {trend.replace(/^[+-]/, '')} vs previous
             </Text>
@@ -108,21 +112,21 @@ function TrackedTimeHero({ seconds, trend, series, rangeLabel }: { seconds: numb
         ) : null}
       </View>
 
-      <Text style={{ color: BENTO_INK_TEXT.primary, fontSize: 52, lineHeight: 58, fontFamily: 'Inter_700Bold', letterSpacing: -1.5 }}>
+      <Text style={{ color: BENTO_INK_TEXT.primary, fontSize: 40, lineHeight: 46, fontFamily: 'Inter_700Bold', letterSpacing: -1.2, fontVariant: ['tabular-nums'] }}>
         {formatDuration(seconds)}
       </Text>
 
       {series.length > 1 && (
-        <View className="h-14 flex-row items-end" style={{ gap: series.length > 14 ? 2 : 5 }}>
+        <View className="h-12 flex-row items-end" style={{ gap: series.length > 14 ? 2 : 4 }}>
           {series.map((d) => (
             <View
               key={d.date}
               className="flex-1"
               style={{
-                height: d.seconds > 0 ? Math.max((d.seconds / max) * 56, 3) : 2,
+                height: d.seconds > 0 ? Math.max((d.seconds / max) * 48, 3) : 2,
                 borderTopLeftRadius: 3,
                 borderTopRightRadius: 3,
-                backgroundColor: d.date === today ? '#2DD4BF' : 'rgba(255,255,255,0.16)',
+                backgroundColor: d.date === today ? ocean.seafoam : 'rgba(255,255,255,0.14)',
               }}
             />
           ))}
@@ -246,20 +250,20 @@ export default function InsightsScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-base">
+    <SafeAreaView className="flex-1 bg-transparent">
       <ScrollView
         className="flex-1"
         contentContainerClassName="pb-24"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <ResponsiveContainer className="gap-3 pt-3 md:gap-4 md:pt-6">
-          <View className="gap-3">
+        <ResponsiveContainer className="gap-2.5 pt-3 md:gap-3 md:pt-5">
+          <View className="gap-2.5">
             {/* Left padding on phone clears AppLayout's floating menu button. */}
             <View className="pl-12 md:pl-0">
-              <Text variant="label" color="muted" style={{ letterSpacing: 1.4 }}>
+              <Text variant="label" color="muted" className="text-[10.5px]" style={{ letterSpacing: 1.2 }}>
                 Insights
               </Text>
-              <Text variant={isPhone ? 'h3' : 'h2'} color="primary" numberOfLines={1}>
+              <Text variant="h2" color="primary" className={isPhone ? 'text-[19px]' : 'text-[22px]'} numberOfLines={1}>
                 Your patterns, {rangeLabel}
               </Text>
             </View>
@@ -273,17 +277,17 @@ export default function InsightsScreen() {
           </View>
 
           {/* Row 1 — the hero number and the score that summarizes it. */}
-          <View className="gap-3 md:flex-row md:gap-4">
-            <BentoTile tone="ink" index={0} className="md:flex-[1.3]">
+          <View className="gap-2.5 md:flex-row md:gap-3">
+            <BentoTile tone="deep" dense index={0} className="md:flex-[1.3]">
               {rangeLoading || !summary ? (
                 <SkeletonChart />
               ) : (
                 <TrackedTimeHero seconds={totalSeconds} trend={summary.totalTimeTrend} series={rangeData.time} rangeLabel={rangeLabel} />
               )}
             </BentoTile>
-            <BentoTile index={1} className="md:flex-1">
-              <View className="flex-1 gap-4">
-                <BentoHeader title="Productivity score" icon="Target" />
+            <BentoTile tone="glass" dense index={1} className="md:flex-1">
+              <View className="flex-1 gap-3">
+                <BentoHeader dense title="Productivity score" icon="Target" />
                 {rangeError ? (
                   <ErrorState message={rangeError} onRetry={fetchRangeData} />
                 ) : rangeLoading || !summary ? (
@@ -296,26 +300,26 @@ export default function InsightsScreen() {
           </View>
 
           {/* Row 2 — time per day and mood over the same days. */}
-          <View className="gap-3 lg:flex-row lg:gap-4">
-            <BentoTile index={2} className="lg:flex-[1.5]">
+          <View className="gap-2.5 lg:flex-row lg:gap-3">
+            <BentoTile tone="glass" dense index={2} className="lg:flex-[1.5]">
               <View className="gap-3">
-                <BentoHeader title="Time tracked" icon="BarChart3" />
+                <BentoHeader dense title="Time tracked" icon="BarChart3" />
                 {rangeLoading ? <SkeletonChart /> : <TimeChart data={rangeData.time} />}
               </View>
             </BentoTile>
-            <BentoTile index={3} className="lg:flex-1">
+            <BentoTile tone="glass" dense index={3} className="lg:flex-1">
               <View className="gap-3">
-                <BentoHeader title="Mood trend" icon="Smile" color="#F59E0B" />
+                <BentoHeader dense title="Mood trend" icon="Smile" color={ocean.sand} />
                 {rangeLoading ? <SkeletonChart /> : <MoodTrend data={rangeData.mood} />}
               </View>
             </BentoTile>
           </View>
 
           {/* Row 3 — where the time went, and the all-round stat wheel. */}
-          <View className="gap-3 lg:flex-row lg:gap-4">
-            <BentoTile index={4} className="lg:flex-[1.5]">
-              <View className="gap-4">
-                <BentoHeader title="Activity breakdown" icon="PieChart" color="#6366F1" />
+          <View className="gap-2.5 lg:flex-row lg:gap-3">
+            <BentoTile tone="glass" dense index={4} className="lg:flex-[1.5]">
+              <View className="gap-3">
+                <BentoHeader dense title="Activity breakdown" icon="PieChart" color={ocean.lavender} />
                 {rangeLoading ? (
                   <SkeletonChart />
                 ) : (
@@ -326,9 +330,9 @@ export default function InsightsScreen() {
                 )}
               </View>
             </BentoTile>
-            <BentoTile index={5} className="lg:flex-1">
+            <BentoTile tone="glass" dense index={5} className="lg:flex-1">
               <View className="flex-1 gap-3">
-                <BentoHeader title="Your stats" icon="Hexagon" color="#14B8A6" />
+                <BentoHeader dense title="Your stats" icon="Hexagon" color={ocean.lagoon} />
                 <View className="flex-1 justify-center">
                   <HexagonStats productivityScore={summary?.productivityScore.overall} />
                 </View>
@@ -336,9 +340,9 @@ export default function InsightsScreen() {
             </BentoTile>
           </View>
 
-          <BentoTile index={6}>
-            <View className="gap-4">
-              <BentoHeader title="Last 12 months" icon="CalendarDays" />
+          <BentoTile tone="glass" dense index={6}>
+            <View className="gap-3">
+              <BentoHeader dense title="Last 12 months" icon="CalendarDays" />
               {heatmapError ? (
                 <ErrorState message={heatmapError} onRetry={fetchHeatmap} />
               ) : heatmapLoading ? (
@@ -349,24 +353,24 @@ export default function InsightsScreen() {
             </View>
           </BentoTile>
 
-          <BentoTile index={7}>
-            <View className="gap-4">
-              <BentoHeader title="Period summary" icon="ListChecks" color="#0EA5E9" />
+          <BentoTile tone="glass" dense index={7}>
+            <View className="gap-3">
+              <BentoHeader dense title="Period summary" icon="ListChecks" color={ocean.surf} />
               {rangeLoading || !summary ? <SkeletonChart /> : <SummaryCard items={summary.weeklySummary} />}
             </View>
           </BentoTile>
 
-          <BentoTile index={8}>
-            <View className="gap-4">
-              <BentoHeader title="Tide's Quests" icon="Swords" color="#8B5CF6" />
+          <BentoTile tone="glass" dense index={8}>
+            <View className="gap-3">
+              <BentoHeader dense title="Tide's Quests" icon="Swords" color={ocean.lavender} />
               {rangeLoading || !questInsights ? <SkeletonChart /> : <QuestStats data={questInsights} />}
             </View>
           </BentoTile>
 
           <View className="gap-3 lg:flex-row lg:items-start lg:gap-4">
-            <BentoTile index={9} className="lg:flex-[1.5]">
-              <View className="gap-4">
-                <BentoHeader title="Task stats" icon="CheckSquare" color="#14B8A6" />
+            <BentoTile tone="glass" dense index={9} className="lg:flex-[1.5]">
+              <View className="gap-3">
+                <BentoHeader dense title="Task stats" icon="CheckSquare" color={ocean.lagoon} />
                 {tasksError ? (
                   <ErrorState
                     message={tasksError}
@@ -382,17 +386,17 @@ export default function InsightsScreen() {
                 )}
               </View>
             </BentoTile>
-            <BentoTile index={10} className="lg:flex-1">
-              <View className="gap-4">
-                <BentoHeader title="AI suggestions" icon="Sparkles" color="#6366F1" />
+            <BentoTile tone="glass" dense index={10} className="lg:flex-1">
+              <View className="gap-3">
+                <BentoHeader dense title="AI suggestions" icon="Sparkles" color={ocean.lavender} />
                 <AiSuggestions />
               </View>
             </BentoTile>
           </View>
 
-          <BentoTile index={11}>
-            <View className="gap-4">
-              <BentoHeader title="History" icon="History" color="#64748B" />
+          <BentoTile tone="glass" dense index={11}>
+            <View className="gap-3">
+              <BentoHeader dense title="History" icon="History" color="#64748B" />
               <HistoryView />
             </View>
           </BentoTile>

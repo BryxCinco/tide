@@ -53,18 +53,18 @@ export function ChatHeader({ isTyping, hasMessages, onClear }: ChatHeaderProps) 
   const { isPhone } = useResponsive();
 
   return (
-    <View className="flex-row items-center gap-3 border-b border-subtle px-4 py-3 md:px-6">
+    <View className="flex-row items-center gap-2.5 border-b border-subtle px-3 py-2.5 md:px-6">
       {/* Phone uses the drawer-access hamburger; tablet/desktop keep BackButton since the
           Sidebar is always visible there. */}
       <MobileMenuButton />
       {!isPhone && <BackButton />}
 
-      <AIAvatar size={36} />
+      <AIAvatar size={32} />
 
       {/* minWidth: 0 lets this column truncate its own text instead of pushing the action
           button past the screen edge. */}
       <View className="flex-1" style={{ minWidth: 0 }}>
-        <Text variant="body" color="primary" className="text-[16px] font-semibold" numberOfLines={1}>
+        <Text variant="body" color="primary" className="text-[14px] font-semibold" numberOfLines={1}>
           TIDE Coach
         </Text>
         <StatusDot isTyping={isTyping} compact={isPhone} />
@@ -75,11 +75,11 @@ export function ChatHeader({ isTyping, hasMessages, onClear }: ChatHeaderProps) 
           onPress={onClear}
           hitSlop={6}
           accessibilityLabel="Start a new chat"
-          className="h-9 flex-row items-center gap-1.5 rounded-xl border border-subtle bg-surface px-3 transition-colors hover:border-tide-teal/40"
+          className="h-8 flex-row items-center gap-1.5 rounded-[10px] border border-subtle px-2.5 hover:border-tide-teal/40 hover:bg-hover"
         >
-          <Icon name="SquarePen" size={15} color={themeColors.text.secondary} />
+          <Icon name="SquarePen" size={14} color={themeColors.text.secondary} />
           {!isPhone && (
-            <Text variant="body" color="secondary" className="text-[13px] font-medium">
+            <Text variant="body" color="secondary" className="text-[12px] font-semibold">
               New chat
             </Text>
           )}

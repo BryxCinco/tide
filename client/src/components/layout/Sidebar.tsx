@@ -76,12 +76,12 @@ export function Sidebar({ collapsed: forcedCollapsed = false }: SidebarProps) {
     >
       <View
         className="flex-1 rounded-[22px] border"
-        style={[{ backgroundColor: palette.background, borderColor: palette.borderColor }, palette.panelShadow]}
+        style={[{ backgroundColor: palette.background, borderColor: palette.borderColor }, palette.panelBlur, palette.panelShadow]}
       >
         {/* Aurora wash behind the brand mark — the panel's one decorative flourish. */}
         <View className="absolute inset-x-0 top-0 h-36 overflow-hidden rounded-t-[22px]" pointerEvents="none">
           <LinearGradient
-            colors={[hexToRgba(teal, isDark ? 0.14 : 0.08), hexToRgba('#6366F1', isDark ? 0.05 : 0.025), 'transparent']}
+            colors={[hexToRgba(teal, isDark ? 0.14 : 0.08), hexToRgba('#22D3EE', isDark ? 0.05 : 0.04), 'transparent']}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             style={{ flex: 1 }}

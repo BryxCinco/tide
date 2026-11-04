@@ -2,6 +2,7 @@ import { ScrollView, View } from 'react-native';
 
 import type { QuickSuggestion } from '../../types/chat';
 import { hexToRgba } from '../../utils/color';
+import { ocean } from '../../utils/theme';
 import { BENTO_INK_TEXT, BentoHeader, BentoTile, Icon, Text, type IconName } from '../ui';
 import { Pressable } from '../ui/SoundPressable';
 import { useTodaySnapshot } from './ChatWelcome';
@@ -15,7 +16,7 @@ export interface ChatContextRailProps {
   busy: boolean;
 }
 
-const PROMPT_COLORS = ['#14B8A6', '#6366F1', '#F59E0B', '#EC4899'];
+const PROMPT_COLORS = [ocean.lagoon, ocean.lavender, ocean.sand, '#F472B6'];
 
 /**
  * Desktop-only side panel beside an active conversation: the same "what I see today"
@@ -28,12 +29,12 @@ export function ChatContextRail({ suggestions, onSelect, messageCount, onNewChat
   return (
     // Fixed-width wrapper: a bare ScrollView in a row grows like flex-1 on web and would
     // take half the screen from the conversation.
-    <View className="border-l border-subtle" style={{ width: 300, flexShrink: 0 }}>
-      <ScrollView className="flex-1" contentContainerClassName="gap-3 p-4" showsVerticalScrollIndicator={false}>
-        <BentoTile tone="ink" index={0}>
-          <View className="gap-4">
+    <View className="border-l border-subtle" style={{ width: 280, flexShrink: 0 }}>
+      <ScrollView className="flex-1" contentContainerClassName="gap-2.5 p-3" showsVerticalScrollIndicator={false}>
+        <BentoTile tone="deep" dense index={0}>
+          <View className="gap-3">
             <View className="flex-row items-center gap-2">
-              <View className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: '#22C55E' }} />
+              <View className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ocean.seafoam }} />
               <Text variant="label" style={{ color: BENTO_INK_TEXT.muted, letterSpacing: 1.4 }}>
                 Coach can see
               </Text>
@@ -56,9 +57,9 @@ export function ChatContextRail({ suggestions, onSelect, messageCount, onNewChat
           </View>
         </BentoTile>
 
-        <BentoTile index={1}>
+        <BentoTile tone="glass" dense index={1}>
           <View className="gap-3">
-            <BentoHeader title="Try asking" icon="Lightbulb" color="#F59E0B" />
+            <BentoHeader dense title="Try asking" icon="Lightbulb" color={ocean.sand} />
             <View className="gap-2">
               {suggestions.slice(0, 4).map((suggestion, i) => {
                 const color = PROMPT_COLORS[i % PROMPT_COLORS.length];
@@ -67,7 +68,7 @@ export function ChatContextRail({ suggestions, onSelect, messageCount, onNewChat
                     key={suggestion.id}
                     disabled={busy}
                     onPress={() => onSelect(suggestion.label)}
-                    className="flex-row items-center gap-2.5 rounded-xl border border-subtle bg-base px-3 py-2.5 hover:border-tide-teal/40"
+                    className="flex-row items-center gap-2.5 rounded-xl border border-subtle px-2.5 py-2 hover:border-tide-teal/40 hover:bg-hover"
                     style={busy ? { opacity: 0.5 } : undefined}
                   >
                     <View className="h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: hexToRgba(color, 0.12) }}>
@@ -83,7 +84,7 @@ export function ChatContextRail({ suggestions, onSelect, messageCount, onNewChat
           </View>
         </BentoTile>
 
-        <BentoTile index={2}>
+        <BentoTile tone="glass" dense index={2}>
           <View className="gap-3">
             <View>
               <Text variant="h3" color="primary" style={{ fontVariant: ['tabular-nums'] }}>
@@ -96,7 +97,7 @@ export function ChatContextRail({ suggestions, onSelect, messageCount, onNewChat
             <Pressable
               onPress={onNewChat}
               accessibilityLabel="Start a new chat"
-              className="h-9 flex-row items-center justify-center gap-1.5 rounded-xl border border-subtle bg-base px-3 hover:border-tide-teal/40"
+              className="h-8 flex-row items-center justify-center gap-1.5 rounded-[10px] border border-subtle px-3 hover:border-tide-teal/40 hover:bg-hover"
             >
               <Icon name="SquarePen" size={14} />
               <Text variant="body" color="secondary" className="text-[13px] font-medium">

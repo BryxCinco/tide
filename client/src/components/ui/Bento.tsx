@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react';
 import { Animated as RNAnimated, Easing as RNEasing, Platform, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useThemeStore } from '../../store/themeStore';
@@ -50,6 +50,18 @@ export interface BentoTileProps {
 }
 
 const ENTRANCE_STAGGER_MS = 40;
+
+/**
+ * True inside a `dense` BentoTile. Shared pieces rendered deep inside a tile's content (empty
+ * and error states) read it to switch to their compact layout, so a dense screen doesn't
+ * have to thread a prop through every chart component.
+ */
+const BentoDensityContext = createContext(false);
+
+/** Whether the nearest BentoTile is `dense`. */
+export function useBentoDense(): boolean {
+  return useContext(BentoDensityContext);
+}
 
 // backdrop-filter only exists on web (react-native-web passes it through); native gets the
 // translucent fill without the blur.
@@ -173,13 +185,15 @@ export function BentoTile({ children, tone = 'surface', onPress, index = 0, clas
 
   return (
     <FadeInView index={index} className={cn('min-w-0', className)} style={style}>
-      {onPress ? (
-        <Pressable onPress={onPress} accessibilityLabel={accessibilityLabel} className="flex-1">
-          {body}
-        </Pressable>
-      ) : (
-        body
-      )}
+      <BentoDensityContext.Provider value={dense}>
+        {onPress ? (
+          <Pressable onPress={onPress} accessibilityLabel={accessibilityLabel} className="flex-1">
+            {body}
+          </Pressable>
+        ) : (
+          body
+        )}
+      </BentoDensityContext.Provider>
     </FadeInView>
   );
 }

@@ -7,7 +7,7 @@ import { useResponsive } from '../../hooks/useResponsive';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useUiStore } from '../../store/uiStore';
 import { shadows } from '../../utils/theme';
-import { Icon } from '../ui';
+import { Icon, OceanBackdrop } from '../ui';
 import { MobileDrawer } from './MobileDrawer';
 import { Sidebar } from './Sidebar';
 import { SidebarCollapseToggle } from './SidebarCollapseToggle';
@@ -49,6 +49,9 @@ export function AppLayout({
   if (isPhone) {
     return (
       <View className="flex-1 bg-base">
+        {/* One continuous Tide Ocean backdrop behind the whole app; screens that are
+            transparent show it, opaque ones sit on the same base color. */}
+        <OceanBackdrop />
         {children}
 
         {showMobileMenuButton && (
@@ -73,6 +76,8 @@ export function AppLayout({
 
   return (
     <View className="flex-1 flex-row bg-base">
+      {/* Behind the sidebar and the content alike, so the two read as one surface. */}
+      <OceanBackdrop />
       <Sidebar collapsed={isTablet} />
       {/* minWidth: 0 overrides flexbox's default "never shrink below content's intrinsic
           width" — without it, a wide child (a long unbroken table/text) can force this

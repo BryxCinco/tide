@@ -23,7 +23,7 @@ import {
 } from '@/components/dashboard';
 import { CalendarWidget, StreakWidget, TimeWidget, TodaysRoutineWidget, WeatherWidget, WeeklyProgressWidget } from '@/components/dashboard/widgets';
 import { TaskFormModal } from '@/components/tasks';
-import { BentoStat, Button, EmptyState, FadeInView, OceanBackdrop, ResponsiveContainer } from '@/components/ui';
+import { BentoStat, Button, EmptyState, FadeInView, ResponsiveContainer } from '@/components/ui';
 import { ocean } from '@/utils/theme';
 import { MOOD_ICON_MAP } from '@/components/journal/MoodIcon';
 import { mockHeroFocus, mockQuickActions } from '@/mocks/mockDashboard';
@@ -209,8 +209,7 @@ export default function DashboardScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-base" edges={['top']}>
-      <OceanBackdrop />
+    <SafeAreaView className="flex-1 bg-transparent" edges={['top']}>
       <ScrollView
         className="flex-1"
         contentContainerClassName="pb-24"

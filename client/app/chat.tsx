@@ -6,6 +6,7 @@ import {
   type NativeSyntheticEvent,
   type TextInput as RNTextInputHandle,
   type TextInputKeyPressEventData,
+  type ViewStyle,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +15,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-na
 import { CHAT_COLUMN_MAX_WIDTH, ChatContextRail, ChatConversation, ChatHeader, DEFAULT_QUICK_SUGGESTIONS } from '@/components/chat';
 import { AppLayout, MobileTabBar } from '@/components/layout';
 import { Icon, Skeleton, Text } from '@/components/ui';
+import { useThemeStore } from '@/store/themeStore';
 import { Pressable } from '@/components/ui/SoundPressable';
 import { TextInput } from '@/components/ui/SoundTextInput';
 import { useAuth } from '@/hooks/useAuth';
@@ -23,6 +25,10 @@ import { useChatStore } from '@/store/chatStore';
 import { showToast } from '@/store/toastStore';
 import { gradientDirections, gradients } from '@/utils/gradients';
 import { soundManager } from '@/utils/soundManager';
+
+// Frosted composer over the app's OceanBackdrop (web only — native has no backdrop-filter).
+const COMPOSER_BLUR: ViewStyle =
+  Platform.OS === 'web' ? ({ backdropFilter: 'blur(18px) saturate(160%)', WebkitBackdropFilter: 'blur(18px) saturate(160%)' } as unknown as ViewStyle) : {};
 
 const MIN_COMPOSER_HEIGHT = 40;
 const MAX_COMPOSER_HEIGHT = 130; // ~5 lines at this font size, per Fix 5's "auto-grow up to 5 lines".
@@ -119,6 +125,7 @@ function ChatSkeleton() {
 export default function ChatScreen() {
   const { user } = useAuth();
   const themeColors = useThemeColors();
+  const isDark = useThemeStore((s) => s.theme === 'dark');
   const { isPhone, isDesktop } = useResponsive();
   const messages = useChatStore((s) => s.messages);
   const hasHydrated = useChatStore((s) => s.hasHydrated);
@@ -179,7 +186,7 @@ export default function ChatScreen() {
     <AppLayout showMobileMenuButton={false}>
       {/* bottom excluded — MobileTabBar (below) owns the bottom safe-area inset itself,
           so the two don't double up on phone. */}
-      <SafeAreaView className="flex-1 bg-base" edges={['top']}>
+      <SafeAreaView className="flex-1 bg-transparent" edges={['top']}>
         <ChatHeader isTyping={isTyping} hasMessages={messages.length > 0} onClear={clearChat} />
 
         {/* Desktop with a conversation going: chat on the left, context rail on the right. */}
@@ -201,12 +208,15 @@ export default function ChatScreen() {
             {/* Floating composer card, centered on the same reading column as the messages. */}
             <View className="w-full self-center px-3 pb-3 pt-1 md:px-6 md:pb-5" style={{ maxWidth: CHAT_COLUMN_MAX_WIDTH + 48 }}>
               <View
-                className="flex-row items-end gap-1.5 rounded-[26px] border border-default bg-surface p-1.5"
+                className="flex-row items-end gap-1 rounded-[22px] border p-1"
                 style={{
-                  shadowColor: '#0F172A',
-                  shadowOffset: { width: 0, height: 8 },
-                  shadowOpacity: 0.06,
-                  shadowRadius: 24,
+                  backgroundColor: isDark ? 'rgba(12, 30, 36, 0.78)' : 'rgba(255, 255, 255, 0.82)',
+                  borderColor: isDark ? 'rgba(94, 234, 212, 0.12)' : 'rgba(5, 42, 48, 0.08)',
+                  ...COMPOSER_BLUR,
+                  shadowColor: '#052A30',
+                  shadowOffset: { width: 0, height: 10 },
+                  shadowOpacity: isDark ? 0.45 : 0.08,
+                  shadowRadius: 28,
                   elevation: 3,
                 }}
               >
