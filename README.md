@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🌊 TIDE
+<img src="client/assets/logo-wordmark.png" alt="TIDE" width="300" />
 
 ### A server-authoritative, AI-powered productivity OS.
 
