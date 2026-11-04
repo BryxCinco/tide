@@ -24,19 +24,19 @@ export function LevelCard({ className, index = 1 }: { className?: string; index?
   const progress = ceiling === floor ? 100 : Math.round(((totalXp - floor) / (ceiling - floor)) * 100);
 
   return (
-    <BentoTile tone="ink" index={index} className={className}>
-      <View className="flex-1 flex-row items-center gap-5">
-        <BentoRing value={progress} size={116} strokeWidth={10}>
-          <Text variant="label" style={{ color: BENTO_INK_TEXT.muted, letterSpacing: 1.4 }}>
+    <BentoTile tone="deep" dense index={index} className={className}>
+      <View className="flex-1 flex-row items-center gap-4">
+        <BentoRing value={progress} size={104} strokeWidth={9}>
+          <Text variant="label" className="text-[10px]" style={{ color: BENTO_INK_TEXT.muted, letterSpacing: 1 }}>
             Level
           </Text>
-          <Text variant="display" style={{ color: BENTO_INK_TEXT.primary, fontVariant: ['tabular-nums'], lineHeight: 40 }}>
+          <Text variant="display" className="text-[32px]" style={{ color: BENTO_INK_TEXT.primary, fontVariant: ['tabular-nums'], lineHeight: 36 }}>
             {level}
           </Text>
         </BentoRing>
-        <View className="flex-1 gap-3" style={{ minWidth: 0 }}>
+        <View className="flex-1 gap-2.5" style={{ minWidth: 0 }}>
           <View>
-            <Text variant="h2" style={{ color: BENTO_INK_TEXT.primary, fontVariant: ['tabular-nums'] }}>
+            <Text variant="h2" className="text-[22px] leading-[27px]" style={{ color: BENTO_INK_TEXT.primary, fontVariant: ['tabular-nums'] }}>
               {totalXp.toLocaleString()} XP
             </Text>
             <Text variant="body" className="text-[12px]" style={{ color: BENTO_INK_TEXT.muted }}>

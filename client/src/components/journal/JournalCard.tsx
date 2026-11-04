@@ -7,7 +7,7 @@ import { confirmAsync } from '../../utils/confirm';
 import { hexToRgba } from '../../utils/color';
 import { cn } from '../../utils/cn';
 import { formatTime, formatWeekdayMonthDay } from '../../utils/formatDate';
-import { FadeInView, Icon, Text, VisibleDeleteButton } from '../ui';
+import { FadeInView, Icon, Text, useGlassSurface, VisibleDeleteButton } from '../ui';
 import { MOOD_ICON_MAP } from './MoodIcon';
 
 export interface JournalCardProps {
@@ -28,6 +28,7 @@ export function JournalCard({ entry, onPress, onToggleFavorite, onDelete, index 
   const themeColors = useThemeColors();
   const accent = mood?.color ?? themeColors.brand.tideTeal;
   const photo = entry.photoUrls?.[0];
+  const glass = useGlassSurface();
 
   const handleLongPressDelete = async () => {
     const confirmed = await confirmAsync('Delete entry?', `"${entry.title || 'This entry'}" will be removed. This can't be undone.`);
@@ -39,7 +40,8 @@ export function JournalCard({ entry, onPress, onToggleFavorite, onDelete, index 
       <Pressable
         onPress={onPress}
         onLongPress={handleLongPressDelete}
-        className="flex-1 overflow-hidden rounded-[24px] border border-subtle bg-surface hover:border-tide-teal/40"
+        className="flex-1 overflow-hidden rounded-[20px] border hover:border-tide-teal/40"
+        style={glass}
       >
         {/* Mood-tinted wash along the top — each card carries its own mood color. */}
         <View
@@ -53,7 +55,7 @@ export function JournalCard({ entry, onPress, onToggleFavorite, onDelete, index 
             of the old separate bottom badge. */}
         {photo && (
           <View>
-            <Image source={{ uri: photo }} style={{ width: '100%', height: featured ? 180 : 140 }} resizeMode="cover" />
+            <Image source={{ uri: photo }} style={{ width: '100%', height: featured ? 160 : 120 }} resizeMode="cover" />
             {entry.photoUrls.length > 1 && (
               <View
                 className="absolute bottom-2 right-2 flex-row items-center gap-1 rounded-full px-2 py-1"
@@ -68,14 +70,14 @@ export function JournalCard({ entry, onPress, onToggleFavorite, onDelete, index 
           </View>
         )}
 
-        <View className={cn('flex-1 gap-3', featured ? 'p-6' : 'p-5')}>
+        <View className={cn('flex-1 gap-2.5', featured ? 'p-4' : 'p-3.5')}>
           <View className="flex-row items-start justify-between gap-2">
             <View className="flex-row items-center gap-2.5" style={{ flexShrink: 1 }}>
               <View
                 className="items-center justify-center rounded-xl"
-                style={{ width: 40, height: 40, backgroundColor: hexToRgba(accent, 0.12) }}
+                style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: hexToRgba(accent, 0.13) }}
               >
-                <Icon name={mood?.icon ?? 'BookOpen'} size={18} color={accent} />
+                <Icon name={mood?.icon ?? 'BookOpen'} size={15} color={accent} />
               </View>
               <View style={{ flexShrink: 1 }}>
                 <Text variant="body" color="primary" className="text-[13px] font-semibold" numberOfLines={1}>
@@ -110,17 +112,17 @@ export function JournalCard({ entry, onPress, onToggleFavorite, onDelete, index 
           </View>
 
           <View className="flex-1 gap-1.5">
-            <Text variant={featured ? 'h2' : 'h3'} color="primary" numberOfLines={2}>
+            <Text variant="h3" color="primary" className={featured ? 'text-[19px] leading-[24px]' : 'text-[15px] leading-[20px]'} numberOfLines={2}>
               {entry.title || 'Untitled'}
             </Text>
-            <Text variant="body" color="secondary" className="leading-[22px]" numberOfLines={featured ? 5 : 3}>
+            <Text variant="body" color="secondary" className="text-[13px] leading-[19px]" numberOfLines={featured ? 5 : 3}>
               {entry.content}
             </Text>
           </View>
 
           <View className="flex-row flex-wrap items-center gap-1.5">
             {entry.tags.slice(0, featured ? 5 : 3).map((tag) => (
-              <View key={tag} className="rounded-full border border-subtle bg-base px-2.5 py-1">
+              <View key={tag} className="rounded-full border border-subtle bg-hover px-2 py-0.5">
                 <Text variant="body" color="secondary" className="text-[11px] font-medium">
                   #{tag}
                 </Text>

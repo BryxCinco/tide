@@ -10,6 +10,8 @@ export const gradients = {
   /** Teal -> cyan -> indigo — TIDE's signature "aurora". Reserved for the few moments that
    * should feel special: the active nav item, the AI Coach identity, the send button. */
   aurora: ['#14B8A6', '#06B6D4', '#6366F1'] as const,
+  /** "Tide Ocean": lagoon into open water. Hero tiles (journal prompt, featured prompt). */
+  ocean: ['#14B8A6', '#0891B2', '#0E4F6B'] as const,
 } as const;
 
 /** `start`/`end` points (as fractions of the box) matching `gradients.primary`'s 90deg angle. */

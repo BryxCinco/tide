@@ -24,8 +24,10 @@ import { Text } from './Text';
  *   OceanBackdrop. Same text colors as `surface`.
  * - `deep` ("Tide Ocean"): the deep-sea statement tile — teal-navy with lagoon/aqua light
  *   in its corners. Light-on-dark content, like `ink` (use `BENTO_INK_TEXT`).
+ * - `lagoon` ("Tide Ocean"): the `gradients.ocean` hero tile, white content — the ocean
+ *   counterpart of `aurora`.
  */
-export type BentoTone = 'surface' | 'ink' | 'aurora' | 'glow' | 'glass' | 'deep';
+export type BentoTone = 'surface' | 'ink' | 'aurora' | 'glow' | 'glass' | 'deep' | 'lagoon';
 
 /** Text colors for content placed on `ink` / `aurora` tiles. */
 export const BENTO_INK_TEXT = {
@@ -67,6 +69,25 @@ export function useBentoDense(): boolean {
 // translucent fill without the blur.
 const GLASS_BLUR: ViewStyle =
   Platform.OS === 'web' ? ({ backdropFilter: 'blur(18px) saturate(160%)', WebkitBackdropFilter: 'blur(18px) saturate(160%)' } as unknown as ViewStyle) : {};
+
+/**
+ * The "Tide Ocean" glass surface (fill, hairline border, web blur, soft deep-sea lift) for
+ * cards that can't be a BentoTile — pressable list cards with their own layout. Use with a
+ * `border` class and no `bg-surface`.
+ */
+export function useGlassSurface(): ViewStyle {
+  const isDark = useThemeStore((s) => s.theme === 'dark');
+  return {
+    backgroundColor: isDark ? 'rgba(12, 30, 36, 0.62)' : 'rgba(255, 255, 255, 0.72)',
+    borderColor: isDark ? 'rgba(94, 234, 212, 0.09)' : 'rgba(5, 42, 48, 0.07)',
+    ...GLASS_BLUR,
+    shadowColor: '#052A30',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: isDark ? 0.4 : 0.05,
+    shadowRadius: 20,
+    elevation: 2,
+  };
+}
 
 export interface FadeInViewProps {
   children: ReactNode;
@@ -127,17 +148,17 @@ export function BentoTile({ children, tone = 'surface', onPress, index = 0, clas
               borderColor: isDark ? 'rgba(94, 234, 212, 0.09)' : 'rgba(5, 42, 48, 0.07)',
               ...GLASS_BLUR,
             }
-          : tone === 'aurora'
+          : tone === 'aurora' || tone === 'lagoon'
             ? { borderColor: 'transparent' }
             : {};
 
-  const isOcean = tone === 'glass' || tone === 'deep';
+  const isOcean = tone === 'glass' || tone === 'deep' || tone === 'lagoon';
   const shadow: ViewStyle = isOcean
     ? {
         shadowColor: '#052A30',
-        shadowOffset: { width: 0, height: tone === 'deep' ? 10 : 6 },
-        shadowOpacity: isDark ? 0.4 : tone === 'deep' ? 0.18 : 0.05,
-        shadowRadius: tone === 'deep' ? 26 : 20,
+        shadowOffset: { width: 0, height: tone === 'glass' ? 6 : 10 },
+        shadowOpacity: isDark ? 0.4 : tone === 'glass' ? 0.05 : 0.18,
+        shadowRadius: tone === 'glass' ? 20 : 26,
         elevation: 2,
       }
     : {
@@ -163,6 +184,12 @@ export function BentoTile({ children, tone = 'surface', onPress, index = 0, clas
           <View style={{ position: 'absolute', top: -90, right: -70, width: 240, height: 240, borderRadius: 120, backgroundColor: hexToRgba(ocean.lagoon, 0.22) }} />
           <View style={{ position: 'absolute', bottom: -110, left: -60, width: 220, height: 220, borderRadius: 110, backgroundColor: hexToRgba(ocean.aqua, 0.12) }} />
         </View>
+      )}
+      {tone === 'lagoon' && (
+        <>
+          <LinearGradient colors={[...gradients.ocean]} {...gradientDirections.diagonal} style={FILL} pointerEvents="none" />
+          <View style={{ position: 'absolute', top: -80, right: -60, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(94, 234, 212, 0.18)' }} pointerEvents="none" />
+        </>
       )}
       {tone === 'aurora' && (
         <LinearGradient colors={[...gradients.aurora]} {...gradientDirections.diagonal} style={FILL} pointerEvents="none" />

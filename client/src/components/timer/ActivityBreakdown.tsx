@@ -4,7 +4,8 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from '
 
 import type { Activity } from '../../types/activity';
 import { formatDuration } from '../../utils/formatTime';
-import { Text } from '../ui';
+import { ocean } from '../../utils/theme';
+import { BentoHeader, BentoTile, Text } from '../ui';
 
 interface BreakdownRowProps {
   activity: Activity;
@@ -25,14 +26,14 @@ function BreakdownRow({ activity, seconds, percentage }: BreakdownRowProps) {
   return (
     <View className="gap-1.5">
       <View className="flex-row items-center justify-between">
-        <Text variant="body" color="primary" className="font-medium">
+        <Text variant="body" color="primary" className="text-[13px] font-medium">
           {activity.name}
         </Text>
         <Text variant="caption" color="muted" className="normal-case tracking-normal">
           {formatDuration(seconds)}
         </Text>
       </View>
-      <View className="h-2 w-full overflow-hidden rounded-full bg-hover">
+      <View className="h-1.5 w-full overflow-hidden rounded-full bg-hover">
         <Animated.View
           style={[{ height: '100%', overflow: 'hidden', borderRadius: 9999, backgroundColor: activity.color }, fillStyle]}
         />
@@ -56,17 +57,16 @@ export function ActivityBreakdown({ activities, totals }: ActivityBreakdownProps
   const maxSeconds = rows.length > 0 ? rows[0].seconds : 1;
 
   return (
-    <View className="gap-4 rounded-[24px] border border-subtle bg-surface p-5">
-      <Text variant="h3" color="primary">
-        Activity Breakdown
-      </Text>
+    <BentoTile tone="glass" dense index={6}>
+      <View className="gap-3">
+      <BentoHeader dense title="Activity Breakdown" icon="BarChart3" color={ocean.surf} />
 
       {rows.length === 0 ? (
-        <Text variant="body" color="muted">
+        <Text variant="body" color="muted" className="text-[13px]">
           No activity tracked yet today.
         </Text>
       ) : (
-        <View className="gap-4">
+        <View className="gap-3">
           {rows.map(({ activity, seconds }) => (
             <BreakdownRow
               key={activity.id}
@@ -77,6 +77,7 @@ export function ActivityBreakdown({ activities, totals }: ActivityBreakdownProps
           ))}
         </View>
       )}
-    </View>
+      </View>
+    </BentoTile>
   );
 }

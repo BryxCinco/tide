@@ -16,17 +16,17 @@ export interface SettingsSectionProps {
 
 /**
  * A settings group as a bento tile: colored icon header, then its rows edge to edge
- * (`-mx-5` cancels the tile's own padding so each row's divider spans the full width;
- * SettingsItem's own `px-5` restores the inset for the row content).
+ * (`-mx-3.5` cancels the dense tile's own padding so each row's divider spans the full width;
+ * SettingsItem's own `px-3.5` restores the inset for the row content).
  */
 export function SettingsSection({ title, icon, color, index, className, children }: SettingsSectionProps) {
   const items = Children.toArray(children);
 
   return (
-    <BentoTile index={index} className={className}>
-      <View className="gap-2">
-        <BentoHeader title={title} icon={icon} color={color} />
-        <View className="-mx-5 -mb-2">
+    <BentoTile tone="glass" dense index={index} className={className}>
+      <View className="gap-1">
+        <BentoHeader dense title={title} icon={icon} color={color} />
+        <View className="-mx-3.5 -mb-1.5">
           {items.map((child, i) =>
             isValidElement(child)
               ? cloneElement(child as ReactElement<{ isLast?: boolean; color?: string }>, { isLast: i === items.length - 1, color })

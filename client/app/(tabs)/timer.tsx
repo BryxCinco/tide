@@ -16,6 +16,7 @@ import {
 import { BENTO_INK_TEXT, BentoHeader, BentoStat, BentoTile, Button, ErrorState, Icon, Input, Modal, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useTimer } from '@/hooks/useTimer';
+import { ocean } from '@/utils/theme';
 import { useActivityStore } from '@/store/activityStore';
 import { showToast } from '@/store/toastStore';
 import { DEFAULT_FOCUS_ACTIVITY } from '@/mocks/mockActivities';
@@ -175,20 +176,20 @@ export default function TimerScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-base">
+    <SafeAreaView className="flex-1 bg-transparent">
       <ScrollView
         className="flex-1"
-        contentContainerClassName="pb-24 pt-3 md:pt-6"
+        contentContainerClassName="pb-24 pt-3 md:pt-5"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <ResponsiveContainer className="gap-3 md:gap-4">
+        <ResponsiveContainer className="gap-2.5 md:gap-3">
           {/* Header — left padding on phone clears AppLayout's floating menu button. */}
           <View className="flex-row items-center justify-between pl-12 md:pl-0">
             <View className="flex-1" style={{ minWidth: 0 }}>
-              <Text variant="label" color="muted" style={{ letterSpacing: 1.4 }}>
+              <Text variant="label" color="muted" className="text-[10.5px]" style={{ letterSpacing: 1.2 }}>
                 Focus
               </Text>
-              <Text variant={isPhone ? 'h3' : 'h2'} color="primary" numberOfLines={2}>
+              <Text variant="h2" color="primary" className={isPhone ? 'text-[19px] leading-[24px]' : 'text-[22px] leading-[28px]'} numberOfLines={2}>
                 Deep work, one session at a time
               </Text>
             </View>
@@ -197,21 +198,21 @@ export default function TimerScreen() {
             )}
           </View>
 
-          <View className="gap-3 md:flex-row md:gap-4">
+          <View className="gap-2.5 md:flex-row md:gap-3">
             {/* STAGE — the ring, mode switch and controls. */}
-            <BentoTile tone="glow" index={0} className="md:flex-[1.35]">
-              <View className="flex-1 justify-between gap-5">
+            <BentoTile tone="glass" dense index={0} className="md:flex-[1.35]">
+              <View className="flex-1 justify-between gap-4">
                 <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-center gap-2 rounded-full border border-subtle bg-base px-3 py-1.5">
+                  <View className="flex-row items-center gap-1.5 rounded-full border border-subtle bg-hover px-2.5 py-1">
                     <View
                       className="h-2 w-2 rounded-full"
                       style={{ backgroundColor: status === 'running' ? '#22C55E' : status === 'paused' ? '#F59E0B' : '#94A3B8' }}
                     />
-                    <Text variant="body" color="secondary" className="text-[12px] font-semibold">
+                    <Text variant="body" color="secondary" className="text-[11.5px] font-semibold">
                       {status === 'running' ? 'In session' : status === 'paused' ? 'Paused' : 'Ready'}
                     </Text>
                   </View>
-                  <Text variant="body" color="muted" className="text-[12px] font-medium">
+                  <Text variant="body" color="muted" className="text-[11.5px] font-medium">
                     {mode === 'countdown' ? 'Countdown' : 'Stopwatch'}
                   </Text>
                 </View>
@@ -248,34 +249,37 @@ export default function TimerScreen() {
             </BentoTile>
 
             {/* SIDE COLUMN — today's numbers, what you're working on, tags & notes. */}
-            <View className="gap-3 md:flex-1 md:gap-4">
-              <View className="flex-row gap-3 md:gap-4">
-                <BentoTile tone="ink" index={1} className="flex-1">
-                  <View className="gap-3">
-                    <Icon name="Hourglass" size={18} color="#5EEAD4" />
+            <View className="gap-2.5 md:flex-1 md:gap-3">
+              <View className="flex-row gap-2.5 md:gap-3">
+                <BentoTile tone="deep" dense index={1} className="flex-1">
+                  <View className="flex-1 justify-between gap-2.5">
+                    <View className="h-6 w-6 items-center justify-center rounded-[8px]" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
+                      <Icon name="Hourglass" size={13} color={ocean.seafoam} strokeWidth={2.2} />
+                    </View>
                     <View>
-                      <Text variant="h2" style={{ color: BENTO_INK_TEXT.primary, fontVariant: ['tabular-nums'] }} numberOfLines={1}>
+                      <Text variant="h2" className="text-[24px] leading-[28px]" style={{ color: BENTO_INK_TEXT.primary, fontVariant: ['tabular-nums'] }} numberOfLines={1}>
                         {formatDuration(todayTotalSeconds)}
                       </Text>
-                      <Text variant="body" className="text-[12px] font-medium" style={{ color: BENTO_INK_TEXT.muted }}>
+                      <Text variant="body" className="text-[11.5px] font-medium" style={{ color: BENTO_INK_TEXT.muted }}>
                         tracked today
                       </Text>
                     </View>
                   </View>
                 </BentoTile>
                 <BentoStat
+                  dense
                   className="flex-1"
                   index={2}
                   icon="Target"
-                  color="#6366F1"
+                  color={ocean.lavender}
                   value={`${todaySessions.length}`}
                   label={todaySessions.length === 1 ? 'session today' : 'sessions today'}
                 />
               </View>
 
-              <BentoTile index={3}>
-                <View className="gap-4">
-                  <BentoHeader title="What are you focusing on?" icon="Layers" />
+              <BentoTile tone="glass" dense index={3}>
+                <View className="gap-3">
+                  <BentoHeader dense title="What are you focusing on?" icon="Layers" color={ocean.lagoon} />
                   <ActivityPicker
                     compact={!isPhone}
                     activities={activities}
@@ -288,8 +292,8 @@ export default function TimerScreen() {
                 </View>
               </BentoTile>
 
-              <BentoTile index={4}>
-                <View className="gap-4">
+              <BentoTile tone="glass" dense index={4}>
+                <View className="gap-3">
                   <InterestTags tags={INTEREST_TAGS} selectedTags={selectedTags} onToggle={toggleTag} />
                   <Input label="Notes" placeholder="What are you working on?" value={notes} onChangeText={setNotes} />
                 </View>
@@ -312,7 +316,7 @@ export default function TimerScreen() {
               ))}
             </View>
           ) : (
-            <View className="gap-3 md:flex-row md:gap-4">
+            <View className="gap-2.5 md:flex-row md:gap-3">
               <View className="md:flex-[1.35]">
                 <TodayLogs sessions={todaySessions} />
               </View>

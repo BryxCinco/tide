@@ -9,7 +9,7 @@ import { useTimerStore } from '../../store/timerStore';
 import type { QuickSuggestion } from '../../types/chat';
 import { hexToRgba } from '../../utils/color';
 import { formatDuration } from '../../utils/formatTime';
-import { gradientDirections } from '../../utils/gradients';
+import { gradientDirections, gradients } from '../../utils/gradients';
 import { ocean } from '../../utils/theme';
 import { getGreeting } from '../../utils/greeting';
 import { BENTO_INK_TEXT, BentoTile, FadeInView, Icon, Text, type IconName } from '../ui';
@@ -24,9 +24,6 @@ function greetingFor(name?: string): string {
 }
 
 const SUGGESTION_COLORS = [ocean.lagoon, ocean.surf, ocean.lavender, ocean.sand, '#F472B6', ocean.coral, ocean.aqua, ocean.seafoam];
-
-// The featured prompt — lagoon into open water, a deeper take on the aurora.
-const OCEAN_GRADIENT = [ocean.lagoon, '#0891B2', '#0E4F6B'] as const;
 
 export interface SnapshotItem {
   icon: IconName;
@@ -126,7 +123,7 @@ export function ChatWelcome({ userFirstName, suggestions, onSelect }: ChatWelcom
               className="min-h-[92px] flex-1 justify-between overflow-hidden rounded-[20px] p-3.5"
             >
               <LinearGradient
-                colors={[...OCEAN_GRADIENT]}
+                colors={[...gradients.ocean]}
                 {...gradientDirections.diagonal}
                 style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
               />

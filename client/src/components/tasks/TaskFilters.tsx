@@ -33,7 +33,7 @@ export function TaskFilters({ filter, sort, onFilterChange, onSortChange }: Task
   const { isPhone } = useResponsive();
   return (
     <View className="gap-3 md:flex-row md:items-center md:justify-between">
-      <View className="flex-row rounded-2xl border border-subtle bg-base p-1">
+      <View className="flex-row rounded-[14px] border border-subtle bg-hover p-0.5">
         {FILTERS.map((option) => {
           const selected = filter === option.value;
           return (
@@ -42,15 +42,15 @@ export function TaskFilters({ filter, sort, onFilterChange, onSortChange }: Task
               onPress={() => onFilterChange(option.value)}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
-              className={cn('flex-1 flex-row items-center justify-center gap-1.5 rounded-xl px-3 py-2 md:flex-none', selected && 'bg-surface')}
+              className={cn('flex-1 flex-row items-center justify-center gap-1.5 rounded-[12px] px-3 py-1.5 md:flex-none', selected && 'bg-surface')}
               style={
                 selected
-                  ? { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 1 }
+                  ? { shadowColor: '#052A30', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 1 }
                   : undefined
               }
             >
-              {!isPhone && <Icon name={option.icon} size={14} color={selected ? '#14B8A6' : undefined} />}
-              <Text variant="body" color={selected ? 'primary' : 'muted'} className={cn('text-[13px]', selected ? 'font-semibold' : 'font-medium')}>
+              {!isPhone && <Icon name={option.icon} size={13} color={selected ? '#14B8A6' : undefined} />}
+              <Text variant="body" color={selected ? 'primary' : 'muted'} className={cn('text-[12.5px]', selected ? 'font-semibold' : 'font-medium')}>
                 {option.label}
               </Text>
             </Pressable>

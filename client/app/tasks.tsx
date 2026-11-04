@@ -12,6 +12,7 @@ import { useActivityStore } from '@/store/activityStore';
 import { getVisibleTasks, isTaskDueToday, isTaskOverdue, useTaskStore } from '@/store/taskStore';
 import type { Task, TaskPriority } from '@/types/task';
 import { toDateKey } from '@/utils/formatDate';
+import { ocean } from '@/utils/theme';
 
 export default function TasksScreen() {
   const tasks = useTaskStore((s) => s.tasks);
@@ -77,43 +78,43 @@ export default function TasksScreen() {
     <AppLayout showMobileMenuButton={false}>
       {/* bottom excluded — MobileTabBar (below) owns the bottom safe-area inset itself,
           so the two don't double up on phone. */}
-      <SafeAreaView className="flex-1 bg-base" edges={['top', 'left', 'right']}>
+      <SafeAreaView className="flex-1 bg-transparent" edges={['top', 'left', 'right']}>
         <ScrollView
           className="flex-1"
-          contentContainerClassName="pb-24 pt-3 md:pt-6"
+          contentContainerClassName="pb-24 pt-3 md:pt-5"
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
-          <ResponsiveContainer className="gap-3 md:gap-4">
+          <ResponsiveContainer className="gap-2.5 md:gap-3">
             <View className="flex-row items-center gap-3">
               {/* Phone: drawer hamburger in the left slot; tablet/desktop have the Sidebar. */}
               <MobileMenuButton />
               {!isPhone && <BackButton />}
               <View className="flex-1" style={{ minWidth: 0 }}>
-                <Text variant="label" color="muted" style={{ letterSpacing: 1.4 }}>
+                <Text variant="label" color="muted" className="text-[10.5px]" style={{ letterSpacing: 1.2 }}>
                   Tasks
                 </Text>
-                <Text variant={isPhone ? 'h3' : 'h2'} color="primary" numberOfLines={1}>
+                <Text variant="h2" color="primary" className={isPhone ? 'text-[19px] leading-[24px]' : 'text-[22px] leading-[28px]'} numberOfLines={1}>
                   Get things done
                 </Text>
               </View>
               <Button title="New" variant="primary" size="sm" icon="Plus" onPress={openCreate} />
             </View>
 
-            <View className="gap-3 md:flex-row md:gap-4">
+            <View className="gap-2.5 md:flex-row md:gap-3">
               {/* Progress — ring of done/total plus what's still open, by priority. */}
-              <BentoTile tone="ink" index={0} className="md:flex-[1.3]">
-                <View className="flex-1 flex-row items-center gap-5">
-                  <BentoRing value={completion} size={isPhone ? 104 : 124} strokeWidth={isPhone ? 9 : 11}>
-                    <Text variant="h2" style={{ color: BENTO_INK_TEXT.primary, fontVariant: ['tabular-nums'] }}>
+              <BentoTile tone="deep" dense index={0} className="md:flex-[1.3]">
+                <View className="flex-1 flex-row items-center gap-4">
+                  <BentoRing value={completion} size={isPhone ? 96 : 112} strokeWidth={isPhone ? 8 : 10}>
+                    <Text variant="h2" className="text-[22px] leading-[26px]" style={{ color: BENTO_INK_TEXT.primary, fontVariant: ['tabular-nums'] }}>
                       {completion}%
                     </Text>
                     <Text variant="body" className="text-[11px] font-medium" style={{ color: BENTO_INK_TEXT.muted }}>
                       complete
                     </Text>
                   </BentoRing>
-                  <View className="flex-1 gap-3" style={{ minWidth: 0 }}>
+                  <View className="flex-1 gap-2.5" style={{ minWidth: 0 }}>
                     <View>
-                      <Text variant="h3" style={{ color: BENTO_INK_TEXT.primary }}>
+                      <Text variant="h3" className="text-[16px] leading-[21px]" style={{ color: BENTO_INK_TEXT.primary }}>
                         {doneCount} of {tasks.length} done
                       </Text>
                       <Text variant="body" className="text-[12px]" style={{ color: BENTO_INK_TEXT.muted }}>
@@ -138,14 +139,14 @@ export default function TasksScreen() {
               </BentoTile>
 
               {/* Quick-filter stats — tapping one applies that filter to the list below. */}
-              <View className="gap-3 md:flex-1 md:gap-4">
-                <View className="flex-row gap-3 md:gap-4">
-                  <BentoStat className="flex-1" index={1} icon="Sun" color="#F59E0B" value={`${dueTodayCount}`} label="due today" onPress={() => setFilter('today')} />
-                  <BentoStat className="flex-1" index={2} icon="AlertTriangle" color="#EF4444" value={`${overdueCount}`} label="overdue" onPress={() => setFilter('overdue')} />
+              <View className="gap-2.5 md:flex-1 md:gap-3">
+                <View className="flex-row gap-2.5 md:gap-3">
+                  <BentoStat dense className="flex-1" index={1} icon="Sun" color={ocean.sand} value={`${dueTodayCount}`} label="due today" onPress={() => setFilter('today')} />
+                  <BentoStat dense className="flex-1" index={2} icon="AlertTriangle" color={ocean.coral} value={`${overdueCount}`} label="overdue" onPress={() => setFilter('overdue')} />
                 </View>
-                <View className="flex-row gap-3 md:gap-4">
-                  <BentoStat className="flex-1" index={3} icon="Loader" color="#6366F1" value={`${inProgressCount}`} label="in progress" />
-                  <BentoStat className="flex-1" index={4} icon="CheckCheck" color="#14B8A6" value={`${doneCount}`} label="completed" onPress={() => setFilter('done')} />
+                <View className="flex-row gap-2.5 md:gap-3">
+                  <BentoStat dense className="flex-1" index={3} icon="Loader" color={ocean.lavender} value={`${inProgressCount}`} label="in progress" />
+                  <BentoStat dense className="flex-1" index={4} icon="CheckCheck" color={ocean.lagoon} value={`${doneCount}`} label="completed" onPress={() => setFilter('done')} />
                 </View>
               </View>
             </View>
@@ -154,7 +155,7 @@ export default function TasksScreen() {
               <QuestCard />
             </FadeInView>
 
-            <BentoTile index={6}>
+            <BentoTile tone="glass" dense index={6}>
               <TaskFilters filter={filter} sort={sort} onFilterChange={setFilter} onSortChange={setSort} />
             </BentoTile>
 
@@ -181,7 +182,7 @@ export default function TasksScreen() {
                 onAction={openCreate}
               />
             ) : (
-              <View className="flex-row flex-wrap gap-3">
+              <View className="flex-row flex-wrap gap-2.5">
                 {visibleTasks.map((task, index) => (
                   <FadeInView key={task.id} index={index} className="basis-full md:basis-[45%] md:grow">
                     <TaskCard

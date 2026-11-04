@@ -3,7 +3,8 @@ import { View } from 'react-native';
 import type { Session } from '../../types/timer';
 import { hexToRgba } from '../../utils/color';
 import { formatDuration } from '../../utils/formatTime';
-import { Badge, Divider, EmptyState, Icon, Text, type IconName } from '../ui';
+import { ocean } from '../../utils/theme';
+import { Badge, BentoHeader, BentoTile, Divider, EmptyState, Icon, Text, type IconName } from '../ui';
 
 export interface TodayLogsProps {
   sessions: Session[];
@@ -11,13 +12,15 @@ export interface TodayLogsProps {
 
 export function TodayLogs({ sessions }: TodayLogsProps) {
   return (
-    <View className="rounded-[24px] border border-subtle bg-surface p-5">
-      <View className="mb-2 flex-row items-center gap-2">
-        <Text variant="h3" color="primary">
-          Today&apos;s Sessions
-        </Text>
-        {sessions.length > 0 && <Badge label={String(sessions.length)} variant="teal" size="sm" />}
-      </View>
+    <BentoTile tone="glass" dense index={5}>
+      <BentoHeader
+        dense
+        className="mb-1"
+        title="Today's Sessions"
+        icon="Clock"
+        color={ocean.lagoon}
+        right={sessions.length > 0 ? <Badge label={String(sessions.length)} variant="teal" size="sm" /> : undefined}
+      />
 
       {sessions.length === 0 ? (
         <EmptyState
@@ -30,15 +33,15 @@ export function TodayLogs({ sessions }: TodayLogsProps) {
           return (
             <View key={session.id}>
               {index > 0 && <Divider spacing="sm" />}
-              <View className="flex-row items-center gap-3 py-2">
+              <View className="flex-row items-center gap-2.5 py-1.5">
                 <View
-                  className="h-10 w-10 items-center justify-center rounded-full"
-                  style={{ backgroundColor: hexToRgba(session.color, 0.1) }}
+                  className="h-8 w-8 items-center justify-center rounded-[10px]"
+                  style={{ backgroundColor: hexToRgba(session.color, 0.13) }}
                 >
-                  <Icon name={session.icon as IconName} size={18} color={session.color} />
+                  <Icon name={session.icon as IconName} size={15} color={session.color} />
                 </View>
                 <View className="flex-1">
-                  <Text variant="body" color="primary" className="font-semibold">
+                  <Text variant="body" color="primary" className="text-[13.5px] font-semibold">
                     {session.activityLabel}
                   </Text>
                   <Text variant="caption" color="muted" className="mt-0.5 normal-case tracking-normal">
@@ -52,7 +55,7 @@ export function TodayLogs({ sessions }: TodayLogsProps) {
                     </View>
                   )}
                 </View>
-                <Text variant="body" color="primary" className="font-semibold">
+                <Text variant="body" color="primary" className="text-[13.5px] font-semibold" style={{ fontVariant: ['tabular-nums'] }}>
                   {formatDuration(session.durationSeconds)}
                 </Text>
               </View>
@@ -60,6 +63,6 @@ export function TodayLogs({ sessions }: TodayLogsProps) {
           );
         })
       )}
-    </View>
+    </BentoTile>
   );
 }

@@ -73,26 +73,26 @@ export default function JournalScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-base">
+    <SafeAreaView className="flex-1 bg-transparent">
       <ScrollView
         className="flex-1"
-        contentContainerClassName="pb-24 pt-3 md:pt-6"
+        contentContainerClassName="pb-24 pt-3 md:pt-5"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <ResponsiveContainer className="gap-3 md:gap-4">
+        <ResponsiveContainer className="gap-2.5 md:gap-3">
           <View className="flex-row items-center justify-between pl-12 md:pl-0">
             <View className="flex-1" style={{ minWidth: 0 }}>
-              <Text variant="label" color="muted" style={{ letterSpacing: 1.4 }}>
+              <Text variant="label" color="muted" className="text-[10.5px]" style={{ letterSpacing: 1.2 }}>
                 Journal
               </Text>
-              <Text variant={isPhone ? 'h3' : 'h2'} color="primary" numberOfLines={2}>
+              <Text variant="h2" color="primary" className={isPhone ? 'text-[19px] leading-[24px]' : 'text-[22px] leading-[28px]'} numberOfLines={2}>
                 Your story, day by day
               </Text>
             </View>
             {!isPhone && <Button title="New entry" icon="Plus" size="sm" onPress={openNewEntry} />}
           </View>
 
-          <View className="gap-3 md:flex-row md:gap-4">
+          <View className="gap-2.5 md:flex-row md:gap-3">
             <JournalPromptTile
               className="md:flex-[1.6]"
               firstName={user?.name?.trim().split(/\s+/)[0]}
@@ -105,8 +105,8 @@ export default function JournalScreen() {
             />
           </View>
 
-          <BentoTile index={2}>
-            <View className="gap-4">
+          <BentoTile tone="glass" dense index={2}>
+            <View className="gap-3">
               <SearchBar value={searchDraft} onChangeText={setSearchDraft} />
               <JournalFilters
                 filter={filter}
@@ -126,7 +126,7 @@ export default function JournalScreen() {
               }}
             />
           ) : isLoading && allEntries.length === 0 ? (
-            <View className="flex-row flex-wrap gap-3">
+            <View className="flex-row flex-wrap gap-2.5">
               {[0, 1, 2].map((i) => (
                 <View key={i} className={basisClass}>
                   <SkeletonCard />
@@ -136,7 +136,7 @@ export default function JournalScreen() {
           ) : visibleEntries.length === 0 ? (
             <EmptyJournal hasActiveFilters={hasActiveFilters} onNewEntry={openNewEntry} />
           ) : (
-            <View className="flex-row flex-wrap gap-3 md:gap-4">
+            <View className="flex-row flex-wrap gap-2.5 md:gap-3">
               {visibleEntries.map((entry, index) => {
                 const tile = tileStyle(index);
                 return (

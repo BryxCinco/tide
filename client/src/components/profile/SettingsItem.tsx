@@ -37,21 +37,21 @@ export function SettingsItem({ icon, label, description, danger = false, disable
   const content = (
     <View
       className={cn(
-        'flex-row items-center gap-3 px-5 py-3.5',
+        'flex-row items-center gap-2.5 px-3.5 py-2.5',
         !isLast && 'border-b border-subtle',
         disabled && 'opacity-60',
       )}
     >
-      <View className="h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: hexToRgba(accent, 0.12) }}>
-        <Icon name={icon} size={17} color={accent} />
+      <View className="h-[30px] w-[30px] items-center justify-center rounded-[9px]" style={{ backgroundColor: hexToRgba(accent, 0.13) }}>
+        <Icon name={icon} size={15} color={accent} />
       </View>
 
       <View className="flex-1 gap-0.5">
-        <Text variant="body" color="primary" className={cn('font-medium', danger && 'text-error')}>
+        <Text variant="body" color="primary" className={cn('text-[13.5px] font-medium', danger && 'text-error')}>
           {label}
         </Text>
         {description && (
-          <Text variant="body" color="muted" className="text-[12px]">
+          <Text variant="body" color="muted" className="text-[11.5px]">
             {description}
           </Text>
         )}
@@ -68,7 +68,7 @@ export function SettingsItem({ icon, label, description, danger = false, disable
   }
 
   return (
-    <Pressable onPress={onPress} className="hover:bg-elevated">
+    <Pressable onPress={onPress} className="hover:bg-hover">
       {content}
     </Pressable>
   );

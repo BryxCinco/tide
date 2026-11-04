@@ -36,8 +36,8 @@ export function ProfileCover({ onAvatarPress, onEditPress, className }: ProfileC
   const avatarSize = isPhone ? 72 : 84;
 
   return (
-    <FadeInView index={0} className={className} style={{ minHeight: isPhone ? 240 : 250 }}>
-      <View className="flex-1 overflow-hidden rounded-[24px]">
+    <FadeInView index={0} className={className} style={{ minHeight: isPhone ? 220 : 228 }}>
+      <View className="flex-1 overflow-hidden rounded-[20px]">
         {coverType === 'image' && coverValue ? (
           <Image source={{ uri: coverValue }} style={FILL} resizeMode="cover" />
         ) : coverType === 'solid' ? (
@@ -46,7 +46,7 @@ export function ProfileCover({ onAvatarPress, onEditPress, className }: ProfileC
           <LinearGradient colors={gradient.colors} {...gradientDirections.diagonal} style={FILL} />
         )}
         <LinearGradient
-          colors={['rgba(2, 6, 23, 0)', 'rgba(2, 6, 23, 0.3)', 'rgba(2, 6, 23, 0.72)']}
+          colors={['rgba(3, 20, 26, 0)', 'rgba(3, 20, 26, 0.3)', 'rgba(3, 20, 26, 0.72)']}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={FILL}
@@ -57,7 +57,7 @@ export function ProfileCover({ onAvatarPress, onEditPress, className }: ProfileC
           style={{ position: 'absolute', right: -60, top: -60, width: 240, height: 240, borderRadius: 120, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' }}
         />
 
-        <View className="flex-1 justify-between gap-6 p-5 md:p-6">
+        <View className="flex-1 justify-between gap-5 p-4">
           <View className="flex-row items-center justify-between">
             <View className="rounded-full px-3 py-1.5" style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}>
               <Text variant="body" className="text-[12px] font-semibold" style={{ color: '#FFFFFF' }}>

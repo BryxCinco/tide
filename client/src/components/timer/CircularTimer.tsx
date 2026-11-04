@@ -92,8 +92,8 @@ export function CircularTimer({ seconds, status, activityLabel, size = 280, coun
         <Defs>
           <LinearGradient id="circularTimerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
             <Stop offset="0%" stopColor="#14B8A6" />
-            <Stop offset="55%" stopColor="#06B6D4" />
-            <Stop offset="100%" stopColor="#6366F1" />
+            <Stop offset="55%" stopColor="#22D3EE" />
+            <Stop offset="100%" stopColor="#38BDF8" />
           </LinearGradient>
           <LinearGradient id="circularTimerGradientCountdown" x1="0%" y1="0%" x2="100%" y2="100%">
             <Stop offset="0%" stopColor={colors.brand.deepPurple} />

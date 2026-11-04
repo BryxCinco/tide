@@ -29,32 +29,32 @@ function promptOfTheDay(date = new Date()): string {
 
 export function JournalPromptTile({ firstName, onWrite, className }: { firstName?: string; onWrite: () => void; className?: string }) {
   return (
-    <BentoTile tone="aurora" index={0} className={className}>
-      <View className="flex-1 justify-between gap-6">
-        <View className="flex-row items-center gap-2 self-start rounded-full px-3 py-1.5" style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}>
-          <Icon name="Sparkles" size={13} color="#FFFFFF" />
-          <Text variant="body" className="text-[12px] font-semibold" style={{ color: '#FFFFFF' }}>
+    <BentoTile tone="lagoon" dense index={0} className={className}>
+      <View className="flex-1 justify-between gap-4">
+        <View className="flex-row items-center gap-1.5 self-start rounded-full px-2.5 py-1" style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}>
+          <Icon name="Sparkles" size={12} color="#FFFFFF" />
+          <Text variant="body" className="text-[11.5px] font-semibold" style={{ color: '#FFFFFF' }}>
             Prompt of the day
           </Text>
         </View>
 
-        <View className="gap-2">
+        <View className="gap-1">
           {firstName && (
-            <Text variant="body" className="text-[14px] font-medium" style={{ color: 'rgba(255,255,255,0.85)' }}>
+            <Text variant="body" className="text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.85)' }}>
               Hey {firstName},
             </Text>
           )}
-          <Text variant="h1" style={{ color: '#FFFFFF' }}>
+          <Text variant="h1" className="text-[24px] leading-[30px]" style={{ color: '#FFFFFF' }}>
             {promptOfTheDay()}
           </Text>
         </View>
 
         <Pressable
           onPress={onWrite}
-          className="h-11 flex-row items-center gap-2 self-start rounded-full bg-white px-5"
+          className="h-9 flex-row items-center gap-1.5 self-start rounded-full bg-white px-4"
         >
-          <Icon name="PenLine" size={16} color="#0F766E" strokeWidth={2.3} />
-          <Text variant="body" className="text-[14px] font-semibold" style={{ color: '#0F766E' }}>
+          <Icon name="PenLine" size={14} color="#0E4F6B" strokeWidth={2.3} />
+          <Text variant="body" className="text-[13px] font-semibold" style={{ color: '#0E4F6B' }}>
             Start writing
           </Text>
         </Pressable>
@@ -98,12 +98,12 @@ export function JournalStatsTile({ entries, onMoodPress, className }: { entries:
   ];
 
   return (
-    <BentoTile tone="ink" index={1} className={className}>
-      <View className="flex-1 justify-between gap-5">
+    <BentoTile tone="deep" dense index={1} className={className}>
+      <View className="flex-1 justify-between gap-3.5">
         <View className="flex-row justify-between">
           {numbers.map((n) => (
             <View key={n.label}>
-              <Text variant="h2" style={{ color: BENTO_INK_TEXT.primary, fontVariant: ['tabular-nums'] }}>
+              <Text variant="h2" className="text-[24px] leading-[28px]" style={{ color: BENTO_INK_TEXT.primary, fontVariant: ['tabular-nums'] }}>
                 {n.value}
               </Text>
               <Text variant="body" className="text-[12px] font-medium" style={{ color: BENTO_INK_TEXT.muted }}>
@@ -113,8 +113,8 @@ export function JournalStatsTile({ entries, onMoodPress, className }: { entries:
           ))}
         </View>
 
-        <View className="gap-2.5">
-          <Text variant="label" style={{ color: BENTO_INK_TEXT.muted, letterSpacing: 1.4 }}>
+        <View className="gap-2">
+          <Text variant="label" className="text-[10.5px]" style={{ color: BENTO_INK_TEXT.muted, letterSpacing: 0.8 }}>
             Mood mix
           </Text>
           {!stats.hasMoods ? (
@@ -122,7 +122,7 @@ export function JournalStatsTile({ entries, onMoodPress, className }: { entries:
               Pick a mood when you write — your mix of good and rough days shows up here.
             </Text>
           ) : (
-          <View className="h-20 flex-row items-end gap-2.5">
+          <View className="h-[72px] flex-row items-end gap-2">
             {MOOD_ORDER.map((mood) => {
               const config = MOOD_ICON_MAP[mood];
               const count = stats.counts[mood];

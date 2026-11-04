@@ -9,7 +9,7 @@ import { cn } from '../../utils/cn';
 import { hexToRgba } from '../../utils/color';
 import { formatDateKeyCompact } from '../../utils/formatDate';
 import { gradientDirections, gradients } from '../../utils/gradients';
-import { Icon, Text, VisibleDeleteButton } from '../ui';
+import { Icon, Text, useGlassSurface, VisibleDeleteButton } from '../ui';
 
 export const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
   low: { label: 'Low', color: '#94A3B8' },
@@ -49,14 +49,16 @@ export function TaskCard({ task, activityName, onToggle, onView, onEdit, onDelet
   const priority = PRIORITY_META[task.priority];
   const overdue = isTaskOverdue(task);
   const dueToday = !overdue && isTaskDueToday(task);
+  const glass = useGlassSurface();
 
   return (
     <View
-      className={cn('flex-1 flex-row overflow-hidden rounded-[20px] border bg-surface', overdue ? 'border-error/30' : 'border-subtle')}
+      className={cn('flex-1 flex-row overflow-hidden rounded-[18px] border')}
+      style={overdue ? { ...glass, borderColor: 'rgba(239, 68, 68, 0.3)' } : glass}
     >
-      <View className="w-1.5 self-stretch" style={{ backgroundColor: isDone ? themeColors.border.default : priority.color }} />
+      <View className="w-1 self-stretch" style={{ backgroundColor: isDone ? themeColors.border.default : priority.color }} />
 
-      <View className="flex-1 flex-row items-start gap-3 py-3.5 pl-3.5 pr-2">
+      <View className="flex-1 flex-row items-start gap-2.5 py-3 pl-3 pr-1.5">
         <Pressable
           onPress={onToggle}
           disabled={isDone}
@@ -68,7 +70,7 @@ export function TaskCard({ task, activityName, onToggle, onView, onEdit, onDelet
         >
           {isDone && (
             <LinearGradient
-              colors={[...gradients.aurora]}
+              colors={[...gradients.ocean]}
               {...gradientDirections.diagonal}
               style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
             />
@@ -80,17 +82,17 @@ export function TaskCard({ task, activityName, onToggle, onView, onEdit, onDelet
           )}
         </Pressable>
 
-        <Pressable onPress={onView} className="flex-1 gap-2" style={{ minWidth: 0 }}>
+        <Pressable onPress={onView} className="flex-1 gap-1.5" style={{ minWidth: 0 }}>
           <Text
             variant="body"
             color={isDone ? 'muted' : 'primary'}
-            className={cn('text-[15px] font-semibold leading-[21px]', isDone && 'line-through')}
+            className={cn('text-[14px] font-semibold leading-[19px]', isDone && 'line-through')}
             numberOfLines={2}
           >
             {task.title}
           </Text>
           {task.description ? (
-            <Text variant="body" color="muted" className="text-[13px]" numberOfLines={1}>
+            <Text variant="body" color="muted" className="text-[12.5px]" numberOfLines={1}>
               {task.description}
             </Text>
           ) : null}
