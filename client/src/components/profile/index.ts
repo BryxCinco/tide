@@ -12,4 +12,3 @@ export * from './ProfileCover';
 export * from './SettingsItem';
 export * from './SettingsSection';
 export * from './SettingsSwitch';
-export * from './StatsRow';

@@ -18,7 +18,6 @@ import {
   SettingsItem,
   SettingsSection,
   SettingsSwitch,
-  StatsRow,
 } from '@/components/profile';
 import { BentoTile, ErrorState, Icon, ResponsiveContainer, Text, ThemeToggle } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
@@ -165,8 +164,6 @@ export default function ProfileScreen() {
             />
             <LevelCard className="md:flex-1" />
           </View>
-
-          <StatsRow />
 
           {/* Preferences — the longest group — gets the wide left column; the shorter
               Account / Data / About groups stack in the right column. */}
