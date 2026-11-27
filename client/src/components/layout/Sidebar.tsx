@@ -89,7 +89,7 @@ export function Sidebar({ collapsed: forcedCollapsed = false }: SidebarProps) {
         </View>
 
         {/* FIXED TOP — brand mark. */}
-        <View className={cn('shrink-0 pb-2 pt-6', collapsed ? 'items-center' : 'px-5')}>
+        <View className={cn('shrink-0 pb-1 pt-5', collapsed ? 'items-center' : 'px-5')}>
           {collapsed ? (
             <SidebarLogo collapsed />
           ) : (

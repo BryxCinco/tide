@@ -20,25 +20,14 @@
 }
 
 /* Sidebar/drawer nav scroll — invisible until hovered, then a thin teal thumb. */
+/* Sidebar nav: scrolls when the window is short, but never shows a scrollbar — the thin
+ * teal bar (plus Edge's arrow buttons, which the standard scrollbar-color property brings
+ * back) looked like a bug beside the floating sidebar card. */
 .sidebar-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-.sidebar-scrollbar:hover {
-  scrollbar-color: #14B8A6 transparent;
+  scrollbar-width: none;
 }
 .sidebar-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-.sidebar-scrollbar::-webkit-scrollbar-thumb {
-  background-color: transparent;
-  border-radius: 9999px;
-}
-.sidebar-scrollbar:hover::-webkit-scrollbar-thumb {
-  background-color: #14B8A6;
-}
-.sidebar-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+  display: none;
 }
 
 /* Clean text-input cursor (web) — a thin teal caret instead of the browser's default black

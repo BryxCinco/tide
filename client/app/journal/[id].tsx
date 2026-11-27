@@ -14,7 +14,7 @@ export default function JournalEntryScreen() {
 
   return (
     <AppLayout showMobileMenuButton={false}>
-      <SafeAreaView className="flex-1 bg-base">
+      <SafeAreaView className="flex-1 bg-transparent">
         <ResponsiveContainer className="flex-1 py-4 md:py-6 lg:py-8">
           {entry ? (
             <JournalEditor entry={entry} onDone={() => router.back()} />

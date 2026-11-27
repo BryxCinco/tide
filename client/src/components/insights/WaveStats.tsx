@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
+import { useResponsive } from '../../hooks/useResponsive';
 import { insightsService } from '../../services/insights.service';
 import type { WaveDay } from '../../types/insights';
 import { cn } from '../../utils/cn';
@@ -43,6 +44,7 @@ export function WaveStats({ refreshKey = 0, index = 0, className }: WaveStatsPro
   const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const todayKey = toDateKey(new Date());
+  const { isPhone } = useResponsive();
 
   useEffect(() => {
     let alive = true;
@@ -66,7 +68,7 @@ export function WaveStats({ refreshKey = 0, index = 0, className }: WaveStatsPro
   return (
     <BentoTile tone="deep" dense index={index} className={className}>
       <View className="gap-3">
-        <View className="flex-row items-center justify-between gap-2">
+        <View className="flex-row flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <View className="flex-row items-center gap-1.5">
             <Icon name="Waves" size={14} color={avgMeta.color === '#94A3B8' ? BENTO_INK_TEXT.secondary : avgMeta.color} strokeWidth={2.2} />
             <Text variant="label" className="text-[10.5px]" style={{ color: BENTO_INK_TEXT.muted, letterSpacing: 0.8 }}>
@@ -76,7 +78,7 @@ export function WaveStats({ refreshKey = 0, index = 0, className }: WaveStatsPro
           {!loading && (
             <View className="flex-row items-baseline gap-1.5">
               <Text variant="body" className="text-[12px]" style={{ color: BENTO_INK_TEXT.muted }}>
-                This week's tide
+                {isPhone ? 'Week' : "This week's tide"}
               </Text>
               <Text variant="body" className="text-[14px] font-bold" style={{ color: avg.level === 'low' ? BENTO_INK_TEXT.primary : avgMeta.color }}>
                 {avgMeta.label} · {avg.score}
@@ -99,11 +101,11 @@ export function WaveStats({ refreshKey = 0, index = 0, className }: WaveStatsPro
                 accessibilityLabel={loading ? 'Loading' : `${day.label}: ${WAVE_META[day.level].label}, score ${day.score}`}
                 className={cn('flex-1 items-center gap-1 rounded-2xl py-1.5', isActive && 'bg-[rgba(255,255,255,0.07)]')}
               >
-                <WaveGlyph level={day.level} size={40} dim={loading} />
+                <WaveGlyph level={day.level} size={isPhone ? 38 : 56} dim={loading} />
                 <Text variant="body" className={cn('text-[11px]', isToday ? 'font-bold' : 'font-medium')} style={{ color: isToday ? BENTO_INK_TEXT.primary : BENTO_INK_TEXT.secondary }}>
                   {loading ? ' ' : isToday ? 'Today' : day.label}
                 </Text>
-                <Text variant="body" className="text-[10px] font-semibold" style={{ color: day.level === 'low' ? BENTO_INK_TEXT.muted : WAVE_META[day.level].color }}>
+                <Text variant="body" className={cn('font-semibold', isPhone ? 'text-[9px]' : 'text-[10px]')} numberOfLines={1} style={{ color: day.level === 'low' ? BENTO_INK_TEXT.muted : WAVE_META[day.level].color }}>
                   {loading ? ' ' : WAVE_META[day.level].label}
                 </Text>
               </Pressable>

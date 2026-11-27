@@ -37,7 +37,9 @@ export default function TabsLayout() {
           headerShown: false,
           tabBarActiveTintColor: themeColors.brand.tideTeal,
           tabBarInactiveTintColor: themeColors.text.muted,
-          sceneStyle: { backgroundColor: themeColors.background.base },
+          // Transparent so AppLayout's OceanBackdrop is the one background behind every page —
+          // an opaque scene here made tab pages flat while Tasks/AI Coach showed the gradient.
+          sceneStyle: { backgroundColor: 'transparent' },
         }}
       >
         <Tabs.Screen name="index" options={{ title: 'Dashboard', tabBarIcon: makeTabBarIcon('Home') }} />

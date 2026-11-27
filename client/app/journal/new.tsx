@@ -8,7 +8,7 @@ import { ResponsiveContainer } from '@/components/ui';
 export default function NewJournalEntryScreen() {
   return (
     <AppLayout showMobileMenuButton={false}>
-      <SafeAreaView className="flex-1 bg-base">
+      <SafeAreaView className="flex-1 bg-transparent">
         <ResponsiveContainer className="flex-1 py-4 md:py-6 lg:py-8">
           <JournalEditor onDone={() => router.back()} />
         </ResponsiveContainer>

@@ -141,7 +141,7 @@ export default function ActivitiesScreen() {
     <AppLayout showMobileMenuButton={false}>
       {/* bottom excluded — MobileTabBar (below) owns the bottom safe-area inset itself,
           so the two don't double up on phone. */}
-      <SafeAreaView className="flex-1 bg-base" edges={['top', 'left', 'right']}>
+      <SafeAreaView className="flex-1 bg-transparent" edges={['top', 'left', 'right']}>
         <ScrollView
           className="flex-1"
           contentContainerClassName="pb-24 pt-3 md:pt-6"
