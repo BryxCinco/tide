@@ -20,6 +20,7 @@ export * from './OfflineBanner';
 export * from './ProgressBar';
 export * from './ResponsiveContainer';
 export * from './Skeleton';
+export * from './StatStrip';
 export * from './Text';
 export * from './ThemeToggle';
 export * from './Toast';
