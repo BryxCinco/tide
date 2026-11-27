@@ -12,11 +12,14 @@ import { useStreakStore } from './streakStore';
 
 export type TaskFilter = 'all' | 'today' | 'done' | 'overdue';
 export type TaskSort = 'priority' | 'dueDate' | 'created';
+export type TaskView = 'board' | 'table';
 
 interface TaskState {
   tasks: Task[];
   filter: TaskFilter;
   sort: TaskSort;
+  /** Board or Table — a layout preference, persisted. */
+  view: TaskView;
   isLoading: boolean;
   error: string | null;
   /**
@@ -48,6 +51,10 @@ interface TaskState {
   /** Binary done/not-done toggle for the checkbox — the 3-way status (incl. "in-progress")
    * is only settable deliberately, via updateTask from the edit modal's status selector. */
   toggleTaskStatus: (id: string) => void;
+  /** Board/Table status change. Moving to Done goes through toggleTaskStatus (XP + streak);
+   * other moves use updateTask. No-op for locked (done) tasks or the same status. */
+  moveTask: (id: string, status: TaskStatus) => void;
+  setView: (view: TaskView) => void;
   setFilter: (filter: TaskFilter) => void;
   setSort: (sort: TaskSort) => void;
   clearError: () => void;
@@ -64,6 +71,7 @@ export const useTaskStore = create<TaskState>()(
       tasks: [],
       filter: 'all',
       sort: 'priority',
+      view: 'board',
       isLoading: false,
       error: null,
       withdrawnCount: 0,
@@ -177,17 +185,25 @@ export const useTaskStore = create<TaskState>()(
           });
       },
 
+      moveTask: (id, status) => {
+        const task = get().tasks.find((t) => t.id === id);
+        if (!task || task.status === 'done' || task.status === status) return;
+        if (status === 'done') get().toggleTaskStatus(id);
+        else get().updateTask(id, { status });
+      },
+
+      setView: (view) => set({ view }),
       setFilter: (filter) => set({ filter }),
       setSort: (sort) => set({ sort }),
       clearError: () => set({ error: null }),
-      reset: () => set({ tasks: [], withdrawnCount: 0, filter: 'all', sort: 'priority', isLoading: false, error: null }),
+      reset: () => set({ tasks: [], withdrawnCount: 0, filter: 'all', sort: 'priority', view: 'board', isLoading: false, error: null }),
     }),
     {
       name: 'tide_tasks',
       storage: createJSONStorage(() => storage),
       // Filter/sort are view state, not data — persisting them would make the screen
       // "remember" a stale view instead of defaulting to All/Priority each session.
-      partialize: (state) => ({ tasks: state.tasks, withdrawnCount: state.withdrawnCount }),
+      partialize: (state) => ({ tasks: state.tasks, withdrawnCount: state.withdrawnCount, view: state.view }),
     },
   ),
 );
