@@ -1,9 +1,9 @@
 import { Tabs } from 'expo-router';
 
-import type { ColorValue } from 'react-native';
+import { View, type ColorValue } from 'react-native';
 
 import { AppLayout, MobileTabBar } from '@/components/layout';
-import { Icon, type IconName } from '@/components/ui';
+import { Icon, OceanBackdrop, type IconName } from '@/components/ui';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useThemeColors } from '@/hooks/useThemeColors';
 
@@ -33,13 +33,21 @@ export default function TabsLayout() {
         // chrome, so these 5 tabs look identical to the bar on Tasks/Activities/AI Coach.
         // It renders nothing above phone width, where the Sidebar takes over.
         tabBar={() => (isPhone ? <MobileTabBar /> : null)}
+        // …and each scene paints the same OceanBackdrop AppLayout uses behind the non-tab pages
+        // (Tasks, AI Coach, Activities), so every page has the same background.
+        screenLayout={({ children }) => (
+          <View style={{ flex: 1 }}>
+            <OceanBackdrop />
+            {children}
+          </View>
+        )}
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: themeColors.brand.tideTeal,
           tabBarInactiveTintColor: themeColors.text.muted,
-          // Transparent so AppLayout's OceanBackdrop is the one background behind every page —
-          // an opaque scene here made tab pages flat while Tasks/AI Coach showed the gradient.
-          sceneStyle: { backgroundColor: 'transparent' },
+          // Must stay OPAQUE: on web every visited tab stays mounted and stacked (inactive ones
+          // only get zIndex -1), so a transparent scene shows the other tabs through it.
+          sceneStyle: { backgroundColor: themeColors.background.base },
         }}
       >
         <Tabs.Screen name="index" options={{ title: 'Dashboard', tabBarIcon: makeTabBarIcon('Home') }} />
