@@ -3,8 +3,8 @@ import { toPlainPreview } from './blocks.ts';
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * Journal header numbers. "Last 7 days" matches the list's "This Week" filter and the
- * Today / This week grouping (all trailing 7 days); words are counted from the plain text,
+ * Journal header numbers. "Last 7 days" is the same trailing 7×24h window as the list's
+ * "Last 7 days" filter (journalStore's isWithinDays); words are counted from the plain text,
  * so block markers like "#" and "- [ ]" don't inflate the total. Pure, for tests.
  */
 export function journalStats(

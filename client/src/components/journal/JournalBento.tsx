@@ -1,11 +1,7 @@
-import { useMemo } from 'react';
 import { View } from 'react-native';
 
-import type { JournalEntry, Mood } from '../../types/journal';
-import { MOOD_ORDER } from '../../types/journal';
-import { BENTO_INK_TEXT, BentoTile, Icon, Text } from '../ui';
+import { BentoTile, Icon, Text } from '../ui';
 import { Pressable } from '../ui/SoundPressable';
-import { MOOD_ICON_MAP } from './MoodIcon';
 
 const PROMPTS = [
   'What made today feel worth it?',
@@ -25,130 +21,6 @@ function promptOfTheDay(date = new Date()): string {
   const start = new Date(date.getFullYear(), 0, 0);
   const dayOfYear = Math.floor((date.getTime() - start.getTime()) / 86_400_000);
   return PROMPTS[dayOfYear % PROMPTS.length];
-}
-
-export function JournalPromptTile({ firstName, onWrite, className }: { firstName?: string; onWrite: () => void; className?: string }) {
-  return (
-    <BentoTile tone="lagoon" dense index={0} className={className}>
-      <View className="flex-1 justify-between gap-4">
-        <View className="flex-row items-center gap-1.5 self-start rounded-full px-2.5 py-1" style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}>
-          <Icon name="Sparkles" size={12} color="#FFFFFF" />
-          <Text variant="body" className="text-[11.5px] font-semibold" style={{ color: '#FFFFFF' }}>
-            Prompt of the day
-          </Text>
-        </View>
-
-        <View className="gap-1">
-          {firstName && (
-            <Text variant="body" className="text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.85)' }}>
-              Hey {firstName},
-            </Text>
-          )}
-          <Text variant="h1" className="text-[24px] leading-[30px]" style={{ color: '#FFFFFF' }}>
-            {promptOfTheDay()}
-          </Text>
-        </View>
-
-        <Pressable
-          onPress={onWrite}
-          className="h-9 flex-row items-center gap-1.5 self-start rounded-full bg-white px-4"
-        >
-          <Icon name="PenLine" size={14} color="#0E4F6B" strokeWidth={2.3} />
-          <Text variant="body" className="text-[13px] font-semibold" style={{ color: '#0E4F6B' }}>
-            Start writing
-          </Text>
-        </Pressable>
-      </View>
-    </BentoTile>
-  );
-}
-
-function isThisWeek(iso: string): boolean {
-  const date = new Date(iso);
-  const now = new Date();
-  const startOfWeek = new Date(now);
-  startOfWeek.setHours(0, 0, 0, 0);
-  startOfWeek.setDate(now.getDate() - now.getDay());
-  return date >= startOfWeek;
-}
-
-/** Dark tile: totals plus a five-bar mood breakdown across every entry. */
-export function JournalStatsTile({ entries, onMoodPress, className }: { entries: JournalEntry[]; onMoodPress?: (mood: Mood) => void; className?: string }) {
-  const stats = useMemo(() => {
-    const counts: Record<Mood, number> = { terrible: 0, bad: 0, okay: 0, good: 0, great: 0 };
-    let words = 0;
-    for (const entry of entries) {
-      if (entry.mood) counts[entry.mood] += 1;
-      words += entry.wordCount ?? 0;
-    }
-    return {
-      counts,
-      maxCount: Math.max(1, ...Object.values(counts)),
-      hasMoods: Object.values(counts).some((c) => c > 0),
-      thisWeek: entries.filter((e) => isThisWeek(e.createdAt)).length,
-      favorites: entries.filter((e) => e.isFavorite).length,
-      words,
-    };
-  }, [entries]);
-
-  const numbers = [
-    { label: 'entries', value: entries.length },
-    { label: 'this week', value: stats.thisWeek },
-    { label: 'favorites', value: stats.favorites },
-  ];
-
-  return (
-    <BentoTile tone="deep" dense index={1} className={className}>
-      <View className="flex-1 justify-between gap-3.5">
-        <View className="flex-row justify-between">
-          {numbers.map((n) => (
-            <View key={n.label}>
-              <Text variant="h2" className="text-[24px] leading-[28px]" style={{ color: BENTO_INK_TEXT.primary, fontVariant: ['tabular-nums'] }}>
-                {n.value}
-              </Text>
-              <Text variant="body" className="text-[12px] font-medium" style={{ color: BENTO_INK_TEXT.muted }}>
-                {n.label}
-              </Text>
-            </View>
-          ))}
-        </View>
-
-        <View className="gap-2">
-          <Text variant="label" className="text-[10.5px]" style={{ color: BENTO_INK_TEXT.muted, letterSpacing: 0.8 }}>
-            Mood mix
-          </Text>
-          {!stats.hasMoods ? (
-            <Text variant="body" className="text-[13px] leading-[19px]" style={{ color: BENTO_INK_TEXT.secondary }}>
-              Pick a mood when you write — your mix of good and rough days shows up here.
-            </Text>
-          ) : (
-          <View className="h-[72px] flex-row items-end gap-2">
-            {MOOD_ORDER.map((mood) => {
-              const config = MOOD_ICON_MAP[mood];
-              const count = stats.counts[mood];
-              const height = Math.max(6, (count / stats.maxCount) * 52);
-              return (
-                <Pressable
-                  key={mood}
-                  onPress={onMoodPress ? () => onMoodPress(mood) : undefined}
-                  accessibilityLabel={`${config.label}: ${count}`}
-                  className="flex-1 items-center gap-1.5"
-                >
-                  <View style={{ height, width: '100%', borderRadius: 8, backgroundColor: count > 0 ? config.color : 'rgba(255,255,255,0.08)' }} />
-                  <Icon name={config.icon} size={14} color={count > 0 ? config.color : BENTO_INK_TEXT.muted} />
-                </Pressable>
-              );
-            })}
-          </View>
-          )}
-        </View>
-
-        <Text variant="body" className="text-[12px]" style={{ color: BENTO_INK_TEXT.muted }}>
-          {stats.words.toLocaleString()} words written so far
-        </Text>
-      </View>
-    </BentoTile>
-  );
 }
 
 /**

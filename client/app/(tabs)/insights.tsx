@@ -23,6 +23,7 @@ import { router } from 'expo-router';
 import { useResponsive } from '@/hooks/useResponsive';
 import { getApiErrorMessage } from '@/services/api';
 import { insightsService, type InsightsRangeData, type InsightsSummary } from '@/services/insights.service';
+import { useAuthStore } from '@/store/authStore';
 import { useLevelStore } from '@/store/levelStore';
 import { useQuestStore } from '@/store/questStore';
 import { useStreakStore } from '@/store/streakStore';
@@ -234,16 +235,22 @@ export default function InsightsScreen() {
     }
   };
 
+  // Subscribed so a guest who saves their progress to an account (or signs in) gets real
+  // insights straight away — canUseServerData() reads module flags, which don't re-render.
+  const isGuest = useAuthStore((s) => s.isGuest);
+  const authToken = useAuthStore((s) => s.token);
+  const signedIn = canUseServerData();
+
   useEffect(() => {
     fetchRangeData();
-    // Re-fetches whenever the selected window changes.
+    // Re-fetches whenever the selected window changes, or the session does.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days, endKey]);
+  }, [days, endKey, isGuest, authToken]);
 
   useEffect(() => {
     fetchHeatmap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isGuest, authToken]);
 
   const [waveRefresh, setWaveRefresh] = useState(0);
 
@@ -287,12 +294,12 @@ export default function InsightsScreen() {
                 Insights
               </Text>
               <Text variant="h2" color="primary" className={isPhone ? 'text-[19px]' : 'text-[22px]'} numberOfLines={1}>
-                Your patterns, {rangeLabel}
+                {signedIn ? `Your patterns, ${rangeLabel}` : 'Your patterns'}
               </Text>
             </View>
             {/* Wave Stats — always the last 7 days, so it sits above the range filter. */}
             <WaveStats refreshKey={waveRefresh} />
-            {canUseServerData() && (
+            {signedIn && (
               <TimeFilter
                 value={range}
                 customRange={customRange}
@@ -303,7 +310,7 @@ export default function InsightsScreen() {
             )}
           </View>
 
-          {!canUseServerData() ? (
+          {!signedIn ? (
             // Demo (guest) users have no server history: one clear card instead of a page of
             // "Something went wrong" tiles.
             <BentoTile tone="surface" index={1}>

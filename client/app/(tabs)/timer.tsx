@@ -13,7 +13,7 @@ import {
   TimerDisplay,
   TodayLogs,
 } from '@/components/timer';
-import { BentoHeader, BentoTile, StatStrip, Button, ErrorState, Icon, Input, Modal, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
+import { BentoHeader, BentoTile, StatStrip, Button, ErrorState, Input, Modal, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useTimer } from '@/hooks/useTimer';
 import { ocean } from '@/utils/theme';
