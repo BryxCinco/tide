@@ -12,7 +12,7 @@ import { formatDuration } from '../../utils/formatTime';
 import { gradientDirections, gradients } from '../../utils/gradients';
 import { ocean } from '../../utils/theme';
 import { getGreeting } from '../../utils/greeting';
-import { BENTO_INK_TEXT, BentoTile, FadeInView, Icon, Text, type IconName } from '../ui';
+import { BentoTile, FadeInView, Icon, Text, type IconName } from '../ui';
 import { Pressable } from '../ui/SoundPressable';
 import { AIAvatar } from './AIAvatar';
 
@@ -70,50 +70,37 @@ export function ChatWelcome({ userFirstName, suggestions, onSelect }: ChatWelcom
 
   return (
     <View className="gap-2.5 px-3 md:gap-3 md:px-6">
-      <View className="gap-2.5 md:flex-row md:gap-3">
-        <BentoTile tone="glass" dense index={0} className="md:flex-[1.4]">
-          <View className="flex-1 justify-between gap-4">
+      {/* Focus-first: the greeting and what the coach can see sit in one tile — the context as
+          small chips (not a second stats card repeating the Dashboard) — so the starter
+          prompts and the chat stay the focus. */}
+      <BentoTile tone="glass" dense index={0}>
+        <View className="gap-3">
+          <View className="flex-row items-center gap-3">
             <AIAvatar size={40} pulse shape="squircle" />
-            <View className="gap-1">
-              <Text variant="h2" color="primary" className={isPhone ? 'text-[21px] leading-[26px]' : 'text-[26px] leading-[31px]'}>
+            <View className="flex-1" style={{ minWidth: 0 }}>
+              <Text variant="h2" color="primary" className={isPhone ? 'text-[20px] leading-[25px]' : 'text-[24px] leading-[29px]'}>
                 {greetingFor(userFirstName)}
               </Text>
               <Text variant="body" color="muted" className="text-[13px] leading-[19px]">
-                I&apos;m your TIDE Coach. I can see your focus time, tasks, streak and journal — ask me anything, or let me
-                plan your day.
+                I&apos;m your TIDE Coach — ask me anything, or let me plan your day. Here&apos;s what I can see:
               </Text>
             </View>
           </View>
-        </BentoTile>
-
-        <BentoTile tone="deep" dense index={1} className="md:flex-1">
-          <View className="gap-3">
-            <View className="flex-row items-center gap-1.5">
-              <View className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ocean.seafoam }} />
-              <Text variant="label" className="text-[10.5px]" style={{ color: BENTO_INK_TEXT.muted, letterSpacing: 0.8 }}>
-                What I see today
-              </Text>
-            </View>
-            <View className="flex-row flex-wrap gap-y-3">
-              {snapshot.map((item) => (
-                <View key={item.label} className="basis-1/2 flex-row items-center gap-2">
-                  <View className="h-7 w-7 items-center justify-center rounded-[9px]" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
-                    <Icon name={item.icon} size={14} color={item.color} />
-                  </View>
-                  <View className="min-w-0 flex-1">
-                    <Text variant="h3" className="text-[17px] leading-[21px]" style={{ color: BENTO_INK_TEXT.primary, fontVariant: ['tabular-nums'] }} numberOfLines={1}>
-                      {item.value}
-                    </Text>
-                    <Text variant="body" className="text-[11px]" style={{ color: BENTO_INK_TEXT.muted }} numberOfLines={1}>
-                      {item.label}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </View>
+          <View className="flex-row flex-wrap gap-2">
+            {snapshot.map((item) => (
+              <View key={item.label} className="flex-row items-center gap-1.5 rounded-full border border-subtle px-2.5 py-1">
+                <Icon name={item.icon} size={13} color={item.color} />
+                <Text variant="body" color="primary" className="text-[12.5px] font-semibold" style={{ fontVariant: ['tabular-nums'] }}>
+                  {item.value}
+                </Text>
+                <Text variant="body" color="muted" className="text-[12px]">
+                  {item.label}
+                </Text>
+              </View>
+            ))}
           </View>
-        </BentoTile>
-      </View>
+        </View>
+      </BentoTile>
 
       <View className="flex-row flex-wrap gap-2.5 md:gap-3">
         {featured && (
