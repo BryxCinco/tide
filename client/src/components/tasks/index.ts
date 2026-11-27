@@ -6,3 +6,4 @@ export * from './BoardCard';
 export * from './InlineTaskInput';
 export * from './Popover';
 export * from './TaskBoard';
+export * from './TaskTable';
