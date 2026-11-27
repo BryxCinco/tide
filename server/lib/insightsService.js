@@ -17,6 +17,7 @@ function mondayFirstIndex(date) {
 // the client) — see localDay.js. Date keys themselves (quest `date`, task `due_date`) are
 // already local and are compared as-is. `tz` defaults to 0 (UTC) everywhere.
 const { localKey, windowBounds, previousWindow } = require('./localDay');
+const { scoreDay, waveLevel } = require('./waves');
 
 function formatHoursMinutes(totalSeconds) {
   const totalMinutes = Math.round(totalSeconds / 60);
@@ -359,4 +360,43 @@ async function getProductivitySummary(userId, days, endKey, tz = 0) {
   };
 }
 
-module.exports = { getProductivitySummary, getTimeSeries, getHeatmap, getActivityBreakdown, getQuestStats };
+/** Wave Stats: one entry per local day with its raw counts, score and level (lib/waves.js). */
+async function getWaves(userId, days, endKey, tz = 0) {
+  const { startIso, endIso, keys } = windowBounds(days, endKey, tz);
+  const [sessionsRes, journalRes, done] = await Promise.all([
+    supabaseAdmin.from('time_logs').select('duration_seconds, ended_at, activity_name').eq('user_id', userId).gte('ended_at', startIso).lte('ended_at', endIso),
+    supabaseAdmin.from('journal_entries').select('created_at').eq('user_id', userId).gte('created_at', startIso).lte('created_at', endIso),
+    getAccomplishmentsByDate(userId, keys, tz),
+  ]);
+  if (sessionsRes.error) throw new Error(sessionsRes.error.message);
+  if (journalRes.error) throw new Error(journalRes.error.message);
+
+  const focus = {};
+  const activities = {};
+  for (const row of sessionsRes.data || []) {
+    if (!row.ended_at) continue;
+    const key = localKey(row.ended_at, tz);
+    focus[key] = (focus[key] || 0) + (row.duration_seconds || 0);
+    (activities[key] || (activities[key] = new Set())).add(row.activity_name || 'Other');
+  }
+  const journal = {};
+  for (const row of journalRes.data || []) {
+    if (!row.created_at) continue;
+    const key = localKey(row.created_at, tz);
+    journal[key] = (journal[key] || 0) + 1;
+  }
+
+  return keys.map((date) => {
+    const counts = {
+      focusSeconds: focus[date] || 0,
+      tasks: done.tasks[date] || 0,
+      quests: done.quests[date] || 0,
+      journal: journal[date] || 0,
+      activities: activities[date] ? activities[date].size : 0,
+    };
+    const score = scoreDay(counts);
+    return { date, label: WEEKDAY_LABELS[mondayFirstIndex(new Date(`${date}T00:00:00.000Z`))], score, level: waveLevel(score), ...counts };
+  });
+}
+
+module.exports = { getProductivitySummary, getTimeSeries, getHeatmap, getActivityBreakdown, getQuestStats, getWaves };

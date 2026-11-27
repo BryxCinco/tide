@@ -1,6 +1,6 @@
 const express = require('express');
 const { requireAuth } = require('../middleware/auth');
-const { getProductivitySummary, getTimeSeries, getHeatmap, getActivityBreakdown, getQuestStats } = require('../lib/insightsService');
+const { getProductivitySummary, getTimeSeries, getHeatmap, getActivityBreakdown, getQuestStats, getWaves } = require('../lib/insightsService');
 
 const { insightsLimiter } = require('../lib/rateLimits');
 const { parseTz, localKey } = require('../lib/localDay');
@@ -80,6 +80,19 @@ router.get('/quests', async (req, res) => {
     const tz = parseTz(req.query.tz);
     const end = parseEndKey(req.query.end, tz);
     res.json({ quests: await getQuestStats(req.user.id, days, end, tz) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/insights/waves?days=7&end=YYYY-MM-DD&tz=480 — Wave Stats (Low/Mid/High/Tsunami)
+// per local day. days is capped at 31.
+router.get('/waves', async (req, res) => {
+  try {
+    const days = parseDays(req.query.days, 7, 31);
+    const tz = parseTz(req.query.tz);
+    const end = parseEndKey(req.query.end, tz);
+    res.json({ waves: await getWaves(req.user.id, days, end, tz) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
