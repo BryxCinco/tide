@@ -17,8 +17,8 @@ export interface TimeFilterProps {
 
 const RANGE_OPTIONS: { value: InsightsRange; label: string }[] = [
   { value: 'today', label: 'Today' },
-  { value: 'week', label: 'This Week' },
-  { value: 'month', label: 'This Month' },
+  { value: 'week', label: 'Last 7 days' },
+  { value: 'month', label: 'Last 30 days' },
   { value: 'monthYear', label: 'Pick a Month' },
   { value: 'custom', label: 'Custom' },
 ];

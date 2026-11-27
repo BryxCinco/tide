@@ -88,7 +88,8 @@ function TrackedTimeHero({ seconds, trend, series, rangeLabel }: { seconds: numb
   const max = Math.max(...series.map((d) => d.seconds), 1);
   const isUp = trend.trim().startsWith('+');
   const isDown = trend.trim().startsWith('-');
-  const today = new Date().toISOString().slice(0, 10);
+  // Local today — toISOString() is the UTC date, which is yesterday before 8AM in the PH.
+  const today = toDateKey(new Date());
 
   return (
     <View className="flex-1 justify-between gap-3">
@@ -242,7 +243,9 @@ export default function InsightsScreen() {
         ? formatMonthYear(monthYearRange.month, monthYearRange.year)
         : range === 'today'
           ? 'today'
-          : `this ${range}`;
+          : range === 'week'
+            ? 'last 7 days'
+            : 'last 30 days';
 
   const handleRangeChange = (nextRange: InsightsRange, nextCustom?: CustomInsightsRange) => {
     setRange(nextRange);

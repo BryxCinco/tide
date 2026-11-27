@@ -113,3 +113,21 @@ export interface InsightsData {
   /** Illustrative, not computed — same convention as mockDashboard's StatItem.trend strings. */
   totalTimeTrend: string;
 }
+
+/** Wave Stats: a day's productivity as a wave — see server/lib/waves.js for the score. */
+export type WaveLevel = 'low' | 'mid' | 'high' | 'tsunami';
+
+export interface WaveDay {
+  /** Local "YYYY-MM-DD". */
+  date: string;
+  /** Weekday, e.g. "Mon". */
+  label: string;
+  /** 0–100. */
+  score: number;
+  level: WaveLevel;
+  focusSeconds: number;
+  tasks: number;
+  quests: number;
+  journal: number;
+  activities: number;
+}
