@@ -9,6 +9,8 @@ export interface WidgetGridProps {
   /** Already filtered to enabled widgets and sorted by order — see getVisibleWidgets. */
   widgets: WidgetInstance[];
   renderWidget: (type: WidgetId, instance: WidgetInstance) => ReactNode;
+  /** Force a column count (the Dashboard's right rail stacks its widgets in 1). */
+  columns?: number;
 }
 
 /** phone 2-col, tablet 2-col, desktop 3-col — a widget's `size` spans up to that many of the
@@ -32,9 +34,9 @@ function spanFor(size: WidgetSize, columns: number): number {
  * already has the mock data/handlers), this just lays instances out in the user's chosen
  * order and size with the same staggered entrance the Dashboard has always used. Keyed by
  * instance `id` (not `type`) now that more than one instance of the same type can exist. */
-export function WidgetGrid({ widgets, renderWidget }: WidgetGridProps) {
+export function WidgetGrid({ widgets, renderWidget, columns: forcedColumns }: WidgetGridProps) {
   const { isPhone, isTablet } = useResponsive();
-  const columns = columnsFor(isPhone, isTablet);
+  const columns = forcedColumns ?? columnsFor(isPhone, isTablet);
 
   return (
     <View className="flex-row flex-wrap" style={{ gap: isPhone ? 10 : 12 }}>

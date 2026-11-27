@@ -24,7 +24,10 @@ import {
 import { CalendarWidget, StreakWidget, TimeWidget, TodaysRoutineWidget, WeatherWidget, WeeklyProgressWidget } from '@/components/dashboard/widgets';
 import { WaveStats } from '@/components/insights';
 import { TaskFormModal } from '@/components/tasks';
-import { BentoStat, Button, EmptyState, FadeInView, ResponsiveContainer } from '@/components/ui';
+import { Button, EmptyState, FadeInView, ResponsiveContainer, StatStrip } from '@/components/ui';
+import { useResponsive } from '@/hooks/useResponsive';
+import { canUseServerData } from '@/utils/authFlags';
+import { splitWidgets } from '@/utils/dashboardLayout';
 import { ocean } from '@/utils/theme';
 import { MOOD_ICON_MAP } from '@/components/journal/MoodIcon';
 import { mockHeroFocus, mockQuickActions } from '@/mocks/mockDashboard';
@@ -49,10 +52,15 @@ export default function DashboardScreen() {
   const allWidgets = useDashboardStore((s) => s.preferences.widgets);
   // 'hero' and 'stats' are covered by the bento overview at the top of the screen (the
   // greeting/focus tiles and the four stat tiles), so they're never rendered twice below.
+  const { isDesktop } = useResponsive();
+  // Wave Stats only renders for signed-in users (it hides itself for guests) — the rail
+  // must not be an empty column then.
+  const showWaves = canUseServerData();
   const visibleWidgets = useMemo(
     () => getVisibleWidgets(allWidgets).filter((w) => !BENTO_COVERED_WIDGETS.has(w.type)),
     [allWidgets],
   );
+  const { main: mainWidgets, rail: railWidgets } = useMemo(() => splitWidgets(visibleWidgets), [visibleWidgets]);
 
   const todaySessions = useTimerStore((s) => s.todaySessions);
   const activityTotals = useTimerStore((s) => s.activityTotals);
@@ -234,57 +242,47 @@ export default function DashboardScreen() {
             />
           </View>
 
-          <View className="flex-row flex-wrap gap-2.5 md:flex-nowrap md:gap-3">
-            <BentoStat
-              dense
-              className="basis-[47%] grow md:basis-0"
-              index={2}
-              icon="Flame"
-              color={ocean.coral}
-              value={`${streak}`}
-              label="Day streak"
-              onPress={() => router.push('/(tabs)/insights')}
-            />
-            <BentoStat
-              dense
-              className="basis-[47%] grow md:basis-0"
-              index={3}
-              icon="Trophy"
-              color={ocean.lavender}
-              value={`Lv ${level}`}
-              label="Level"
-              progress={progressToNextLevel(totalXp)}
-              onPress={() => router.push('/(tabs)/profile')}
-            />
-            <BentoStat
-              dense
-              className="basis-[47%] grow md:basis-0"
-              index={4}
-              icon="ListChecks"
-              color={ocean.lagoon}
-              value={`${openTasksCount}`}
-              label={missedTasksCount > 0 ? `Open · ${missedTasksCount} overdue` : 'Open tasks'}
-              onPress={() => router.push('/tasks')}
-            />
-            <BentoStat
-              dense
-              className="basis-[47%] grow md:basis-0"
-              index={5}
-              icon="BookOpen"
-              color={ocean.surf}
-              value={`${journalCount}`}
-              label="Journal"
-              onPress={() => router.push('/(tabs)/journal')}
-            />
-          </View>
+          <StatStrip
+            index={2}
+            items={[
+              { id: 'streak', icon: 'Flame', color: ocean.coral, value: `${streak}`, label: 'day streak', onPress: () => router.push('/(tabs)/insights') },
+              { id: 'level', icon: 'Trophy', color: ocean.lavender, value: `Lv ${level}`, label: 'level', progress: progressToNextLevel(totalXp), onPress: () => router.push('/(tabs)/profile') },
+              {
+                id: 'tasks',
+                icon: 'ListChecks',
+                color: missedTasksCount > 0 ? ocean.coral : ocean.lagoon,
+                value: `${openTasksCount}`,
+                label: missedTasksCount > 0 ? `open · ${missedTasksCount} overdue` : 'open tasks',
+                onPress: () => router.push('/tasks'),
+              },
+              { id: 'journal', icon: 'BookOpen', color: ocean.surf, value: `${journalCount}`, label: 'journal pages', onPress: () => router.push('/(tabs)/journal') },
+            ]}
+          />
 
-          <WaveStats index={6} refreshKey={waveRefresh} />
-
-          <FadeInView index={7}>
-            <QuestCard />
-          </FadeInView>
-
-          <WidgetGrid widgets={visibleWidgets} renderWidget={renderWidget} />
+          {/* Focus-first: on desktop the day's plan (quests, tasks, focus) fills the main column
+              and the glanceable things — this week's waves, small widgets — sit in a rail. */}
+          {isDesktop && (showWaves || railWidgets.length > 0) ? (
+            <View className="flex-row items-start gap-3">
+              <View className="gap-3" style={{ flex: 1.7, minWidth: 0 }}>
+                <FadeInView index={3}>
+                  <QuestCard />
+                </FadeInView>
+                <WidgetGrid widgets={mainWidgets} renderWidget={renderWidget} columns={2} />
+              </View>
+              <View className="gap-3" style={{ flex: 1, minWidth: 0 }}>
+                <WaveStats compact index={4} refreshKey={waveRefresh} />
+                {railWidgets.length > 0 && <WidgetGrid widgets={railWidgets} renderWidget={renderWidget} columns={1} />}
+              </View>
+            </View>
+          ) : (
+            <>
+              <WaveStats index={3} refreshKey={waveRefresh} />
+              <FadeInView index={4}>
+                <QuestCard />
+              </FadeInView>
+              <WidgetGrid widgets={visibleWidgets} renderWidget={renderWidget} />
+            </>
+          )}
 
           <FadeInView index={2}>
             <Button

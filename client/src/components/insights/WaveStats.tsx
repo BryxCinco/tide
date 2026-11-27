@@ -18,6 +18,8 @@ export interface WaveStatsProps {
   refreshKey?: number;
   index?: number;
   className?: string;
+  /** Narrow placement (the Dashboard rail): smaller glyphs and a short header. */
+  compact?: boolean;
 }
 
 const PLACEHOLDER: WaveDay[] = Array.from({ length: 7 }, (_, i) => ({
@@ -40,7 +42,7 @@ function breakdown(day: WaveDay): string {
  * time, tasks, quests, journaling and activities (server/lib/waves.js). Hides itself when the
  * data can't load (e.g. demo mode), so it never breaks the page it sits on.
  */
-export function WaveStats({ refreshKey = 0, index = 0, className }: WaveStatsProps) {
+export function WaveStats({ refreshKey = 0, index = 0, className, compact = false }: WaveStatsProps) {
   const [days, setDays] = useState<WaveDay[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -83,7 +85,7 @@ export function WaveStats({ refreshKey = 0, index = 0, className }: WaveStatsPro
           {!loading && (
             <View className="flex-row items-baseline gap-1.5">
               <Text variant="body" className="text-[12px]" style={{ color: BENTO_INK_TEXT.muted }}>
-                {isPhone ? 'Week' : "This week's tide"}
+                {isPhone || compact ? 'Week' : "This week's tide"}
               </Text>
               <Text variant="body" className="text-[14px] font-bold" style={{ color: avg.level === 'low' ? BENTO_INK_TEXT.primary : avgMeta.color }}>
                 {avgMeta.label} · {avg.score}
@@ -106,11 +108,11 @@ export function WaveStats({ refreshKey = 0, index = 0, className }: WaveStatsPro
                 accessibilityLabel={loading ? 'Loading' : `${day.label}: ${WAVE_META[day.level].label}, score ${day.score}`}
                 className={cn('flex-1 items-center gap-1 rounded-2xl py-1.5', isActive && 'bg-[rgba(255,255,255,0.07)]')}
               >
-                <WaveGlyph level={day.level} size={isPhone ? 38 : 56} dim={loading} />
+                <WaveGlyph level={day.level} size={isPhone ? 38 : compact ? 42 : 56} dim={loading} />
                 <Text variant="body" className={cn('text-[11px]', isToday ? 'font-bold' : 'font-medium')} style={{ color: isToday ? BENTO_INK_TEXT.primary : BENTO_INK_TEXT.secondary }}>
                   {loading ? ' ' : isToday ? 'Today' : day.label}
                 </Text>
-                <Text variant="body" className={cn('font-semibold', isPhone ? 'text-[9px]' : 'text-[10px]')} numberOfLines={1} style={{ color: day.level === 'low' ? BENTO_INK_TEXT.muted : WAVE_META[day.level].color }}>
+                <Text variant="body" className={cn('font-semibold', isPhone || compact ? 'text-[9px]' : 'text-[10px]')} numberOfLines={1} style={{ color: day.level === 'low' ? BENTO_INK_TEXT.muted : WAVE_META[day.level].color }}>
                   {loading ? ' ' : WAVE_META[day.level].label}
                 </Text>
               </Pressable>
