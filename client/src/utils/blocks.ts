@@ -89,3 +89,113 @@ export function todoProgress(md: string): { done: number; total: number } {
 export function hasMeaningfulContent(blocks: Block[]): boolean {
   return blocks.some((b) => b.text.trim() !== '' || b.type === 'todo' || b.type === 'divider');
 }
+
+// ── Editing operations ────────────────────────────────────────────────────────
+// All pure: each returns a new array, and the structural ones also say which block to
+// focus (and where to put the caret) so the editor component stays a thin shell.
+
+export interface EditResult {
+  blocks: Block[];
+  focusIndex: number;
+  caret?: number;
+}
+
+export const LIST_TYPES: BlockType[] = ['todo', 'bullet', 'numbered'];
+
+/** Typed at the very start of a text block, followed by a space, converts its type. */
+const SHORTCUTS: [string, BlockType][] = [
+  ['### ', 'h3'],
+  ['## ', 'h2'],
+  ['# ', 'h1'],
+  ['[] ', 'todo'],
+  ['- ', 'bullet'],
+  ['* ', 'bullet'],
+  ['1. ', 'numbered'],
+  ['> ', 'quote'],
+];
+
+function withType(block: Block, type: BlockType): Block {
+  const next: Block = { ...block, type };
+  if (type === 'todo') next.checked = block.checked ?? false;
+  else delete next.checked;
+  if (type === 'divider') next.text = '';
+  return next;
+}
+
+function emptyText(): Block {
+  return { id: newBlockId(), type: 'text', text: '' };
+}
+
+/** Sets a block's text, applying markdown shortcuts on text blocks. Keeps the block id. */
+export function updateBlockText(blocks: Block[], index: number, text: string): Block[] {
+  const block = blocks[index];
+  const next = blocks.slice();
+  if (block.type === 'text') {
+    if (text === '---') {
+      next.splice(index, 1, withType(block, 'divider'), emptyText());
+      return next;
+    }
+    for (const [prefix, type] of SHORTCUTS) {
+      if (text.startsWith(prefix)) {
+        next[index] = { ...withType(block, type), text: text.slice(prefix.length) };
+        return next;
+      }
+    }
+  }
+  next[index] = { ...block, text };
+  return next;
+}
+
+/** Enter: split at the caret. Lists continue; headings and quotes are followed by text. */
+export function splitBlock(blocks: Block[], index: number, caret: number): EditResult {
+  const block = blocks[index];
+  const next = blocks.slice();
+  if (LIST_TYPES.includes(block.type) && block.text === '') {
+    next[index] = withType(block, 'text');
+    return { blocks: next, focusIndex: index, caret: 0 };
+  }
+  const continues = LIST_TYPES.includes(block.type);
+  const after: Block = {
+    id: newBlockId(),
+    type: continues ? block.type : 'text',
+    text: block.text.slice(caret),
+    ...(block.type === 'todo' ? { checked: false } : {}),
+  };
+  next.splice(index, 1, { ...block, text: block.text.slice(0, caret) }, after);
+  return { blocks: next, focusIndex: index + 1, caret: 0 };
+}
+
+/** Backspace at the start of a block. Never removes the first block. */
+export function mergeWithPrevious(blocks: Block[], index: number): EditResult {
+  const block = blocks[index];
+  const next = blocks.slice();
+  if (block.type !== 'text') {
+    next[index] = withType(block, 'text');
+    return { blocks: next, focusIndex: index, caret: 0 };
+  }
+  if (index === 0) return { blocks: next, focusIndex: 0, caret: 0 };
+  const previous = blocks[index - 1];
+  if (previous.type === 'divider') {
+    next.splice(index - 1, 1);
+    return { blocks: next, focusIndex: index - 1, caret: 0 };
+  }
+  next.splice(index - 1, 2, { ...previous, text: previous.text + block.text });
+  return { blocks: next, focusIndex: index - 1, caret: previous.text.length };
+}
+
+/** Slash-menu choice. A divider gets a text block after it so typing can carry on. */
+export function setBlockType(blocks: Block[], index: number, type: BlockType): EditResult {
+  const next = blocks.slice();
+  if (type === 'divider') {
+    next.splice(index, 1, withType(blocks[index], 'divider'), emptyText());
+    return { blocks: next, focusIndex: index + 1, caret: 0 };
+  }
+  next[index] = withType(blocks[index], type);
+  return { blocks: next, focusIndex: index, caret: next[index].text.length };
+}
+
+export function toggleTodo(blocks: Block[], index: number): Block[] {
+  const next = blocks.slice();
+  next[index] = { ...blocks[index], checked: !blocks[index].checked };
+  return next;
+}
