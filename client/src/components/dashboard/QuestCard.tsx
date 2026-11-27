@@ -120,6 +120,12 @@ function CategoryGroup({ category, quests, onToggle, onEdit, onDelete }: { categ
  * those two layouts don't mix, so fine-grained reordering now lives only in
  * QuestManagerModal's own flat list (still fully drag-reorderable there).
  */
+/** Each quest column needs ~260px to show its title; fewer columns when the card is narrow. */
+function questColumnBasis(width: number, count: number): `${number}%` {
+  const fit = Math.max(1, Math.min(count, Math.floor((width + 12) / 272)));
+  return `${Math.floor(100 / fit) - 4}%`;
+}
+
 export function QuestCard() {
   const todayQuests = useQuestStore((s) => s.todayQuests);
   // The same day streak as the Dashboard/Profile stat — not the all-quests-done streak.
@@ -135,6 +141,7 @@ export function QuestCard() {
   const [editingQuest, setEditingQuest] = useState<Quest | undefined>(undefined);
   const [managerVisible, setManagerVisible] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [rowWidth, setRowWidth] = useState(0);
 
   useEffect(() => {
     fetchTodayQuests();
@@ -226,16 +233,19 @@ export function QuestCard() {
             No active quests — generate a set, add one below, or unpause one from Manage.
           </Text>
         ) : (
-          <View className="gap-2.5 md:flex-row md:gap-3">
+          // Columns follow the card's own width, not the screen's: on the focus-first Dashboard
+          // this card sits in a narrower main column, where 3-up squeezed titles to "Ta…".
+          <View className="flex-row flex-wrap" style={{ gap: 12 }} onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}>
             {categoriesInOrder.map((category) => (
-              <CategoryGroup
-                key={category}
-                category={category}
-                quests={grouped[category] || []}
-                onToggle={(q) => toggleQuest(q.id)}
-                onEdit={openEdit}
-                onDelete={handleDelete}
-              />
+              <View key={category} style={{ flexBasis: questColumnBasis(rowWidth, categoriesInOrder.length), flexGrow: 1, minWidth: 0 }}>
+                <CategoryGroup
+                  category={category}
+                  quests={grouped[category] || []}
+                  onToggle={(q) => toggleQuest(q.id)}
+                  onEdit={openEdit}
+                  onDelete={handleDelete}
+                />
+              </View>
             ))}
           </View>
         )}
