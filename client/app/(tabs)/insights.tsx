@@ -16,6 +16,7 @@ import {
   TaskStats,
   TimeChart,
   TimeFilter,
+  WaveStats,
 } from '@/components/insights';
 import { BENTO_INK_TEXT, BentoHeader, BentoTile, ErrorState, Icon, ResponsiveContainer, SkeletonChart, Text } from '@/components/ui';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -228,8 +229,11 @@ export default function InsightsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [waveRefresh, setWaveRefresh] = useState(0);
+
   const onRefresh = async () => {
     setRefreshing(true);
+    setWaveRefresh((k) => k + 1);
     await Promise.all([refetchAll(), fetchRangeData(), fetchHeatmap()]);
     setRefreshing(false);
   };
@@ -270,6 +274,8 @@ export default function InsightsScreen() {
                 Your patterns, {rangeLabel}
               </Text>
             </View>
+            {/* Wave Stats — always the last 7 days, so it sits above the range filter. */}
+            <WaveStats refreshKey={waveRefresh} />
             <TimeFilter
               value={range}
               customRange={customRange}

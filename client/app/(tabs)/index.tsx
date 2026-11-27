@@ -22,6 +22,7 @@ import {
   WidgetGrid,
 } from '@/components/dashboard';
 import { CalendarWidget, StreakWidget, TimeWidget, TodaysRoutineWidget, WeatherWidget, WeeklyProgressWidget } from '@/components/dashboard/widgets';
+import { WaveStats } from '@/components/insights';
 import { TaskFormModal } from '@/components/tasks';
 import { BentoStat, Button, EmptyState, FadeInView, ResponsiveContainer } from '@/components/ui';
 import { ocean } from '@/utils/theme';
@@ -79,8 +80,11 @@ export default function DashboardScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [waveRefresh, setWaveRefresh] = useState(0);
+
   const onRefresh = async () => {
     setRefreshing(true);
+    setWaveRefresh((k) => k + 1);
     await Promise.all([fetchTodaySessions(), fetchTasks(), fetchStreak(), fetchLevel(), fetchJournalEntries()]);
     setRefreshing(false);
   };
@@ -274,7 +278,9 @@ export default function DashboardScreen() {
             />
           </View>
 
-          <FadeInView index={6}>
+          <WaveStats index={6} refreshKey={waveRefresh} />
+
+          <FadeInView index={7}>
             <QuestCard />
           </FadeInView>
 

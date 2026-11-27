@@ -12,3 +12,5 @@ export * from './TaskStats';
 export * from './TimeChart';
 export * from './TimeFilter';
 export * from './chartTheme';
+export * from './WaveGlyph';
+export * from './WaveStats';
