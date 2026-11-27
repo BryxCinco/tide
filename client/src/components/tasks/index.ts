@@ -2,3 +2,7 @@ export * from './TaskCard';
 export * from './TaskFilters';
 export * from './TaskFormModal';
 export * from './TaskInfoModal';
+export * from './BoardCard';
+export * from './InlineTaskInput';
+export * from './Popover';
+export * from './TaskBoard';
