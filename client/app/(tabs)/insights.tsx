@@ -18,7 +18,8 @@ import {
   TimeFilter,
   WaveStats,
 } from '@/components/insights';
-import { BENTO_INK_TEXT, BentoHeader, BentoTile, ErrorState, Icon, ResponsiveContainer, SkeletonChart, Text } from '@/components/ui';
+import { BENTO_INK_TEXT, BentoHeader, BentoTile, EmptyState, ErrorState, Icon, ResponsiveContainer, SkeletonChart, Text } from '@/components/ui';
+import { router } from 'expo-router';
 import { useResponsive } from '@/hooks/useResponsive';
 import { getApiErrorMessage } from '@/services/api';
 import { insightsService, type InsightsRangeData, type InsightsSummary } from '@/services/insights.service';
@@ -291,15 +292,31 @@ export default function InsightsScreen() {
             </View>
             {/* Wave Stats — always the last 7 days, so it sits above the range filter. */}
             <WaveStats refreshKey={waveRefresh} />
-            <TimeFilter
-              value={range}
-              customRange={customRange}
-              monthYearRange={monthYearRange}
-              onChange={handleRangeChange}
-              onMonthYearChange={setMonthYearRange}
-            />
+            {canUseServerData() && (
+              <TimeFilter
+                value={range}
+                customRange={customRange}
+                monthYearRange={monthYearRange}
+                onChange={handleRangeChange}
+                onMonthYearChange={setMonthYearRange}
+              />
+            )}
           </View>
 
+          {!canUseServerData() ? (
+            // Demo (guest) users have no server history: one clear card instead of a page of
+            // "Something went wrong" tiles.
+            <BentoTile tone="surface" index={1}>
+              <EmptyState
+                icon="Waves"
+                title="Insights need an account"
+                description="Your patterns, wave stats and trends are built from your saved history. Save your progress to an account to unlock them."
+                actionLabel="Save progress"
+                onAction={() => router.push('/(auth)/link-account')}
+              />
+            </BentoTile>
+          ) : (
+          <>
           {/* Row 1 — the hero number and the score that summarizes it. */}
           <View className="gap-2.5 md:flex-row md:gap-3">
             <BentoTile tone="deep" dense index={0} className="md:flex-[1.3]">
@@ -424,6 +441,8 @@ export default function InsightsScreen() {
               <HistoryView />
             </View>
           </BentoTile>
+          </>
+          )}
         </ResponsiveContainer>
       </ScrollView>
     </SafeAreaView>
