@@ -2,14 +2,12 @@ import { useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { QuestCard } from '@/components/dashboard';
 import { AppLayout, MobileMenuButton, MobileTabBar } from '@/components/layout';
 import { TaskBoard, TaskFilters, TaskPeek, TaskTable } from '@/components/tasks';
-import { PRIORITY_META } from '@/components/tasks/TaskCard';
-import { BackButton, BENTO_INK_TEXT, BentoRing, BentoStat, BentoTile, Button, EmptyState, ErrorState, FadeInView, ResponsiveContainer, SkeletonRow, Text, ViewToggle } from '@/components/ui';
+import { BackButton, BentoTile, Button, ErrorState, ResponsiveContainer, SkeletonRow, StatStrip, Text, ViewToggle } from '@/components/ui';
 import { useResponsive } from '@/hooks/useResponsive';
 import { getVisibleTasks, isTaskDueToday, isTaskOverdue, useTaskStore, type TaskView } from '@/store/taskStore';
-import type { Task, TaskPriority } from '@/types/task';
+import type { Task } from '@/types/task';
 import { toDateKey } from '@/utils/formatDate';
 import { ocean } from '@/utils/theme';
 
@@ -51,10 +49,6 @@ export default function TasksScreen() {
   const todayKey = toDateKey(new Date());
   const doneTodayCount = tasks.filter((t) => t.completedAt && toDateKey(new Date(t.completedAt)) === todayKey).length;
   const completion = tasks.length > 0 ? Math.round((doneCount / tasks.length) * 100) : 0;
-  const openByPriority = (['critical', 'high', 'medium', 'low'] as TaskPriority[]).map((priority) => ({
-    priority,
-    count: tasks.filter((t) => t.status !== 'done' && t.priority === priority).length,
-  }));
 
   const openCreate = () => {
     setPeekTaskId(undefined);
@@ -92,60 +86,24 @@ export default function TasksScreen() {
               <Button title="New" variant="primary" size="sm" icon="Plus" onPress={openCreate} />
             </View>
 
-            <View className="gap-2.5 md:flex-row md:gap-3">
-              {/* Progress — ring of done/total plus what's still open, by priority. */}
-              <BentoTile tone="deep" dense index={0} className="md:flex-[1.3]">
-                <View className="flex-1 flex-row items-center gap-4">
-                  <BentoRing value={completion} size={isPhone ? 96 : 112} strokeWidth={isPhone ? 8 : 10}>
-                    <Text variant="h2" className="text-[22px] leading-[26px]" style={{ color: BENTO_INK_TEXT.primary, fontVariant: ['tabular-nums'] }}>
-                      {completion}%
-                    </Text>
-                    <Text variant="body" className="text-[11px] font-medium" style={{ color: BENTO_INK_TEXT.muted }}>
-                      complete
-                    </Text>
-                  </BentoRing>
-                  <View className="flex-1 gap-2.5" style={{ minWidth: 0 }}>
-                    <View>
-                      <Text variant="h3" className="text-[16px] leading-[21px]" style={{ color: BENTO_INK_TEXT.primary }}>
-                        {doneCount} of {tasks.length} done
-                      </Text>
-                      <Text variant="body" className="text-[12px]" style={{ color: BENTO_INK_TEXT.muted }}>
-                        {doneTodayCount > 0 ? `${doneTodayCount} finished today — keep going` : 'Nothing finished yet today'}
-                      </Text>
-                    </View>
-                    <View className="gap-1.5">
-                      {openByPriority.map(({ priority, count }) => (
-                        <View key={priority} className="flex-row items-center gap-2">
-                          <View className="h-2 w-2 rounded-full" style={{ backgroundColor: PRIORITY_META[priority].color }} />
-                          <Text variant="body" className="flex-1 text-[12px]" style={{ color: BENTO_INK_TEXT.secondary }}>
-                            {PRIORITY_META[priority].label}
-                          </Text>
-                          <Text variant="body" className="text-[12px] font-semibold" style={{ color: BENTO_INK_TEXT.primary }}>
-                            {count}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                </View>
-              </BentoTile>
-
-              {/* Quick-filter stats — tapping one applies that filter to the list below. */}
-              <View className="gap-2.5 md:flex-1 md:gap-3">
-                <View className="flex-row gap-2.5 md:gap-3">
-                  <BentoStat dense className="flex-1" index={1} icon="Sun" color={ocean.sand} value={`${dueTodayCount}`} label="due today" onPress={() => setFilter('today')} />
-                  <BentoStat dense className="flex-1" index={2} icon="AlertTriangle" color={ocean.coral} value={`${overdueCount}`} label="overdue" onPress={() => setFilter('overdue')} />
-                </View>
-                <View className="flex-row gap-2.5 md:gap-3">
-                  <BentoStat dense className="flex-1" index={3} icon="Loader" color={ocean.lavender} value={`${inProgressCount}`} label="in progress" />
-                  <BentoStat dense className="flex-1" index={4} icon="CheckCheck" color={ocean.lagoon} value={`${doneCount}`} label="completed" onPress={() => setFilter('done')} />
-                </View>
-              </View>
-            </View>
-
-            <FadeInView index={5}>
-              <QuestCard />
-            </FadeInView>
+            {/* Focus-first: one slim strip of numbers, so the board is on screen right away. */}
+            <StatStrip
+              index={0}
+              items={[
+                {
+                  id: 'done',
+                  icon: 'CircleCheckBig',
+                  color: ocean.lagoon,
+                  value: `${doneCount}/${tasks.length}`,
+                  label: doneTodayCount > 0 ? `done · ${doneTodayCount} today` : 'done',
+                  progress: completion / 100,
+                },
+                { id: 'today', icon: 'Sun', color: ocean.sand, value: `${dueTodayCount}`, label: 'due today', onPress: () => setFilter('today') },
+                { id: 'overdue', icon: 'AlertTriangle', color: ocean.coral, value: `${overdueCount}`, label: 'overdue', onPress: () => setFilter('overdue') },
+                { id: 'doing', icon: 'Loader', color: ocean.lavender, value: `${inProgressCount}`, label: 'in progress' },
+                { id: 'completed', icon: 'CheckCheck', color: ocean.lagoon, value: `${doneCount}`, label: 'completed', onPress: () => setFilter('done') },
+              ]}
+            />
 
             <BentoTile tone="glass" dense index={6}>
               <View className="gap-3">
