@@ -3,9 +3,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { EmptyJournal, JournalCard, JournalFilters, JournalListRow, JournalPromptTile, JournalStatsTile, SearchBar } from '@/components/journal';
-import { BentoTile, Button, ErrorState, FAB, ResponsiveContainer, SkeletonCard, Text, ViewToggle } from '@/components/ui';
-import { useAuth } from '@/hooks/useAuth';
+import { EmptyJournal, JournalCard, JournalFilters, JournalListRow, JournalPromptBanner, SearchBar } from '@/components/journal';
+import { BentoTile, Button, ErrorState, FAB, ResponsiveContainer, SkeletonCard, StatStrip, Text, ViewToggle } from '@/components/ui';
+import { journalStats } from '@/utils/journalStats';
+import { ocean } from '@/utils/theme';
 import { useResponsive } from '@/hooks/useResponsive';
 import { getVisibleEntries, useJournalStore, type JournalView } from '@/store/journalStore';
 import { groupByRecency } from '@/utils/groupByRecency';
@@ -30,7 +31,6 @@ export default function JournalScreen() {
   const setView = useJournalStore((s) => s.setView);
 
   const { isDesktop, isTablet, isPhone } = useResponsive();
-  const { user } = useAuth();
 
   // Local, immediate value for the input; committed to the store (debounced) so the
   // filtered list doesn't re-run on every keystroke.
@@ -57,6 +57,7 @@ export default function JournalScreen() {
     [allEntries, searchQuery, filter, moodFilter],
   );
 
+  const stats = useMemo(() => journalStats(allEntries, new Date()), [allEntries]);
   const groups = useMemo(() => groupByRecency(visibleEntries, (e) => e.createdAt, new Date()), [visibleEntries]);
 
   const hasActiveFilters = Boolean(searchQuery.trim()) || filter !== 'all' || moodFilter !== null;
@@ -97,28 +98,27 @@ export default function JournalScreen() {
             {!isPhone && <Button title="New entry" icon="Plus" size="sm" onPress={openNewEntry} />}
           </View>
 
-          <View className="gap-2.5 md:flex-row md:gap-3">
-            <JournalPromptTile
-              className="md:flex-[1.6]"
-              firstName={user?.name?.trim().split(/\s+/)[0]}
-              onWrite={openNewEntry}
-            />
-            <JournalStatsTile
-              className="md:flex-1"
-              entries={allEntries}
-              onMoodPress={(mood) => setMoodFilter(moodFilter === mood ? null : mood)}
-            />
-          </View>
+          <JournalPromptBanner onWrite={openNewEntry} />
 
+          <StatStrip
+            index={1}
+            items={[
+              { id: 'entries', icon: 'BookOpen', color: ocean.surf, value: `${stats.entries}`, label: 'entries' },
+              { id: 'week', icon: 'CalendarDays', color: ocean.lagoon, value: `${stats.last7Days}`, label: 'last 7 days', onPress: () => setFilter(filter === 'week' ? 'all' : 'week') },
+              { id: 'fav', icon: 'Star', color: ocean.sand, value: `${stats.favorites}`, label: 'favorites', onPress: () => setFilter(filter === 'favorites' ? 'all' : 'favorites') },
+              { id: 'words', icon: 'Type', color: ocean.lavender, value: stats.words.toLocaleString(), label: 'words written' },
+            ]}
+          />
+
+          {/* One toolbar: search, then a single scrollable row of date and mood filters. */}
           <BentoTile tone="glass" dense index={2}>
-            <View className="gap-3">
-              <SearchBar value={searchDraft} onChangeText={setSearchDraft} />
-              <JournalFilters
-                filter={filter}
-                moodFilter={moodFilter}
-                onFilterChange={setFilter}
-                onMoodFilterChange={setMoodFilter}
-              />
+            <View className="gap-2.5 md:flex-row md:items-center md:gap-3">
+              <View className="md:w-[300px]">
+                <SearchBar value={searchDraft} onChangeText={setSearchDraft} />
+              </View>
+              <View className="flex-1" style={{ minWidth: 0 }}>
+                <JournalFilters compact filter={filter} moodFilter={moodFilter} onFilterChange={setFilter} onMoodFilterChange={setMoodFilter} />
+              </View>
             </View>
           </BentoTile>
 
