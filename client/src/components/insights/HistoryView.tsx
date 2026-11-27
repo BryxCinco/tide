@@ -8,6 +8,7 @@ import { useTimerStore } from '../../store/timerStore';
 import { cn } from '../../utils/cn';
 import { formatWeekdayMonthDay, toDateKey } from '../../utils/formatDate';
 import { formatDuration } from '../../utils/formatTime';
+import { toPlainPreview } from '../../utils/blocks';
 import { EmptyState, Icon, Input, Text, type IconName } from '../ui';
 
 type HistoryType = 'all' | 'session' | 'journal' | 'task';
@@ -67,7 +68,7 @@ export function HistoryView() {
       dateKey: toDateKey(new Date(entry.createdAt)),
       sortAt: new Date(entry.createdAt).getTime(),
       title: entry.title || 'Untitled entry',
-      subtitle: entry.content.slice(0, 80),
+      subtitle: toPlainPreview(entry.content).slice(0, 80),
       icon: 'BookOpen',
       color: '#8B5CF6',
     }));

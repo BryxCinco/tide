@@ -3,11 +3,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { EmptyJournal, JournalCard, JournalFilters, JournalPromptTile, JournalStatsTile, SearchBar } from '@/components/journal';
-import { BentoTile, Button, ErrorState, FAB, ResponsiveContainer, SkeletonCard, Text } from '@/components/ui';
+import { EmptyJournal, JournalCard, JournalFilters, JournalListRow, JournalPromptTile, JournalStatsTile, SearchBar } from '@/components/journal';
+import { BentoTile, Button, ErrorState, FAB, ResponsiveContainer, SkeletonCard, Text, ViewToggle } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { useResponsive } from '@/hooks/useResponsive';
-import { getVisibleEntries, useJournalStore } from '@/store/journalStore';
+import { getVisibleEntries, useJournalStore, type JournalView } from '@/store/journalStore';
+import { groupByRecency } from '@/utils/groupByRecency';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -25,6 +26,8 @@ export default function JournalScreen() {
   const setSearchQuery = useJournalStore((s) => s.setSearchQuery);
   const toggleFavorite = useJournalStore((s) => s.toggleFavorite);
   const deleteEntry = useJournalStore((s) => s.deleteEntry);
+  const view = useJournalStore((s) => s.view);
+  const setView = useJournalStore((s) => s.setView);
 
   const { isDesktop, isTablet, isPhone } = useResponsive();
   const { user } = useAuth();
@@ -53,6 +56,8 @@ export default function JournalScreen() {
     () => getVisibleEntries(allEntries, searchQuery, filter, moodFilter),
     [allEntries, searchQuery, filter, moodFilter],
   );
+
+  const groups = useMemo(() => groupByRecency(visibleEntries, (e) => e.createdAt, new Date()), [visibleEntries]);
 
   const hasActiveFilters = Boolean(searchQuery.trim()) || filter !== 'all' || moodFilter !== null;
 
@@ -117,6 +122,20 @@ export default function JournalScreen() {
             </View>
           </BentoTile>
 
+          <View className="flex-row items-center justify-between px-1">
+            <ViewToggle<JournalView>
+              value={view}
+              onChange={setView}
+              options={[
+                { value: 'gallery', label: 'Gallery', icon: 'LayoutGrid' },
+                { value: 'list', label: 'List', icon: 'List' },
+              ]}
+            />
+            <Text variant="body" color="muted" className="text-[12.5px]">
+              {visibleEntries.length} {visibleEntries.length === 1 ? 'page' : 'pages'}
+            </Text>
+          </View>
+
           {error && allEntries.length === 0 ? (
             <ErrorState
               message={error}
@@ -135,6 +154,27 @@ export default function JournalScreen() {
             </View>
           ) : visibleEntries.length === 0 ? (
             <EmptyJournal hasActiveFilters={hasActiveFilters} onNewEntry={openNewEntry} />
+          ) : view === 'list' ? (
+            <BentoTile tone="surface" dense index={3}>
+              <View className="gap-3">
+                {groups.map(({ group, items }) => (
+                  <View key={group} className="gap-0.5">
+                    <Text variant="label" color="muted" className="px-2.5 pb-1 text-[10.5px]" style={{ letterSpacing: 1.2 }}>
+                      {group}
+                    </Text>
+                    {items.map((entry) => (
+                      <JournalListRow
+                        key={entry.id}
+                        entry={entry}
+                        showTime={group === 'Today'}
+                        onPress={() => openEntry(entry.id)}
+                        onToggleFavorite={() => toggleFavorite(entry.id)}
+                      />
+                    ))}
+                  </View>
+                ))}
+              </View>
+            </BentoTile>
           ) : (
             <View className="flex-row flex-wrap gap-2.5 md:gap-3">
               {visibleEntries.map((entry, index) => {

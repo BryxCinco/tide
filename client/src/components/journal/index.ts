@@ -4,6 +4,7 @@ export * from './JournalBento';
 export * from './JournalCard';
 export * from './JournalEditor';
 export * from './JournalFilters';
+export * from './JournalListRow';
 export * from './JournalPhotoPicker';
 export * from './MoodIcon';
 export * from './MoodSelector';

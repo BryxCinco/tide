@@ -5,17 +5,21 @@ import { getApiErrorMessage, reportApiError } from '../services/api';
 import { journalService } from '../services/journal.service';
 import type { JournalEntry, Mood } from '../types/journal';
 import { hasAuthToken, isGuestMode } from '../utils/authFlags';
+import { toPlainPreview } from '../utils/blocks';
 import { countWords } from '../utils/formatDate';
 import { storage } from '../utils/storage';
 import { useLevelStore } from './levelStore';
 
 export type JournalFilter = 'all' | 'week' | 'month' | 'favorites';
+export type JournalView = 'gallery' | 'list';
 
 interface JournalState {
   entries: JournalEntry[];
   searchQuery: string;
   filter: JournalFilter;
   moodFilter: Mood | null;
+  /** Gallery (bento cards) or List (compact rows grouped by recency). Persisted. */
+  view: JournalView;
   isLoading: boolean;
   error: string | null;
 
@@ -27,6 +31,7 @@ interface JournalState {
   setSearchQuery: (query: string) => void;
   setFilter: (filter: JournalFilter) => void;
   setMoodFilter: (mood: Mood | null) => void;
+  setView: (view: JournalView) => void;
   getEntryById: (id: string) => JournalEntry | undefined;
   clearError: () => void;
   /** Wipes local state back to empty — see taskStore.reset()'s comment for why this exists
@@ -41,6 +46,7 @@ export const useJournalStore = create<JournalState>()(
       searchQuery: '',
       filter: 'all',
       moodFilter: null,
+      view: 'gallery',
       isLoading: false,
       error: null,
 
@@ -138,8 +144,9 @@ export const useJournalStore = create<JournalState>()(
       setSearchQuery: (searchQuery) => set({ searchQuery }),
       setFilter: (filter) => set({ filter }),
       setMoodFilter: (moodFilter) => set({ moodFilter }),
+      setView: (view) => set({ view }),
       clearError: () => set({ error: null }),
-      reset: () => set({ entries: [], searchQuery: '', filter: 'all', moodFilter: null, isLoading: false, error: null }),
+      reset: () => set({ entries: [], searchQuery: '', filter: 'all', moodFilter: null, view: 'gallery', isLoading: false, error: null }),
 
       getEntryById: (id) => get().entries.find((e) => e.id === id),
     }),
@@ -148,7 +155,8 @@ export const useJournalStore = create<JournalState>()(
       storage: createJSONStorage(() => storage),
       // Search/filter/mood-filter are view state, not data — persisting them would make
       // the screen "remember" a stale view instead of defaulting to All/no-filter each session.
-      partialize: (state) => ({ entries: state.entries }),
+      // The chosen layout (gallery/list) is a preference, so it is kept.
+      partialize: (state) => ({ entries: state.entries, view: state.view }),
     },
   ),
 );
@@ -179,7 +187,7 @@ export function getVisibleEntries(
     if (moodFilter && entry.mood !== moodFilter) return false;
 
     if (query) {
-      const haystack = `${entry.title} ${entry.content} ${entry.tags.join(' ')}`.toLowerCase();
+      const haystack = `${entry.title} ${toPlainPreview(entry.content)} ${entry.tags.join(' ')}`.toLowerCase();
       if (!haystack.includes(query)) return false;
     }
 

@@ -6,7 +6,9 @@ import type { JournalEntry } from '../../types/journal';
 import { confirmAsync } from '../../utils/confirm';
 import { hexToRgba } from '../../utils/color';
 import { cn } from '../../utils/cn';
-import { formatTime, formatWeekdayMonthDay } from '../../utils/formatDate';
+import { todoProgress, toPlainPreview } from '../../utils/blocks';
+import { ocean } from '../../utils/theme';
+import { countWords, formatTime, formatWeekdayMonthDay } from '../../utils/formatDate';
 import { FadeInView, Icon, Text, useGlassSurface, VisibleDeleteButton } from '../ui';
 import { MOOD_ICON_MAP } from './MoodIcon';
 
@@ -27,6 +29,10 @@ export function JournalCard({ entry, onPress, onToggleFavorite, onDelete, index 
   const mood = entry.mood ? MOOD_ICON_MAP[entry.mood] : undefined;
   const themeColors = useThemeColors();
   const accent = mood?.color ?? themeColors.brand.tideTeal;
+  // Content is markdown blocks — show it as clean prose, plus checklist progress.
+  const preview = toPlainPreview(entry.content);
+  const todos = todoProgress(entry.content);
+  const words = countWords(preview);
   const photo = entry.photoUrls?.[0];
   const glass = useGlassSurface();
 
@@ -116,7 +122,7 @@ export function JournalCard({ entry, onPress, onToggleFavorite, onDelete, index 
               {entry.title || 'Untitled'}
             </Text>
             <Text variant="body" color="secondary" className="text-[13px] leading-[19px]" numberOfLines={featured ? 5 : 3}>
-              {entry.content}
+              {preview}
             </Text>
           </View>
 
@@ -128,9 +134,17 @@ export function JournalCard({ entry, onPress, onToggleFavorite, onDelete, index 
                 </Text>
               </View>
             ))}
-            {entry.wordCount > 0 && (
+            {todos.total > 0 && (
+              <View className="flex-row items-center gap-1 rounded-full px-2 py-0.5" style={{ backgroundColor: hexToRgba(ocean.lagoon, 0.12) }}>
+                <Icon name="SquareCheck" size={11} color={ocean.lagoon} />
+                <Text variant="body" className="text-[11px] font-semibold" style={{ color: ocean.lagoon }}>
+                  {todos.done}/{todos.total}
+                </Text>
+              </View>
+            )}
+            {words > 0 && (
               <Text variant="body" color="muted" className="ml-auto text-[11px]">
-                {entry.wordCount} words
+                {words} words
               </Text>
             )}
           </View>

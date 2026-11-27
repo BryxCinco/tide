@@ -24,4 +24,5 @@ export * from './Text';
 export * from './ThemeToggle';
 export * from './Toast';
 export * from './Tooltip';
+export * from './ViewToggle';
 export * from './VisibleDeleteButton';
