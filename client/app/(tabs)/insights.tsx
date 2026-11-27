@@ -31,6 +31,10 @@ import type { ActivityBreakdownSlice, CustomInsightsRange, DayTimeEntry, Heatmap
 import { formatDuration } from '@/utils/formatTime';
 import { formatMonthYear, fromDateKey, toDateKey } from '@/utils/formatDate';
 import { ocean } from '@/utils/theme';
+import { canUseServerData } from '@/utils/authFlags';
+
+/** Shown to demo (guest) users: insights are computed on the server from a real account. */
+const GUEST_INSIGHTS_MESSAGE = 'Insights are built from your saved history. Create an account to see yours.';
 
 /** Heatmap always shows a fixed trailing window regardless of the selected range filter —
  * a full year (53 weeks) of GitHub-style, calendar-aligned week columns (see Heatmap.tsx). */
@@ -186,6 +190,12 @@ export default function InsightsScreen() {
   const [heatmapError, setHeatmapError] = useState<string | null>(null);
 
   const fetchRangeData = async () => {
+    // A guest's fake token would 401 and the api interceptor would log them out.
+    if (!canUseServerData()) {
+      setRangeError(GUEST_INSIGHTS_MESSAGE);
+      setRangeLoading(false);
+      return;
+    }
     setRangeLoading(true);
     setRangeError(null);
     try {
@@ -207,6 +217,11 @@ export default function InsightsScreen() {
   };
 
   const fetchHeatmap = async () => {
+    if (!canUseServerData()) {
+      setHeatmapError(GUEST_INSIGHTS_MESSAGE);
+      setHeatmapLoading(false);
+      return;
+    }
     setHeatmapLoading(true);
     setHeatmapError(null);
     try {

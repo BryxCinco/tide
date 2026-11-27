@@ -7,6 +7,7 @@ import type { Mood } from '../../types/journal';
 import type { MoodTrendPoint } from '../../types/insights';
 import { EmptyState, Icon, Text } from '../ui';
 import { Pressable } from '../ui/SoundPressable';
+import { toDateKey } from '../../utils/formatDate';
 import { useChartTheme } from './chartTheme';
 
 export interface MoodTrendProps {
@@ -23,7 +24,8 @@ const PAD = 8;
 const MOOD_BY_SCORE: Record<number, Mood> = { 1: 'terrible', 2: 'bad', 3: 'okay', 4: 'good', 5: 'great' };
 
 function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
+  // Local today — the server returns local date keys (toISOString() is the UTC date).
+  return toDateKey(new Date());
 }
 
 /** Smooth curve through the points via quadratic Beziers anchored at segment midpoints. */

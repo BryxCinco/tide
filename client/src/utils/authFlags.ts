@@ -34,3 +34,10 @@ export function setHasAuthToken(value: boolean): void {
 export function hasAuthToken(): boolean {
   return hasToken;
 }
+
+/** True only for a real signed-in session. Guests (demo) carry a fake token that the server
+ * rejects with 401 — and the api interceptor treats a 401 as "session expired" and logs the
+ * user out — so anything that fetches outside the stores' own guest checks must ask this. */
+export function canUseServerData(): boolean {
+  return !isGuest && hasToken;
+}

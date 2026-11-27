@@ -5,6 +5,7 @@ import { Pressable } from '../ui/SoundPressable';
 import type { DayTimeEntry } from '../../types/insights';
 import { formatDuration } from '../../utils/formatTime';
 import { Text } from '../ui';
+import { toDateKey } from '../../utils/formatDate';
 import { niceTimeTicks, useChartTheme } from './chartTheme';
 
 export interface TimeChartProps {
@@ -16,7 +17,8 @@ const Y_AXIS_WIDTH = 30;
 const MAX_BAR_WIDTH = 24;
 
 function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
+  // Local today — the server returns local date keys (toISOString() is the UTC date).
+  return toDateKey(new Date());
 }
 
 /**

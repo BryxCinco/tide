@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import { useResponsive } from '../../hooks/useResponsive';
 import { insightsService } from '../../services/insights.service';
 import type { WaveDay } from '../../types/insights';
+import { canUseServerData } from '../../utils/authFlags';
 import { cn } from '../../utils/cn';
 import { toDateKey } from '../../utils/formatDate';
 import { formatDuration } from '../../utils/formatTime';
@@ -46,7 +47,11 @@ export function WaveStats({ refreshKey = 0, index = 0, className }: WaveStatsPro
   const todayKey = toDateKey(new Date());
   const { isPhone } = useResponsive();
 
+  const allowed = canUseServerData();
+
   useEffect(() => {
+    // Guests (demo) have no server data, and their fake token would 401 → logout.
+    if (!allowed) return;
     let alive = true;
     insightsService
       .getWaves(7, todayKey)
@@ -55,9 +60,9 @@ export function WaveStats({ refreshKey = 0, index = 0, className }: WaveStatsPro
     return () => {
       alive = false;
     };
-  }, [refreshKey, todayKey]);
+  }, [refreshKey, todayKey, allowed]);
 
-  if (failed) return null;
+  if (!allowed || failed) return null;
 
   const loading = days === null;
   const list = days ?? PLACEHOLDER;
