@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, View, type TextInput as RNTextInput } from 'react-native';
 import { TextInput } from '../ui/SoundTextInput';
 
 import { useResponsive } from '../../hooks/useResponsive';
@@ -15,6 +15,7 @@ import { gradientDirections, gradients } from '../../utils/gradients';
 import { BackButton, Icon, Text } from '../ui';
 import { Pressable } from '../ui/SoundPressable';
 import { BlockEditor, type BlockEditorHandle } from './blocks/BlockEditor';
+import { useAutoGrowOnWeb } from './blocks/BlockRow';
 import { KeyboardBlockToolbar } from './blocks/KeyboardBlockToolbar';
 import { PropertiesRow } from './PropertiesRow';
 
@@ -54,6 +55,9 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
   const themeColors = useThemeColors();
   const { isPhone } = useResponsive();
   const editorRef = useRef<BlockEditorHandle>(null);
+  const titleRef = useRef<RNTextInput>(null);
+  const titleLine = isPhone ? 36 : 42;
+  useAutoGrowOnWeb(titleRef, title + titleLine, titleLine);
 
   const createdAt = entry?.createdAt ?? new Date().toISOString();
   const isCreatingRef = useRef(false);
@@ -87,7 +91,14 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
     }
   };
 
+  // Opening an entry is not an edit: skip the first run so an unchanged entry isn't re-saved
+  // (which would bump its updated date and flash "Saving…").
+  const isFirstRun = useRef(true);
   useEffect(() => {
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      return;
+    }
     if (!hasContent()) return;
 
     setSaveState('saving');
@@ -180,6 +191,7 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
             )}
 
             <TextInput
+              ref={titleRef}
               value={title}
               onChangeText={setTitle}
               placeholder="Untitled"
@@ -187,7 +199,7 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
               multiline
               scrollEnabled={false}
               className="mt-5 p-0 font-sans font-bold text-primary"
-              style={{ fontSize: isPhone ? 28 : 34, lineHeight: isPhone ? 36 : 42 }}
+              style={{ fontSize: isPhone ? 28 : 34, lineHeight: titleLine }}
             />
 
             <View className="mt-3">

@@ -9,6 +9,21 @@ import { Icon, Text } from '../../ui';
 import { Pressable } from '../../ui/SoundPressable';
 import { TextInput } from '../../ui/SoundTextInput';
 
+/**
+ * Web textareas never shrink to their content on their own (scrollHeight is at least the
+ * current height), so size them by hand after every change. Native multiline inputs grow by
+ * themselves / via onContentSizeChange, so this is a no-op there.
+ */
+export function useAutoGrowOnWeb(input: React.RefObject<RNTextInput | null>, dep: string, minHeight: number) {
+  useLayoutEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const el = input.current as unknown as HTMLTextAreaElement | null;
+    if (!el?.style) return;
+    el.style.height = '0px';
+    el.style.height = `${Math.max(minHeight, el.scrollHeight)}px`;
+  }, [input, dep, minHeight]);
+}
+
 /** Font size / line height per block type. Text matches the old editor's 16/27. */
 const TYPE_STYLE: Record<Block['type'], { fontSize: number; lineHeight: number; className: string }> = {
   text: { fontSize: 16, lineHeight: 27, className: 'text-secondary' },
@@ -47,8 +62,6 @@ export const BlockRow = forwardRef<RNTextInput, BlockRowProps>(function BlockRow
   const style = TYPE_STYLE[block.type];
   const isWeb = Platform.OS === 'web';
 
-  // Web textareas never shrink to their content on their own (scrollHeight is at least the
-  // current height), so size them by hand after every edit. Native uses onContentSizeChange.
   const local = useRef<RNTextInput | null>(null);
   const setRefs = useCallback(
     (node: RNTextInput | null) => {
@@ -58,13 +71,7 @@ export const BlockRow = forwardRef<RNTextInput, BlockRowProps>(function BlockRow
     },
     [ref],
   );
-  useLayoutEffect(() => {
-    if (!isWeb) return;
-    const el = local.current as unknown as HTMLTextAreaElement | null;
-    if (!el?.style) return;
-    el.style.height = '0px';
-    el.style.height = `${Math.max(style.lineHeight, el.scrollHeight)}px`;
-  }, [isWeb, block.text, block.type, style.lineHeight]);
+  useAutoGrowOnWeb(local, block.text + block.type, style.lineHeight);
 
   if (block.type === 'divider') {
     return (
