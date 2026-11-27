@@ -27,7 +27,7 @@ import { TaskFormModal } from '@/components/tasks';
 import { Button, EmptyState, FadeInView, ResponsiveContainer, StatStrip } from '@/components/ui';
 import { useResponsive } from '@/hooks/useResponsive';
 import { canUseServerData } from '@/utils/authFlags';
-import { splitWidgets } from '@/utils/dashboardLayout';
+import { showRail, splitWidgets } from '@/utils/dashboardLayout';
 import { ocean } from '@/utils/theme';
 import { MOOD_ICON_MAP } from '@/components/journal/MoodIcon';
 import { mockHeroFocus, mockQuickActions } from '@/mocks/mockDashboard';
@@ -55,7 +55,8 @@ export default function DashboardScreen() {
   const { isDesktop } = useResponsive();
   // Wave Stats only renders for signed-in users (it hides itself for guests) — the rail
   // must not be an empty column then.
-  const showWaves = canUseServerData();
+  const [waveVisible, setWaveVisible] = useState(true);
+  const wavesShown = canUseServerData() && waveVisible;
   const visibleWidgets = useMemo(
     () => getVisibleWidgets(allWidgets).filter((w) => !BENTO_COVERED_WIDGETS.has(w.type)),
     [allWidgets],
@@ -261,7 +262,7 @@ export default function DashboardScreen() {
 
           {/* Focus-first: on desktop the day's plan (quests, tasks, focus) fills the main column
               and the glanceable things — this week's waves, small widgets — sit in a rail. */}
-          {isDesktop && (showWaves || railWidgets.length > 0) ? (
+          {showRail({ isDesktop, wavesShown, railCount: railWidgets.length }) ? (
             <View className="flex-row items-start gap-3">
               <View className="gap-3" style={{ flex: 1.7, minWidth: 0 }}>
                 <FadeInView index={3}>
@@ -270,13 +271,13 @@ export default function DashboardScreen() {
                 <WidgetGrid widgets={mainWidgets} renderWidget={renderWidget} columns={2} />
               </View>
               <View className="gap-3" style={{ flex: 1, minWidth: 0 }}>
-                <WaveStats compact index={4} refreshKey={waveRefresh} />
+                <WaveStats compact index={4} refreshKey={waveRefresh} onVisibleChange={setWaveVisible} />
                 {railWidgets.length > 0 && <WidgetGrid widgets={railWidgets} renderWidget={renderWidget} columns={1} />}
               </View>
             </View>
           ) : (
             <>
-              <WaveStats index={3} refreshKey={waveRefresh} />
+              <WaveStats index={3} refreshKey={waveRefresh} onVisibleChange={setWaveVisible} />
               <FadeInView index={4}>
                 <QuestCard />
               </FadeInView>

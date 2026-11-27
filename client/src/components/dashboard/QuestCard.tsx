@@ -12,6 +12,8 @@ import { soundManager } from '../../utils/soundManager';
 import { formatWeekdayMonthDay } from '../../utils/formatDate';
 import { ocean } from '../../utils/theme';
 import { BentoHeader, BentoTile, Button, Icon, Text, type IconName } from '../ui';
+import { useResponsive } from '../../hooks/useResponsive';
+import { questColumnBasis } from '../../utils/dashboardLayout';
 import { Pressable } from '../ui/SoundPressable';
 
 function QuestRow({ quest, onToggle, onEdit, onDelete }: { quest: Quest; onToggle: () => void; onEdit: () => void; onDelete: () => void }) {
@@ -120,12 +122,6 @@ function CategoryGroup({ category, quests, onToggle, onEdit, onDelete }: { categ
  * those two layouts don't mix, so fine-grained reordering now lives only in
  * QuestManagerModal's own flat list (still fully drag-reorderable there).
  */
-/** Each quest column needs ~260px to show its title; fewer columns when the card is narrow. */
-function questColumnBasis(width: number, count: number): `${number}%` {
-  const fit = Math.max(1, Math.min(count, Math.floor((width + 12) / 272)));
-  return `${Math.floor(100 / fit) - 4}%`;
-}
-
 export function QuestCard() {
   const todayQuests = useQuestStore((s) => s.todayQuests);
   // The same day streak as the Dashboard/Profile stat — not the all-quests-done streak.
@@ -141,7 +137,8 @@ export function QuestCard() {
   const [editingQuest, setEditingQuest] = useState<Quest | undefined>(undefined);
   const [managerVisible, setManagerVisible] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [rowWidth, setRowWidth] = useState(0);
+  const [rowWidth, setRowWidth] = useState<number | undefined>(undefined);
+  const { isPhone } = useResponsive();
 
   useEffect(() => {
     fetchTodayQuests();
@@ -237,7 +234,7 @@ export function QuestCard() {
           // this card sits in a narrower main column, where 3-up squeezed titles to "Ta…".
           <View className="flex-row flex-wrap" style={{ gap: 12 }} onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}>
             {categoriesInOrder.map((category) => (
-              <View key={category} style={{ flexBasis: questColumnBasis(rowWidth, categoriesInOrder.length), flexGrow: 1, minWidth: 0 }}>
+              <View key={category} style={{ flexBasis: questColumnBasis(rowWidth, categoriesInOrder.length, isPhone), flexGrow: 1, minWidth: 0 }}>
                 <CategoryGroup
                   category={category}
                   quests={grouped[category] || []}

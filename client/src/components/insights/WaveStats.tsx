@@ -20,6 +20,8 @@ export interface WaveStatsProps {
   className?: string;
   /** Narrow placement (the Dashboard rail): smaller glyphs and a short header. */
   compact?: boolean;
+  /** Tells the parent whether the tile is shown (it hides for guests and failed loads). */
+  onVisibleChange?: (visible: boolean) => void;
 }
 
 const PLACEHOLDER: WaveDay[] = Array.from({ length: 7 }, (_, i) => ({
@@ -42,7 +44,7 @@ function breakdown(day: WaveDay): string {
  * time, tasks, quests, journaling and activities (server/lib/waves.js). Hides itself when the
  * data can't load (e.g. demo mode), so it never breaks the page it sits on.
  */
-export function WaveStats({ refreshKey = 0, index = 0, className, compact = false }: WaveStatsProps) {
+export function WaveStats({ refreshKey = 0, index = 0, className, compact = false, onVisibleChange }: WaveStatsProps) {
   const [days, setDays] = useState<WaveDay[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -64,7 +66,12 @@ export function WaveStats({ refreshKey = 0, index = 0, className, compact = fals
     };
   }, [refreshKey, todayKey, allowed]);
 
-  if (!allowed || failed) return null;
+  const visible = allowed && !failed;
+  useEffect(() => {
+    onVisibleChange?.(visible);
+  }, [visible, onVisibleChange]);
+
+  if (!visible) return null;
 
   const loading = days === null;
   const list = days ?? PLACEHOLDER;
