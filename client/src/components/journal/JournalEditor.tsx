@@ -1,42 +1,44 @@
-import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { TextInput } from '../ui/SoundTextInput';
 
+import { useResponsive } from '../../hooks/useResponsive';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useJournalStore } from '../../store/journalStore';
-import { useThemeStore } from '../../store/themeStore';
 import { showToast } from '../../store/toastStore';
 import type { JournalEntry, Mood } from '../../types/journal';
-import { cn } from '../../utils/cn';
+import { hasMeaningfulContent, parseBlocks, toPlainPreview } from '../../utils/blocks';
 import { confirmAsync } from '../../utils/confirm';
-import { countWords, formatMonthDayYear, formatTime, formatWeekday, formatWeekdayMonthDay } from '../../utils/formatDate';
-import { shadows } from '../../utils/theme';
-import { BackButton, Button, ConfirmationModal, Text } from '../ui';
-import { InterestTags } from './InterestTags';
-import { JournalPhotoPicker } from './JournalPhotoPicker';
-import { MoodSelector } from './MoodSelector';
+import { countWords, formatWeekdayMonthDay } from '../../utils/formatDate';
+import { gradientDirections, gradients } from '../../utils/gradients';
+import { BackButton, Icon, Text } from '../ui';
+import { Pressable } from '../ui/SoundPressable';
+import { BlockEditor, type BlockEditorHandle } from './blocks/BlockEditor';
+import { KeyboardBlockToolbar } from './blocks/KeyboardBlockToolbar';
+import { PropertiesRow } from './PropertiesRow';
 
 export interface JournalEditorProps {
   /** Present when editing an existing entry; absent when creating a new one. */
   entry?: JournalEntry;
-  /** Called after a save, delete, or header Back completes, so the screen can navigate back. */
+  /** Called after a delete or header Back completes, so the screen can navigate back. */
   onDone: () => void;
 }
 
 const AUTO_SAVE_DELAY = 3000;
 
 /**
- * Shared by app/journal/new.tsx and app/journal/[id].tsx, including its own header
- * (Back / date / Save) — kept in one place rather than duplicated across both screens.
- * A brand-new entry is created on the first auto-save (or the first manual Save) rather
- * than up front, so opening "New Entry" and leaving without typing anything never
- * litters the store with a blank draft.
+ * Notion-style entry page, shared by app/journal/new.tsx and app/journal/[id].tsx: cover,
+ * big title, a quiet properties list, then the block body. Autosave is the only save — the
+ * header always says whether the latest edit is saved, so there is no Save button to forget.
+ * A brand-new entry is created on the first autosave rather than up front, so opening
+ * "New entry" and leaving without typing never litters the store with a blank draft.
  */
 export function JournalEditor({ entry, onDone }: JournalEditorProps) {
   const addEntry = useJournalStore((s) => s.addEntry);
   const updateEntry = useJournalStore((s) => s.updateEntry);
   const deleteEntry = useJournalStore((s) => s.deleteEntry);
+  const toggleFavorite = useJournalStore((s) => s.toggleFavorite);
 
   const [title, setTitle] = useState(entry?.title ?? '');
   const [content, setContent] = useState(entry?.content ?? '');
@@ -44,24 +46,23 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
   const [tags, setTags] = useState<string[]>(entry?.tags ?? []);
   const [photoUris, setPhotoUris] = useState<string[]>(entry?.photoUrls ?? []);
   const [savedId, setSavedId] = useState(entry?.id);
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
-  const [isContentFocused, setIsContentFocused] = useState(false);
-  const [showSavedModal, setShowSavedModal] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [editorFocused, setEditorFocused] = useState(false);
+  const isFavorite = useJournalStore((s) => (savedId ? s.entries.find((e) => e.id === savedId)?.isFavorite : false)) ?? false;
+
   const themeColors = useThemeColors();
-  const isDark = useThemeStore((s) => s.theme === 'dark');
+  const { isPhone } = useResponsive();
+  const editorRef = useRef<BlockEditorHandle>(null);
 
-  const isNew = !entry;
   const createdAt = entry?.createdAt ?? new Date().toISOString();
-
   const isCreatingRef = useRef(false);
 
-  // A photo-only entry (no text typed) is still real content worth saving — same bar as
-  // title/content, just extended now that photos are a legitimate way to start an entry.
-  const hasContent = () => Boolean(title.trim() || content.trim() || photoUris.length > 0);
+  // A photo-only entry (no text typed) is still real content worth saving. Empty blocks
+  // (blank lines) are not.
+  const hasContent = () => Boolean(title.trim() || photoUris.length > 0 || hasMeaningfulContent(parseBlocks(content)));
 
-  // Returns whether the entry actually ended up saved — callers that need to tell the user
-  // the truth (handleSave below) check this instead of assuming success just because the
-  // call didn't throw past this function.
+  /** Returns whether the entry actually ended up saved. */
   const persist = async (): Promise<boolean> => {
     const trimmedTitle = title.trim() || 'Untitled';
     if (!hasContent()) return false;
@@ -71,9 +72,7 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
       return true;
     }
 
-    // Guards against the autosave timer and a manual Save firing the very first create
-    // twice (e.g. Save tapped right as the 3s autosave timer also elapses) — both would
-    // otherwise see savedId still unset and race to POST two separate entries.
+    // Guards against two autosave ticks (or Back + autosave) racing to create the entry twice.
     if (isCreatingRef.current) return false;
     isCreatingRef.current = true;
     try {
@@ -81,10 +80,7 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
       setSavedId(created.id);
       return true;
     } catch {
-      // Autosave retries on the next tick either way — the entry is never lost, just not
-      // synced yet — but a manual Save needs to know this happened (see handleSave) instead
-      // of telling the user it saved when the create actually failed (e.g. a dropped
-      // request during a login/logout race, or a real network error).
+      // Autosave retries on the next edit; the header shows the failure meanwhile.
       return false;
     } finally {
       isCreatingRef.current = false;
@@ -96,32 +92,30 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
 
     setSaveState('saving');
     const timeout = setTimeout(async () => {
-      await persist();
-      setSaveState('saved');
+      const ok = await persist();
+      setSaveState(ok ? 'saved' : 'error');
     }, AUTO_SAVE_DELAY);
 
     return () => clearTimeout(timeout);
-    // `persist` closes over title/content/mood/tags/photoUris and is recreated every render —
-    // depending on it directly (instead of these five) would restart the timer on every keystroke.
+    // `persist` closes over the fields and is recreated every render — depending on it
+    // would restart the timer on every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, content, mood, tags, photoUris]);
 
-  // Unlike autosave (which fires silently every 3s while typing — a modal there would be
-  // constant and unusable), an explicit Save tap is a deliberate action worth confirming —
-  // and, if it actually failed, worth saying so instead of showing "Saved!" regardless. That
-  // false-positive was the real bug behind "my new entry doesn't show up anywhere": the
-  // create silently failed (e.g. a dropped request during a login/logout race), but the
-  // user was told it saved and had no reason to think otherwise.
-  const handleSave = async () => {
-    const saved = await persist();
-    if (saved) {
-      setShowSavedModal(true);
-    } else {
-      showToast("Couldn't save your entry. Please try again.", 'error');
+  // Leaving within the 3s autosave window must not drop the last edits.
+  const handleBack = async () => {
+    if (saveState === 'saving' || saveState === 'error') {
+      const ok = await persist();
+      if (!ok && hasContent()) {
+        showToast("Couldn't save your entry. Please try again.", 'error');
+        return;
+      }
     }
+    onDone();
   };
 
   const handleDelete = async () => {
+    setMenuOpen(false);
     if (!savedId) {
       onDone();
       return;
@@ -132,116 +126,124 @@ export function JournalEditor({ entry, onDone }: JournalEditorProps) {
     onDone();
   };
 
+  const words = countWords(toPlainPreview(content));
+  const cover = photoUris[0];
+
   return (
-    <View className="flex-1 gap-5">
-      <View className="flex-row items-center justify-between">
-        <BackButton onPress={onDone} />
-        <Text
-          variant="body"
-          color="primary"
-          className="flex-1 px-2 text-center font-semibold normal-case tracking-normal"
-          numberOfLines={1}
-        >
-          {isNew ? 'Today' : formatWeekdayMonthDay(createdAt)}
+    <View className="flex-1 gap-3">
+      <View className="flex-row items-center gap-2">
+        <BackButton onPress={handleBack} />
+        <Text variant="body" color="muted" className="flex-1 text-[13px]" numberOfLines={1}>
+          Journal <Text variant="body" color="muted" className="text-[13px]">/</Text>{' '}
+          <Text variant="body" color="secondary" className="text-[13px] font-medium">
+            {entry ? formatWeekdayMonthDay(createdAt) : 'Today'}
+          </Text>
         </Text>
-        <Button title="Save" variant="primary" size="sm" onPress={handleSave} />
+        <SaveStatus state={saveState} />
+        <View>
+          <Pressable
+            onPress={() => setMenuOpen((o) => !o)}
+            accessibilityRole="button"
+            accessibilityLabel="More actions"
+            className="h-9 w-9 items-center justify-center rounded-xl hover:bg-[rgba(100,116,139,0.10)]"
+          >
+            <Icon name="Ellipsis" size={20} color={themeColors.text.secondary} />
+          </Pressable>
+          {menuOpen && (
+            <View
+              className="absolute right-0 top-10 z-50 w-[200px] rounded-2xl border border-default bg-elevated py-1.5"
+              style={{ shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 8 }}
+            >
+              {savedId && (
+                <MenuItem
+                  icon="Star"
+                  label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                  onPress={() => {
+                    toggleFavorite(savedId);
+                    setMenuOpen(false);
+                  }}
+                />
+              )}
+              <MenuItem icon="Trash2" label={savedId ? 'Delete entry' : 'Discard'} danger onPress={handleDelete} />
+            </View>
+          )}
+        </View>
       </View>
 
-      {/* Was missing entirely — on iOS, focusing the multiline Entry field (near the bottom
-          of this scroll, min-h-[240px]) could leave it covered by the keyboard with nothing
-          pushing the content up to compensate. */}
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView
-          className="thin-scrollbar flex-1"
-          contentContainerClassName="gap-5 pb-12"
-          keyboardShouldPersistTaps="handled"
-        >
-          <View className="gap-1">
-            <View className="flex-row items-center justify-between">
-              <Text variant="h2" color="primary">
-                {formatMonthDayYear(createdAt)}
-              </Text>
-              {saveState !== 'idle' && (
-                <Text
-                  variant="caption"
-                  color={saveState === 'saving' ? 'muted' : 'accent'}
-                  className="normal-case tracking-normal"
-                >
-                  {saveState === 'saving' ? 'Saving…' : 'Saved'}
-                </Text>
-              )}
-            </View>
-            <Text variant="caption" color="muted" className="normal-case tracking-normal">
-              {formatWeekday(createdAt)} · {formatTime(createdAt)}
-            </Text>
-          </View>
+        <ScrollView className="thin-scrollbar flex-1" contentContainerClassName="pb-24" keyboardShouldPersistTaps="handled">
+          <View className="w-full self-center" style={{ maxWidth: 760 }}>
+            {cover ? (
+              <Image source={{ uri: cover }} className="w-full rounded-3xl" style={{ height: isPhone ? 120 : 180 }} resizeMode="cover" />
+            ) : (
+              <LinearGradient colors={gradients.aurora as unknown as [string, string, ...string[]]} {...gradientDirections.horizontal} style={{ height: 3, borderRadius: 3, width: 72 }} />
+            )}
 
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
-            placeholder="Entry title"
-            placeholderTextColor={themeColors.text.disabled}
-            className="font-sans text-h1 font-bold text-primary"
-          />
+            <TextInput
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Untitled"
+              placeholderTextColor={themeColors.text.disabled}
+              multiline
+              scrollEnabled={false}
+              className="mt-5 p-0 font-sans font-bold text-primary"
+              style={{ fontSize: isPhone ? 28 : 34, lineHeight: isPhone ? 36 : 42 }}
+            />
 
-          <MoodSelector value={mood} onChange={setMood} />
-
-          <InterestTags value={tags} onChange={setTags} />
-
-          <JournalPhotoPicker photoUris={photoUris} onChange={setPhotoUris} />
-
-          <View className="gap-2">
-            <Text variant="label" color="muted">
-              Entry
-            </Text>
-            <View
-              className={cn('rounded-2xl border bg-elevated p-5', isContentFocused ? 'border-tide-teal' : 'border-default')}
-              style={isContentFocused ? (isDark ? shadows.focusRingDark : shadows.focusRing) : undefined}
-            >
-              <TextInput
-                value={content}
-                onChangeText={setContent}
-                placeholder="Write about your day..."
-                placeholderTextColor={themeColors.text.disabled}
-                multiline
-                textAlignVertical="top"
-                onFocus={() => setIsContentFocused(true)}
-                onBlur={() => setIsContentFocused(false)}
-                className="thin-scrollbar min-h-[240px] font-sans text-secondary"
-                style={{ fontSize: 16, lineHeight: 27 }}
+            <View className="mt-3">
+              <PropertiesRow
+                mood={mood}
+                onMoodChange={setMood}
+                tags={tags}
+                onTagsChange={setTags}
+                photoUris={photoUris}
+                onPhotosChange={setPhotoUris}
+                createdAt={createdAt}
               />
             </View>
+
+            <View className="my-4 h-px bg-[rgba(100,116,139,0.18)]" />
+
+            <BlockEditor ref={editorRef} value={content} onChange={setContent} onFocusChange={setEditorFocused} />
+
+            <Text variant="caption" color="muted" className="mt-8 normal-case tracking-normal">
+              {words} {words === 1 ? 'word' : 'words'} · {Math.max(1, Math.round(words / 200))} min read
+            </Text>
           </View>
-
-          <Text variant="caption" color="muted" className="normal-case tracking-normal">
-            {countWords(content)} words
-          </Text>
-
-          {savedId && <Button title="Delete Entry" variant="danger" size="md" fullWidth onPress={handleDelete} />}
         </ScrollView>
+        {isPhone && editorFocused && <KeyboardBlockToolbar editor={editorRef} />}
       </KeyboardAvoidingView>
-
-      <ConfirmationModal
-        visible={showSavedModal}
-        onClose={onDone}
-        variant="success"
-        icon="BookOpen"
-        title="Entry Saved!"
-        message="Your thoughts have been recorded."
-        autoDismissMs={3000}
-        primaryAction={{
-          label: 'View Entry',
-          onPress: () => {
-            setShowSavedModal(false);
-            // Was a no-op before (just closed the modal, left the user on the exact same
-            // screen) — looked like the entry never saved at all. `/journal/[id]` renders
-            // through this same JournalEditor, so navigating there is the actual "view".
-            if (savedId && isNew) router.replace(`/journal/${savedId}`);
-          },
-        }}
-        secondaryAction={{ label: 'Write Another', onPress: () => router.replace('/journal/new') }}
-        tertiaryAction={{ label: 'Done', onPress: onDone }}
-      />
     </View>
+  );
+}
+
+function SaveStatus({ state }: { state: 'idle' | 'saving' | 'saved' | 'error' }) {
+  const theme = useThemeColors();
+  if (state === 'idle') return null;
+  const meta = {
+    saving: { icon: 'LoaderCircle' as const, label: 'Saving…', color: theme.text.muted },
+    saved: { icon: 'CloudCheck' as const, label: 'Saved', color: theme.brand.tideTeal },
+    error: { icon: 'CloudAlert' as const, label: 'Not saved', color: theme.status.error },
+  }[state];
+  return (
+    <View className="flex-row items-center gap-1.5 px-1" accessibilityLiveRegion="polite">
+      <Icon name={meta.icon} size={14} color={meta.color} />
+      <Text variant="caption" className="normal-case tracking-normal" style={{ color: meta.color }}>
+        {meta.label}
+      </Text>
+    </View>
+  );
+}
+
+function MenuItem({ icon, label, onPress, danger }: { icon: 'Star' | 'Trash2'; label: string; onPress: () => void; danger?: boolean }) {
+  const theme = useThemeColors();
+  const color = danger ? theme.status.error : theme.text.secondary;
+  return (
+    <Pressable onPress={onPress} accessibilityRole="menuitem" className="mx-1.5 flex-row items-center gap-2.5 rounded-xl px-2.5 py-2 hover:bg-[rgba(100,116,139,0.10)]">
+      <Icon name={icon} size={16} color={color} />
+      <Text variant="body" className="text-[14px]" style={{ color }}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }

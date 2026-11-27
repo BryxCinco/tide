@@ -1,4 +1,4 @@
-import { forwardRef } from 'react';
+import { forwardRef, useCallback, useLayoutEffect, useRef } from 'react';
 import { Platform, View, type NativeSyntheticEvent, type TextInput as RNTextInput, type TextInputKeyPressEventData, type TextInputSelectionChangeEventData } from 'react-native';
 
 import { useThemeColors } from '../../../hooks/useThemeColors';
@@ -47,6 +47,25 @@ export const BlockRow = forwardRef<RNTextInput, BlockRowProps>(function BlockRow
   const style = TYPE_STYLE[block.type];
   const isWeb = Platform.OS === 'web';
 
+  // Web textareas never shrink to their content on their own (scrollHeight is at least the
+  // current height), so size them by hand after every edit. Native uses onContentSizeChange.
+  const local = useRef<RNTextInput | null>(null);
+  const setRefs = useCallback(
+    (node: RNTextInput | null) => {
+      local.current = node;
+      if (typeof ref === 'function') ref(node);
+      else if (ref) ref.current = node;
+    },
+    [ref],
+  );
+  useLayoutEffect(() => {
+    if (!isWeb) return;
+    const el = local.current as unknown as HTMLTextAreaElement | null;
+    if (!el?.style) return;
+    el.style.height = '0px';
+    el.style.height = `${Math.max(style.lineHeight, el.scrollHeight)}px`;
+  }, [isWeb, block.text, block.type, style.lineHeight]);
+
   if (block.type === 'divider') {
     return (
       <View className="py-3">
@@ -92,7 +111,7 @@ export const BlockRow = forwardRef<RNTextInput, BlockRowProps>(function BlockRow
       {block.type === 'quote' && <View className="mr-3 w-[3px] self-stretch rounded-full" style={{ backgroundColor: ocean.lagoon }} />}
 
       <TextInput
-        ref={ref}
+        ref={setRefs}
         value={block.text}
         onChangeText={onChangeText}
         onKeyPress={onKeyPress}
@@ -106,14 +125,14 @@ export const BlockRow = forwardRef<RNTextInput, BlockRowProps>(function BlockRow
         // Native: Return submits (splits the block) instead of inserting a newline. Web
         // handles Enter in onKeyPress instead, so it isn't wired twice.
         {...(isWeb ? {} : { submitBehavior: 'submit' as const, onSubmitEditing: onSubmit })}
-        onContentSizeChange={(e) => onHeight(e.nativeEvent.contentSize.height)}
+        onContentSizeChange={isWeb ? undefined : (e) => onHeight(e.nativeEvent.contentSize.height)}
         textAlignVertical="top"
         className={cn('flex-1 p-0 font-sans', style.className, done && 'text-muted line-through')}
         style={{
           fontSize: style.fontSize,
           lineHeight: style.lineHeight,
           minHeight: style.lineHeight,
-          ...(height ? { height: Math.max(style.lineHeight, height) } : {}),
+          ...(!isWeb && height ? { height: Math.max(style.lineHeight, height) } : {}),
           paddingVertical: 1,
         }}
       />
