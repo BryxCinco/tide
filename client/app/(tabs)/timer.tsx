@@ -13,7 +13,7 @@ import {
   TimerDisplay,
   TodayLogs,
 } from '@/components/timer';
-import { BENTO_INK_TEXT, BentoHeader, BentoStat, BentoTile, Button, ErrorState, Icon, Input, Modal, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
+import { BentoHeader, BentoTile, StatStrip, Button, ErrorState, Icon, Input, Modal, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useTimer } from '@/hooks/useTimer';
 import { ocean } from '@/utils/theme';
@@ -250,32 +250,13 @@ export default function TimerScreen() {
 
             {/* SIDE COLUMN — today's numbers, what you're working on, tags & notes. */}
             <View className="gap-2.5 md:flex-1 md:gap-3">
-              <View className="flex-row gap-2.5 md:gap-3">
-                <BentoTile tone="deep" dense index={1} className="flex-1">
-                  <View className="flex-1 justify-between gap-2.5">
-                    <View className="h-6 w-6 items-center justify-center rounded-[8px]" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
-                      <Icon name="Hourglass" size={13} color={ocean.seafoam} strokeWidth={2.2} />
-                    </View>
-                    <View>
-                      <Text variant="h2" className="text-[24px] leading-[28px]" style={{ color: BENTO_INK_TEXT.primary, fontVariant: ['tabular-nums'] }} numberOfLines={1}>
-                        {formatDuration(todayTotalSeconds)}
-                      </Text>
-                      <Text variant="body" className="text-[11.5px] font-medium" style={{ color: BENTO_INK_TEXT.muted }}>
-                        tracked today
-                      </Text>
-                    </View>
-                  </View>
-                </BentoTile>
-                <BentoStat
-                  dense
-                  className="flex-1"
-                  index={2}
-                  icon="Target"
-                  color={ocean.lavender}
-                  value={`${todaySessions.length}`}
-                  label={todaySessions.length === 1 ? 'session today' : 'sessions today'}
-                />
-              </View>
+              <StatStrip
+                index={1}
+                items={[
+                  { id: 'tracked', icon: 'Hourglass', color: ocean.lagoon, value: formatDuration(todayTotalSeconds), label: 'tracked today' },
+                  { id: 'sessions', icon: 'Target', color: ocean.lavender, value: `${todaySessions.length}`, label: todaySessions.length === 1 ? 'session today' : 'sessions today' },
+                ]}
+              />
 
               <BentoTile tone="glass" dense index={3}>
                 <View className="gap-3">
