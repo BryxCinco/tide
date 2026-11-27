@@ -9,3 +9,4 @@ export * from './MoodIcon';
 export * from './MoodSelector';
 export * from './PhotoViewerModal';
 export * from './SearchBar';
+export * from './blocks';
