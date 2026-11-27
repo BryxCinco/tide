@@ -47,8 +47,8 @@ describe('serializeBlocks', () => {
     assert.equal(serializeBlocks(parseBlocks(legacy)), legacy);
   });
 
-  test('numbers consecutive numbered blocks by position', () => {
-    assert.equal(serializeBlocks(parseBlocks('1. a\n1. b\ntext\n5. c')), '1. a\n2. b\ntext\n1. c');
+  test('numbers a list by position; a stray "5. " after prose stays prose', () => {
+    assert.equal(serializeBlocks(parseBlocks('1. a\n1. b\ntext\n5. c')), '1. a\n2. b\ntext\n5. c');
   });
 });
 
@@ -195,5 +195,34 @@ describe('setBlockType / toggleTodo', () => {
 
   test('toggleTodo flips checked', () => {
     assert.equal(toggleTodo([mk('todo', 'a', { checked: false })], 0)[0].checked, true);
+  });
+});
+
+// ── Review fixes ──────────────────────────────────────────────────────────────
+describe('legacy numbered-looking prose', () => {
+  test('a "2024. " line is prose, not a list item, and survives a round-trip', () => {
+    const md = '2024. What a year';
+    assert.equal(parseBlocks(md)[0].type, 'text');
+    assert.equal(serializeBlocks(parseBlocks(md)), md);
+  });
+
+  test('a list that does not start at 1 keeps its numbers', () => {
+    const md = 'Reasons:\n2. second\n3. third';
+    assert.equal(serializeBlocks(parseBlocks(md)), md);
+  });
+
+  test('a list starting at 1 is still a numbered list', () => {
+    assert.deepEqual(parseBlocks('1. a\n2. b').map((b) => b.type), ['numbered', 'numbered']);
+  });
+});
+
+describe('trailing divider', () => {
+  test('an entry ending in a divider gets a text block to type into', () => {
+    assert.deepEqual(parseBlocks('---').map((b) => b.type), ['divider', 'text']);
+  });
+
+  test('that helper block is not saved back', () => {
+    assert.equal(serializeBlocks(parseBlocks('---')), '---');
+    assert.equal(serializeBlocks(parseBlocks('a\n---')), 'a\n---');
   });
 });

@@ -19,8 +19,15 @@ export function useAutoGrowOnWeb(input: React.RefObject<RNTextInput | null>, dep
     if (Platform.OS !== 'web') return;
     const el = input.current as unknown as HTMLTextAreaElement | null;
     if (!el?.style) return;
+    // Collapsing to 0px briefly shortens the page, and the scroll container clamps its
+    // scrollTop — restore every scrolled ancestor so a long entry doesn't jump while typing.
+    const scrolled: [HTMLElement, number][] = [];
+    for (let p = el.parentElement; p; p = p.parentElement) {
+      if (p.scrollTop > 0) scrolled.push([p, p.scrollTop]);
+    }
     el.style.height = '0px';
     el.style.height = `${Math.max(minHeight, el.scrollHeight)}px`;
+    for (const [p, top] of scrolled) p.scrollTop = top;
   }, [input, dep, minHeight]);
 }
 

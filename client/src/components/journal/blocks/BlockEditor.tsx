@@ -58,6 +58,8 @@ export const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(funct
   const selections = useRef(new Map<string, number>());
   const pendingFocus = useRef<{ id: string; caret: number } | null>(null);
   const lastFocused = useRef<number>(0);
+  /** Id of the block that currently has focus (synchronous, unlike focusedId state). */
+  const focusedRef = useRef<string | null>(null);
   const blocksRef = useRef(blocks);
   blocksRef.current = blocks;
 
@@ -80,9 +82,16 @@ export const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(funct
     if (!input) return;
     pendingFocus.current = null;
     input.focus();
-    // setSelection exists on RN's TextInput instance; guard for platforms that lack it.
-    (input as unknown as { setSelection?: (s: number, e: number) => void }).setSelection?.(target.caret, target.caret);
+    // Native TextInput has setSelection; on web the ref is the DOM textarea, which has
+    // setSelectionRange instead. Without it the browser caret jumps to the end after a merge.
+    const handle = input as unknown as {
+      setSelection?: (s: number, e: number) => void;
+      setSelectionRange?: (s: number, e: number) => void;
+    };
+    if (handle.setSelection) handle.setSelection(target.caret, target.caret);
+    else handle.setSelectionRange?.(target.caret, target.caret);
     selections.current.set(target.id, target.caret);
+    selections.current.set(`${target.id}:end`, target.caret);
   });
 
   const apply = useCallback((result: EditResult) => {
@@ -226,14 +235,19 @@ export const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(funct
             }}
             onFocus={() => {
               lastFocused.current = index;
+              focusedRef.current = block.id;
               setFocusedId(block.id);
               onFocusChange?.(true);
             }}
             onBlur={() => {
               // Delayed so a tap on the slash menu (which blurs the input on native) lands
-              // before the menu unmounts.
+              // before the menu unmounts. Only clear focus if no block took it in the
+              // meantime (Enter/merge/arrows move focus to another block, or back here
+              // after a slash choice) — otherwise the phone toolbar would vanish.
+              focusedRef.current = focusedRef.current === block.id ? null : focusedRef.current;
               setTimeout(() => {
-                setFocusedId((id) => (id === block.id ? null : id));
+                if (focusedRef.current !== null) return;
+                setFocusedId(null);
                 onFocusChange?.(false);
               }, 150);
             }}

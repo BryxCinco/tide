@@ -24,7 +24,7 @@ export function newBlockId(): string {
   return `b${Date.now().toString(36)}${idCounter.toString(36)}`;
 }
 
-function parseLine(line: string): Omit<Block, 'id'> {
+function parseLine(line: string): Omit<Block, 'id'> & { num?: number } {
   if (line === '---') return { type: 'divider', text: '' };
   if (line.startsWith('### ')) return { type: 'h3', text: line.slice(4) };
   if (line.startsWith('## ')) return { type: 'h2', text: line.slice(3) };
@@ -33,14 +33,41 @@ function parseLine(line: string): Omit<Block, 'id'> {
   if (line.startsWith('- [x] ') || line.startsWith('- [X] ')) return { type: 'todo', text: line.slice(6), checked: true };
   if (line.startsWith('- ')) return { type: 'bullet', text: line.slice(2) };
   if (line.startsWith('> ')) return { type: 'quote', text: line.slice(2) };
-  const numbered = /^\d+\. /.exec(line);
-  if (numbered) return { type: 'numbered', text: line.slice(numbered[0].length) };
+  const numbered = /^(\d+)\. /.exec(line);
+  if (numbered) return { type: 'numbered', text: line.slice(numbered[0].length), num: Number(numbered[1]) };
   return { type: 'text', text: line };
 }
 
-/** Never returns an empty array: an empty string gives one empty text block. */
+/**
+ * Line-by-line parse with context. A "N. " line only counts as a list item when it starts a
+ * run at 1 or continues one (N = previous + 1), so prose like "2024. What a year", or a list
+ * that started mid-way in a plain-text entry, stays exactly as written.
+ */
+function parseAll(md: string): Omit<Block, 'id'>[] {
+  const out: Omit<Block, 'id'>[] = [];
+  let prevNum: number | null = null;
+  for (const line of md.split(/\r?\n/)) {
+    const { num, ...parsed } = parseLine(line);
+    if (parsed.type === 'numbered' && num !== undefined && (num === 1 || (prevNum !== null && num === prevNum + 1))) {
+      prevNum = num;
+      out.push(parsed);
+      continue;
+    }
+    out.push(parsed.type === 'numbered' ? { type: 'text', text: line } : parsed);
+    prevNum = null;
+  }
+  return out;
+}
+
+/**
+ * Never returns an empty array: an empty string gives one empty text block. An entry that
+ * ends in a divider gets an empty text block after it, so there is always somewhere to type
+ * (serializeBlocks drops it again).
+ */
 export function parseBlocks(md: string): Block[] {
-  return md.split(/\r?\n/).map((line) => ({ id: newBlockId(), ...parseLine(line) }));
+  const blocks: Block[] = parseAll(md).map((b) => ({ id: newBlockId(), ...b }));
+  if (blocks[blocks.length - 1].type === 'divider') blocks.push({ id: newBlockId(), type: 'text', text: '' });
+  return blocks;
 }
 
 const PREFIX: Record<Exclude<BlockType, 'numbered' | 'todo' | 'divider'>, string> = {
@@ -60,7 +87,10 @@ export function numberedIndex(blocks: Block[], index: number): number {
 }
 
 export function serializeBlocks(blocks: Block[]): string {
-  return blocks
+  // The empty block parseBlocks adds after a trailing divider is a typing affordance, not content.
+  const last = blocks[blocks.length - 1];
+  const helperAfterDivider = blocks.length > 1 && last.type === 'text' && last.text === '' && blocks[blocks.length - 2].type === 'divider';
+  return (helperAfterDivider ? blocks.slice(0, -1) : blocks)
     .map((block, i) => {
       if (block.type === 'divider') return '---';
       if (block.type === 'todo') return `- [${block.checked ? 'x' : ' '}] ${block.text}`;
@@ -72,16 +102,14 @@ export function serializeBlocks(blocks: Block[]): string {
 
 /** Markers stripped, dividers and blank lines dropped: for cards, search and word counts. */
 export function toPlainPreview(md: string): string {
-  return md
-    .split(/\r?\n/)
-    .map(parseLine)
+  return parseAll(md)
     .filter((b) => b.type !== 'divider' && b.text.trim() !== '')
     .map((b) => b.text.trim())
     .join(' ');
 }
 
 export function todoProgress(md: string): { done: number; total: number } {
-  const todos = md.split(/\r?\n/).map(parseLine).filter((b) => b.type === 'todo');
+  const todos = parseAll(md).filter((b) => b.type === 'todo');
   return { done: todos.filter((b) => b.checked).length, total: todos.length };
 }
 
