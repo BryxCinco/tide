@@ -3,6 +3,7 @@ const { requireAuth } = require('../middleware/auth');
 const { getProductivitySummary, getTimeSeries, getHeatmap, getActivityBreakdown, getQuestStats } = require('../lib/insightsService');
 
 const { insightsLimiter } = require('../lib/rateLimits');
+const { parseTz, localKey } = require('../lib/localDay');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -15,9 +16,10 @@ function parseDays(raw, fallback, max = 366) {
   return Math.min(n, max);
 }
 
-function parseEndKey(raw) {
+// Defaults to the user's local today (tz = minutes east of UTC, sent by the client).
+function parseEndKey(raw, tz = 0) {
   if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-  return new Date().toISOString().slice(0, 10);
+  return localKey(new Date().toISOString(), tz);
 }
 
 // GET /api/insights/summary?days=N&end=YYYY-MM-DD — Productivity Score, Weekly Summary,
@@ -25,8 +27,9 @@ function parseEndKey(raw) {
 router.get('/summary', async (req, res) => {
   try {
     const days = parseDays(req.query.days, 7);
-    const end = parseEndKey(req.query.end);
-    res.json(await getProductivitySummary(req.user.id, days, end));
+    const tz = parseTz(req.query.tz);
+    const end = parseEndKey(req.query.end, tz);
+    res.json(await getProductivitySummary(req.user.id, days, end, tz));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -37,8 +40,9 @@ router.get('/summary', async (req, res) => {
 router.get('/range', async (req, res) => {
   try {
     const days = parseDays(req.query.days, 7);
-    const end = parseEndKey(req.query.end);
-    res.json(await getTimeSeries(req.user.id, days, end));
+    const tz = parseTz(req.query.tz);
+    const end = parseEndKey(req.query.end, tz);
+    res.json(await getTimeSeries(req.user.id, days, end, tz));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -49,8 +53,9 @@ router.get('/range', async (req, res) => {
 router.get('/heatmap', async (req, res) => {
   try {
     const days = parseDays(req.query.days, 30);
-    const end = parseEndKey(req.query.end);
-    res.json({ heatmap: await getHeatmap(req.user.id, days, end) });
+    const tz = parseTz(req.query.tz);
+    const end = parseEndKey(req.query.end, tz);
+    res.json({ heatmap: await getHeatmap(req.user.id, days, end, tz) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -60,8 +65,9 @@ router.get('/heatmap', async (req, res) => {
 router.get('/activity-breakdown', async (req, res) => {
   try {
     const days = parseDays(req.query.days, 7);
-    const end = parseEndKey(req.query.end);
-    res.json({ activityBreakdown: await getActivityBreakdown(req.user.id, days, end) });
+    const tz = parseTz(req.query.tz);
+    const end = parseEndKey(req.query.end, tz);
+    res.json({ activityBreakdown: await getActivityBreakdown(req.user.id, days, end, tz) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -71,8 +77,9 @@ router.get('/activity-breakdown', async (req, res) => {
 router.get('/quests', async (req, res) => {
   try {
     const days = parseDays(req.query.days, 7);
-    const end = parseEndKey(req.query.end);
-    res.json({ quests: await getQuestStats(req.user.id, days, end) });
+    const tz = parseTz(req.query.tz);
+    const end = parseEndKey(req.query.end, tz);
+    res.json({ quests: await getQuestStats(req.user.id, days, end, tz) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

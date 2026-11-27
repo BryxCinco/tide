@@ -13,30 +13,10 @@ function mondayFirstIndex(date) {
   return (date.getUTCDay() + 6) % 7;
 }
 
-// Buckets every timestamp by the UTC date portion of its stored ISO string (ended_at.slice(0,10))
-// rather than converting to any particular user's local timezone — the same simplification
-// ragService.js's retrieveStats already makes for mostProductiveDay/topActivity. Not
-// introducing a new inconsistency, just extending an existing, already-accepted one.
-function dateKeysInRange(days, endKey) {
-  const end = new Date(`${endKey}T00:00:00.000Z`);
-  return Array.from({ length: days }, (_, i) => {
-    const d = new Date(end);
-    d.setUTCDate(d.getUTCDate() - (days - 1 - i));
-    return d.toISOString().slice(0, 10);
-  });
-}
-
-function windowBounds(days, endKey) {
-  const keys = dateKeysInRange(days, endKey);
-  return { startIso: `${keys[0]}T00:00:00.000Z`, endIso: `${keys[keys.length - 1]}T23:59:59.999Z`, keys };
-}
-
-function previousWindow(days, endKey) {
-  const { startIso } = windowBounds(days, endKey);
-  const prevEnd = new Date(startIso);
-  prevEnd.setUTCDate(prevEnd.getUTCDate() - 1);
-  return windowBounds(days, prevEnd.toISOString().slice(0, 10));
-}
+// Every timestamp is bucketed by the user's LOCAL day (`tz` = minutes east of UTC, sent by
+// the client) — see localDay.js. Date keys themselves (quest `date`, task `due_date`) are
+// already local and are compared as-is. `tz` defaults to 0 (UTC) everywhere.
+const { localKey, windowBounds, previousWindow } = require('./localDay');
 
 function formatHoursMinutes(totalSeconds) {
   const totalMinutes = Math.round(totalSeconds / 60);
@@ -53,17 +33,18 @@ function trendPercentOf(current, previous) {
 /** Completed tasks (by completed_at's date) and completed quests (by the quest's own day)
  * per date key in the window — the "things accomplished" side of a day, alongside tracked
  * time. */
-async function getAccomplishmentsByDate(userId, keys) {
+async function getAccomplishmentsByDate(userId, keys, tz = 0) {
   const startKey = keys[0];
   const endKey = keys[keys.length - 1];
+  const { startIso, endIso } = windowBounds(keys.length, endKey, tz);
   const [tasksRes, questsRes] = await Promise.all([
     supabaseAdmin
       .from('tasks')
       .select('completed_at')
       .eq('user_id', userId)
       .eq('status', 'done')
-      .gte('completed_at', `${startKey}T00:00:00.000Z`)
-      .lte('completed_at', `${endKey}T23:59:59.999Z`),
+      .gte('completed_at', startIso)
+      .lte('completed_at', endIso),
     supabaseAdmin.from('quests').select('date').eq('user_id', userId).eq('is_completed', true).gte('date', startKey).lte('date', endKey),
   ]);
   if (tasksRes.error) throw new Error(tasksRes.error.message);
@@ -73,7 +54,7 @@ async function getAccomplishmentsByDate(userId, keys) {
   const quests = {};
   for (const row of tasksRes.data || []) {
     if (!row.completed_at) continue;
-    const key = row.completed_at.slice(0, 10);
+    const key = localKey(row.completed_at, tz);
     tasks[key] = (tasks[key] || 0) + 1;
   }
   for (const row of questsRes.data || []) {
@@ -84,8 +65,8 @@ async function getAccomplishmentsByDate(userId, keys) {
 
 /** { time: DayTimeEntry[], mood: MoodTrendPoint[] } — one entry per day in [end-days+1, end],
  * zero-filled/null-filled rather than sparse, so chart components never see a short array. */
-async function getTimeSeries(userId, days, endKey) {
-  const { startIso, endIso, keys } = windowBounds(days, endKey);
+async function getTimeSeries(userId, days, endKey, tz = 0) {
+  const { startIso, endIso, keys } = windowBounds(days, endKey, tz);
 
   const [sessionsRes, journalRes] = await Promise.all([
     supabaseAdmin.from('time_logs').select('duration_seconds, ended_at').eq('user_id', userId).gte('ended_at', startIso).lte('ended_at', endIso),
@@ -103,7 +84,7 @@ async function getTimeSeries(userId, days, endKey) {
   const secondsByDate = {};
   for (const row of sessionsRes.data || []) {
     if (!row.ended_at) continue;
-    const key = row.ended_at.slice(0, 10);
+    const key = localKey(row.ended_at, tz);
     secondsByDate[key] = (secondsByDate[key] || 0) + (row.duration_seconds || 0);
   }
 
@@ -112,7 +93,7 @@ async function getTimeSeries(userId, days, endKey) {
   const moodByDate = {};
   for (const row of journalRes.data || []) {
     if (!row.mood || !row.created_at) continue;
-    moodByDate[row.created_at.slice(0, 10)] = row.mood;
+    moodByDate[localKey(row.created_at, tz)] = row.mood;
   }
 
   const time = keys.map((key) => {
@@ -141,9 +122,9 @@ async function getTimeSeries(userId, days, endKey) {
 /** HeatmapDay[] — a day's level is the higher of its tracked-time level and its
  * accomplishments level (tasks + quests completed), so a day spent finishing tasks and
  * quests without the timer still shows as active. */
-async function getHeatmap(userId, days, endKey) {
-  const { keys } = windowBounds(days, endKey);
-  const [{ time }, done] = await Promise.all([getTimeSeries(userId, days, endKey), getAccomplishmentsByDate(userId, keys)]);
+async function getHeatmap(userId, days, endKey, tz = 0) {
+  const { keys } = windowBounds(days, endKey, tz);
+  const [{ time }, done] = await Promise.all([getTimeSeries(userId, days, endKey, tz), getAccomplishmentsByDate(userId, keys, tz)]);
   return time.map(({ date, seconds }) => {
     const hours = seconds / 3600;
     const timeLevel = hours >= 5 ? 4 : hours >= 3.5 ? 3 : hours >= 2 ? 2 : hours > 0 ? 1 : 0;
@@ -160,7 +141,7 @@ const QUEST_CATEGORY_ORDER = ['focus', 'tasks', 'journal', 'wellness', 'growth',
 /** Tide's Quests over the window: totals, completion rate, XP earned, perfect days, and
  * per-day, per-category and per-tier breakdowns. Quests are keyed by their own `date` (the
  * user's local day they were issued for). Removed (inactive) quests are left out. */
-async function getQuestStats(userId, days, endKey) {
+async function getQuestStats(userId, days, endKey, tz = 0) { // eslint-disable-line no-unused-vars -- quests carry their own local `date`
   const { keys } = windowBounds(days, endKey);
   const { data, error } = await supabaseAdmin
     .from('quests')
@@ -219,9 +200,9 @@ async function getQuestStats(userId, days, endKey) {
 /** ActivityBreakdownSlice[], sorted busiest-first. trendPercent compares against the
  * immediately preceding equal-length window. recentSessions (up to 5, newest first) backs
  * ActivityHistory's expandable row — previously a seeded-hash synthetic generator. */
-async function getActivityBreakdown(userId, days, endKey) {
-  const { startIso, endIso } = windowBounds(days, endKey);
-  const { startIso: prevStartIso, endIso: prevEndIso } = previousWindow(days, endKey);
+async function getActivityBreakdown(userId, days, endKey, tz = 0) {
+  const { startIso, endIso } = windowBounds(days, endKey, tz);
+  const { startIso: prevStartIso, endIso: prevEndIso } = previousWindow(days, endKey, tz);
 
   const [curRes, prevRes] = await Promise.all([
     supabaseAdmin
@@ -240,7 +221,7 @@ async function getActivityBreakdown(userId, days, endKey) {
     const name = row.activity_name || 'Other';
     const entry = byActivity.get(name) || { id: row.activity_id || name, seconds: 0, lastSessionDate: null, sessions: [] };
     entry.seconds += row.duration_seconds || 0;
-    const sessionDate = (row.ended_at || '').slice(0, 10);
+    const sessionDate = row.ended_at ? localKey(row.ended_at, tz) : '';
     if (sessionDate) {
       if (!entry.lastSessionDate || sessionDate > entry.lastSessionDate) entry.lastSessionDate = sessionDate;
       entry.sessions.push({ date: sessionDate, seconds: row.duration_seconds || 0 });
@@ -274,9 +255,9 @@ async function getActivityBreakdown(userId, days, endKey) {
  * (focusTime*0.4 + consistency*0.3 + taskCompletion*0.2) — that component adds the quest
  * bonus itself from real-time data, so it isn't duplicated here.
  */
-async function getProductivitySummary(userId, days, endKey) {
-  const { startIso, endIso, keys } = windowBounds(days, endKey);
-  const { startIso: prevStartIso, endIso: prevEndIso } = previousWindow(days, endKey);
+async function getProductivitySummary(userId, days, endKey, tz = 0) {
+  const { startIso, endIso, keys } = windowBounds(days, endKey, tz);
+  const { startIso: prevStartIso, endIso: prevEndIso } = previousWindow(days, endKey, tz);
 
   const [sessionsRes, prevSessionsRes, tasksRes, journalRes, questsRes, done] = await Promise.all([
     supabaseAdmin.from('time_logs').select('duration_seconds, ended_at, activity_name').eq('user_id', userId).gte('ended_at', startIso).lte('ended_at', endIso),
@@ -286,7 +267,7 @@ async function getProductivitySummary(userId, days, endKey) {
     supabaseAdmin.from('tasks').select('status, due_date').eq('user_id', userId).gte('due_date', keys[0]).lte('due_date', keys[keys.length - 1]),
     supabaseAdmin.from('journal_entries').select('mood').eq('user_id', userId).gte('created_at', startIso).lte('created_at', endIso),
     supabaseAdmin.from('quests').select('is_completed, xp').eq('user_id', userId).eq('is_active', true).gte('date', keys[0]).lte('date', keys[keys.length - 1]),
-    getAccomplishmentsByDate(userId, keys),
+    getAccomplishmentsByDate(userId, keys, tz),
   ]);
   if (sessionsRes.error) throw new Error(sessionsRes.error.message);
   if (prevSessionsRes.error) throw new Error(prevSessionsRes.error.message);
@@ -299,7 +280,7 @@ async function getProductivitySummary(userId, days, endKey) {
   const prevTotalSeconds = (prevSessionsRes.data || []).reduce((sum, r) => sum + (r.duration_seconds || 0), 0);
 
   // An active day is any day with tracked time, a completed task, or a completed quest.
-  const activeDays = new Set(sessions.filter((r) => r.ended_at).map((r) => r.ended_at.slice(0, 10)));
+  const activeDays = new Set(sessions.filter((r) => r.ended_at).map((r) => localKey(r.ended_at, tz)));
   for (const key of keys) {
     if (done.tasks[key] || done.quests[key]) activeDays.add(key);
   }
@@ -312,7 +293,7 @@ async function getProductivitySummary(userId, days, endKey) {
   const secondsByActivity = {};
   for (const row of sessions) {
     if (!row.ended_at) continue;
-    const idx = mondayFirstIndex(new Date(`${row.ended_at.slice(0, 10)}T00:00:00.000Z`));
+    const idx = mondayFirstIndex(new Date(`${localKey(row.ended_at, tz)}T00:00:00.000Z`));
     secondsByWeekday[idx] += row.duration_seconds || 0;
     const name = row.activity_name || 'Other';
     secondsByActivity[name] = (secondsByActivity[name] || 0) + (row.duration_seconds || 0);
