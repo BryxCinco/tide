@@ -4,12 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { QuestCard } from '@/components/dashboard';
 import { AppLayout, MobileMenuButton, MobileTabBar } from '@/components/layout';
-import { TaskCard, TaskFilters, TaskFormModal, TaskInfoModal } from '@/components/tasks';
+import { TaskBoard, TaskFilters, TaskPeek, TaskTable } from '@/components/tasks';
 import { PRIORITY_META } from '@/components/tasks/TaskCard';
-import { BackButton, BENTO_INK_TEXT, BentoRing, BentoStat, BentoTile, Button, EmptyState, ErrorState, FadeInView, ResponsiveContainer, SkeletonRow, Text } from '@/components/ui';
+import { BackButton, BENTO_INK_TEXT, BentoRing, BentoStat, BentoTile, Button, EmptyState, ErrorState, FadeInView, ResponsiveContainer, SkeletonRow, Text, ViewToggle } from '@/components/ui';
 import { useResponsive } from '@/hooks/useResponsive';
-import { useActivityStore } from '@/store/activityStore';
-import { getVisibleTasks, isTaskDueToday, isTaskOverdue, useTaskStore } from '@/store/taskStore';
+import { getVisibleTasks, isTaskDueToday, isTaskOverdue, useTaskStore, type TaskView } from '@/store/taskStore';
 import type { Task, TaskPriority } from '@/types/task';
 import { toDateKey } from '@/utils/formatDate';
 import { ocean } from '@/utils/theme';
@@ -24,16 +23,14 @@ export default function TasksScreen() {
   const clearError = useTaskStore((s) => s.clearError);
   const setFilter = useTaskStore((s) => s.setFilter);
   const setSort = useTaskStore((s) => s.setSort);
-  const toggleTaskStatus = useTaskStore((s) => s.toggleTaskStatus);
-  const deleteTask = useTaskStore((s) => s.deleteTask);
-
-  const activities = useActivityStore((s) => s.activities);
+  const view = useTaskStore((s) => s.view);
+  const setView = useTaskStore((s) => s.setView);
   const { isPhone } = useResponsive();
 
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | undefined>(undefined);
-  const [infoTask, setInfoTask] = useState<Task | undefined>(undefined);
-  const [infoVisible, setInfoVisible] = useState(false);
+  const [peekVisible, setPeekVisible] = useState(false);
+  const [peekTaskId, setPeekTaskId] = useState<string | undefined>(undefined);
+  // Looked up live so the peek reflects edits made elsewhere (e.g. a status move).
+  const peekTask = tasks.find((t) => t.id === peekTaskId);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
@@ -60,18 +57,13 @@ export default function TasksScreen() {
   }));
 
   const openCreate = () => {
-    setEditingTask(undefined);
-    setModalVisible(true);
+    setPeekTaskId(undefined);
+    setPeekVisible(true);
   };
 
-  const openEdit = (task: Task) => {
-    setEditingTask(task);
-    setModalVisible(true);
-  };
-
-  const openInfo = (task: Task) => {
-    setInfoTask(task);
-    setInfoVisible(true);
+  const openPeek = (task: Task) => {
+    setPeekTaskId(task.id);
+    setPeekVisible(true);
   };
 
   return (
@@ -156,7 +148,17 @@ export default function TasksScreen() {
             </FadeInView>
 
             <BentoTile tone="glass" dense index={6}>
-              <TaskFilters filter={filter} sort={sort} onFilterChange={setFilter} onSortChange={setSort} />
+              <View className="gap-3">
+                <ViewToggle<TaskView>
+                  value={view}
+                  onChange={setView}
+                  options={[
+                    { value: 'board', label: 'Board', icon: 'Columns3' },
+                    { value: 'table', label: 'Table', icon: 'Table' },
+                  ]}
+                />
+                <TaskFilters filter={filter} sort={sort} onFilterChange={setFilter} onSortChange={setSort} />
+              </View>
             </BentoTile>
 
             {error && tasks.length === 0 ? (
@@ -173,47 +175,15 @@ export default function TasksScreen() {
                   <SkeletonRow key={i} />
                 ))}
               </View>
-            ) : visibleTasks.length === 0 ? (
-              <EmptyState
-                icon="ListChecks"
-                title="No tasks yet"
-                description="Create your first task!"
-                actionLabel="New Task"
-                onAction={openCreate}
-              />
+            ) : view === 'board' ? (
+              <TaskBoard tasks={visibleTasks} onOpen={openPeek} />
             ) : (
-              <View className="flex-row flex-wrap gap-2.5">
-                {visibleTasks.map((task, index) => (
-                  <FadeInView key={task.id} index={index} className="basis-full md:basis-[45%] md:grow">
-                    <TaskCard
-                      task={task}
-                      activityName={activities.find((a) => a.id === task.linkedActivityId)?.name}
-                      onToggle={() => toggleTaskStatus(task.id)}
-                      onView={() => openInfo(task)}
-                      onEdit={() => openEdit(task)}
-                      onDelete={() => deleteTask(task.id)}
-                    />
-                  </FadeInView>
-                ))}
-              </View>
+              <TaskTable tasks={visibleTasks} onOpen={openPeek} />
             )}
           </ResponsiveContainer>
         </ScrollView>
 
-        <TaskFormModal visible={modalVisible} onClose={() => setModalVisible(false)} task={editingTask} />
-
-        <TaskInfoModal
-          visible={infoVisible}
-          onClose={() => setInfoVisible(false)}
-          task={infoTask}
-          activityName={activities.find((a) => a.id === infoTask?.linkedActivityId)?.name}
-          onToggle={toggleTaskStatus}
-          onDelete={deleteTask}
-          onEdit={(task) => {
-            setInfoVisible(false);
-            openEdit(task);
-          }}
-        />
+        <TaskPeek visible={peekVisible} task={peekTask} onClose={() => setPeekVisible(false)} />
       </SafeAreaView>
 
       <MobileTabBar />

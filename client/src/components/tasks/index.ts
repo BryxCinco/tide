@@ -7,3 +7,4 @@ export * from './InlineTaskInput';
 export * from './Popover';
 export * from './TaskBoard';
 export * from './TaskTable';
+export * from './TaskPeek';

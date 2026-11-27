@@ -54,6 +54,7 @@ export function InlineTaskInput({ onSubmit, placeholder = 'Type a task, press En
         placeholderTextColor={theme.text.disabled}
         onSubmitEditing={submit}
         submitBehavior="submit"
+        blurOnSubmit={false}
         returnKeyType="done"
         onKeyPress={(e) => {
           if (Platform.OS === 'web' && e.nativeEvent.key === 'Escape') {

@@ -15,6 +15,17 @@ import { formatDateKeyShort, toDateKey } from '../../utils/formatDate';
 import { shadows } from '../../utils/theme';
 import { Button, CalendarPicker, ConfirmationModal, Icon, Input, Modal, Text, type IconName } from '../ui';
 
+export interface TaskFormProps {
+  /** Present when editing; absent when creating a new task. */
+  task?: Task;
+  /** Called with the created or updated task after a successful save. */
+  onSaved: (task: Task) => void;
+  /** Called after a delete. */
+  onClose: () => void;
+  /** Re-seeds the fields from `task` whenever this turns true (e.g. a modal opening). */
+  active?: boolean;
+}
+
 export interface TaskFormModalProps {
   visible: boolean;
   onClose: () => void;
@@ -70,7 +81,7 @@ function PillOption<T extends string>({
  * already exists. Required, like Title: no default is pre-selected, so picking one is a
  * deliberate choice rather than something to silently default past.
  */
-export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
+export function TaskForm({ task, onSaved, onClose, active = true }: TaskFormProps) {
   const addTask = useTaskStore((s) => s.addTask);
   const updateTask = useTaskStore((s) => s.updateTask);
   const deleteTask = useTaskStore((s) => s.deleteTask);
@@ -91,7 +102,6 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [activityError, setActivityError] = useState<string | null>(null);
   const [calendarVisible, setCalendarVisible] = useState(false);
-  const [createdTask, setCreatedTask] = useState<Task | null>(null);
   const todayKey = useMemo(() => toDateKey(new Date()), []);
 
   const isEditing = Boolean(task);
@@ -111,11 +121,10 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
   };
 
   useEffect(() => {
-    if (!visible) return;
+    if (!active) return;
     resetForm();
-    setCreatedTask(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, task]);
+  }, [active, task]);
 
   const addTagFromDraft = () => {
     const trimmed = tagDraft.trim();
@@ -151,9 +160,9 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
 
     if (task) {
       updateTask(task.id, base);
-      onClose();
+      onSaved(task);
     } else {
-      setCreatedTask(addTask(base));
+      onSaved(addTask(base));
     }
   };
 
@@ -166,20 +175,7 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
   };
 
   return (
-    <Modal
-      visible={visible}
-      onClose={onClose}
-      title={isEditing ? 'Edit Task' : 'New Task'}
-      icon="CheckSquare"
-      size="md"
-      footer={
-        <View className="gap-2">
-          <Button title="Save" variant="primary" size="lg" fullWidth onPress={handleSave} />
-          {isEditing && <Button title="Delete Task" variant="danger" size="md" fullWidth onPress={handleDelete} />}
-        </View>
-      }
-    >
-      <View className="gap-6">
+    <View className="gap-6">
           <View className="gap-2">
             <Text variant="label" color="muted">
               Activity Type
@@ -268,7 +264,7 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
               <Text variant="body" color={dueDate ? 'primary' : 'muted'} className="flex-1 normal-case tracking-normal">
                 {dueDate ? formatDateKeyShort(dueDate) : 'Select a date'}
               </Text>
-              {dueDate && (
+              {!!dueDate && (
                 <Pressable onPress={() => setDueDate('')} hitSlop={8} className="h-6 w-6 items-center justify-center rounded-full hover:bg-elevated">
                   <Icon name="X" size={14} color={themeColors.text.muted} />
                 </Pressable>
@@ -318,8 +314,6 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
             </View>
           </View>
 
-      </View>
-
       {/* Nested modal — RNModal portals independently, so stacking this on top of the
           already-open task form modal is safe (last-mounted renders on top). Past dates are
           disabled (minDate=today) EXCEPT the field's own already-set value, so editing a task
@@ -335,7 +329,7 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
               setCalendarVisible(false);
             }}
           />
-          {dueDate && (
+          {!!dueDate && (
             <Button
               title="Clear date"
               variant="ghost"
@@ -348,6 +342,33 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
           )}
         </View>
       </Modal>
+
+      <View className="gap-2">
+        <Button title={isEditing ? 'Save changes' : 'Create task'} variant="primary" size="lg" fullWidth onPress={handleSave} />
+        {isEditing && <Button title="Delete Task" variant="danger" size="md" fullWidth onPress={handleDelete} />}
+      </View>
+    </View>
+  );
+}
+
+/** The task form in a centered modal — still used by the Dashboard's quick add. */
+export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
+  const [createdTask, setCreatedTask] = useState<Task | null>(null);
+  const [resetKey, setResetKey] = useState(0);
+
+  useEffect(() => {
+    if (visible) setCreatedTask(null);
+  }, [visible]);
+
+  return (
+    <Modal visible={visible} onClose={onClose} title={task ? 'Edit Task' : 'New Task'} icon="CheckSquare" size="md">
+      <TaskForm
+        key={resetKey}
+        task={task}
+        active={visible}
+        onClose={onClose}
+        onSaved={(saved) => (task ? onClose() : setCreatedTask(saved))}
+      />
 
       {/* Nested like the CalendarPicker modal above — the outer form modal deliberately
           stays open underneath so "Create Another" can reset straight back into it without
@@ -371,7 +392,7 @@ export function TaskFormModal({ visible, onClose, task }: TaskFormModalProps) {
           label: 'Create Another',
           onPress: () => {
             setCreatedTask(null);
-            resetForm();
+            setResetKey((k) => k + 1);
           },
         }}
         tertiaryAction={{ label: 'Done', onPress: onClose }}

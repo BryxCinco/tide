@@ -1,7 +1,9 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { Modal as RNModal, Pressable as RNPressable, View, useWindowDimensions } from 'react-native';
+import { Modal as RNModal, Platform, Pressable as RNPressable, View, useWindowDimensions } from 'react-native';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { useThemeStore } from '../../store/themeStore';
+import { darkVars, lightVars } from '../../utils/themeVars';
 import { Icon, Text } from '../ui';
 import { Pressable } from '../ui/SoundPressable';
 
@@ -21,16 +23,28 @@ export interface PopoverProps {
  */
 export function Popover({ trigger, children, width = 200, disabled, accessibilityLabel }: PopoverProps) {
   const anchor = useRef<View>(null);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; left: number } | null>(null);
   const { width: winW, height: winH } = useWindowDimensions();
 
+  const theme = useThemeColors();
+  // RN Modal portals outside the app root, so the theme's CSS variables must be re-applied.
+  const isDark = useThemeStore((st) => st.theme === 'dark');
+
+  const place = (x: number, y: number, h: number) => {
+    const left = Math.max(8, Math.min(x, winW - width - 8));
+    // Open upwards (anchored by its bottom edge) when there isn't room below.
+    setPos(y + h + 280 > winH ? { bottom: winH - y + 4, left } : { top: y + h + 4, left });
+  };
+
   const open = () => {
-    anchor.current?.measureInWindow((x, y, _w, h) => {
-      const left = Math.max(8, Math.min(x, winW - width - 8));
-      // Open upwards when there isn't room below.
-      const top = y + h + 300 > winH ? Math.max(8, y - 300) : y + h + 4;
-      setPos({ top, left });
-    });
+    // On web, the viewport rect is exact; measureInWindow can be off when the page scrolls.
+    const node = anchor.current as unknown as { getBoundingClientRect?: () => DOMRect } | null;
+    if (Platform.OS === 'web' && node?.getBoundingClientRect) {
+      const r = node.getBoundingClientRect();
+      place(r.left, r.top, r.height);
+      return;
+    }
+    anchor.current?.measureInWindow((x, y, _w, h) => place(x, y, h));
   };
   const close = () => setPos(null);
 
@@ -48,11 +62,11 @@ export function Popover({ trigger, children, width = 200, disabled, accessibilit
         </Pressable>
       </View>
       <RNModal visible={pos !== null} transparent animationType="fade" onRequestClose={close}>
-        <RNPressable style={{ flex: 1 }} onPress={close} accessibilityLabel="Close menu">
+        <RNPressable style={[{ flex: 1 }, isDark ? darkVars : lightVars]} onPress={close} accessibilityLabel="Close menu">
           {pos && (
             <RNPressable
               onPress={(e) => e.stopPropagation()}
-              style={{ position: 'absolute', top: pos.top, left: pos.left, width, shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 10 }}
+              style={{ position: 'absolute', top: pos.top, bottom: pos.bottom, left: pos.left, width, backgroundColor: theme.background.elevated, borderColor: theme.border.default, shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 10 }}
               className="rounded-2xl border border-default bg-elevated py-1.5"
             >
               {children(close)}
